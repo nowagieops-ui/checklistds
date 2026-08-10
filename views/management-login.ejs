@@ -7,10 +7,18 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <div class="loader-overlay" id="loaderOverlay">
+    <div>
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Verifying your access... standby.</div>
+    </div>
+  </div>
+
   <div class="container">
     <div class="logo">
       <div class="logo-text">DASHSPID</div>
       <div class="logo-sub">Management Access</div>
+      <div class="logo-highlight">Secure management sign-in with the same polished experience.</div>
     </div>
 
     <div class="card">
@@ -21,7 +29,7 @@
         <div class="error"><%= error %></div>
       <% } %>
 
-      <form method="POST" action="/management-login">
+      <form method="POST" action="/management-login" id="managementLoginForm">
         <label for="pin">Management PIN</label>
         <input
           type="password"
@@ -38,5 +46,11 @@
 
     <a href="/" class="logout-link">← Back to field login</a>
   </div>
+
+  <script>
+    document.getElementById('managementLoginForm').addEventListener('submit', function() {
+      document.getElementById('loaderOverlay').classList.add('active');
+    });
+  </script>
 </body>
 </html>
