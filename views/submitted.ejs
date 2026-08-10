@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checked In — Dashspid</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-text">DASHSPID</div>
+      <div class="logo-sub">Morning Checklist</div>
+    </div>
+
+    <div class="card">
+      <div class="success-icon">✅</div>
+      <div class="success-title">You're checked in.</div>
+      <div class="success-sub">Go close some accounts, <%= name %>. Have a strong day.</div>
+
+      <% if (submission) { %>
+        <div class="detail-row">
+          <span class="detail-label">Check-in time</span>
+          <span class="detail-value"><%= time %></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Zone today</span>
+          <span class="detail-value"><%= submission.zone || '—' %></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Targets</span>
+          <span class="detail-value"><%= submission.targets || '—' %></span>
+        </div>
+      <% } %>
+
+      <div style="margin-top: 24px; padding: 16px; background: #FFF4EE; border-radius: 10px;">
+        <div style="font-size: 13px; font-weight: 700; color: #FF5C00; margin-bottom: 6px;">Remember today's rules</div>
+        <div style="font-size: 13px; color: #374151; line-height: 1.6;">
+          Every signup goes through your referral link.<br>
+          Set accounts up live — don't just send links.<br>
+          Daily log updated by 5:30pm tonight.
+        </div>
+      </div>
+    </div>
+
+    <a href="/logout" class="logout-link">Log out</a>
+  </div>
+</body>
+</html>

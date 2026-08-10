@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Management — Dashspid</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-text">DASHSPID</div>
+      <div class="logo-sub">Management Access</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Management Dashboard</div>
+      <div class="card-sub">Enter your management PIN to view today's check-in status.</div>
+
+      <% if (error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/management-login">
+        <label for="pin">Management PIN</label>
+        <input
+          type="password"
+          name="pin"
+          id="pin"
+          placeholder="Enter PIN"
+          required
+          autocomplete="off"
+          inputmode="numeric"
+        >
+        <button type="submit" class="btn">Access Dashboard →</button>
+      </form>
+    </div>
+
+    <a href="/" class="logout-link">← Back to field login</a>
+  </div>
+</body>
+</html>

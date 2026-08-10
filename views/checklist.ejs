@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morning Checklist — Dashspid</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-text">DASHSPID</div>
+      <div class="logo-sub"><%= date %></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Morning Checklist</div>
+      <div class="card-sub">Hi <%= name %>. Complete every item before heading into the field.</div>
+
+      <form method="POST" action="/submit" id="checklistForm">
+
+        <!-- SECTION 1: YOU -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Before You Leave</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_shirt" value="1" required>
+            <span class="check-item-text">
+              Dashspid branded shirt is on
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_refcard" value="1" required>
+            <span class="check-item-text">
+              Quick Reference Card is with me
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_phone" value="1" required>
+            <span class="check-item-text">
+              Phone is charged (minimum 80%)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_data" value="1" required>
+            <span class="check-item-text">
+              Phone data / internet is working
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- SECTION 2: PLATFORM -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Platform & Tools</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_link" value="1" required>
+            <span class="check-item-text">
+              My Dashspid referral link is saved and ready to share
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_demo" value="1" required>
+            <span class="check-item-text">
+              Dashspid demo account is working — I can show the platform live
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_pitchtemplates" value="1">
+            <span class="check-item-text">
+              WhatsApp pitch templates are saved and ready
+            </span>
+          </label>
+        </div>
+
+        <!-- SECTION 3: TODAY'S PLAN -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Today's Plan</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_zone" value="1" required>
+            <span class="check-item-text">
+              I know my zone assignment for today
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_followups" value="1" required>
+            <span class="check-item-text">
+              I have reviewed yesterday's warm leads and planned my follow-ups
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_target" value="1" required>
+            <span class="check-item-text">
+              I have a daily account creation target set for today (minimum 8)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_route" value="1">
+            <span class="check-item-text">
+              My field route for the morning is planned (first 3 locations identified)
+            </span>
+          </label>
+        </div>
+
+        <!-- SECTION 4: MINDSET -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Ready</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_pitch" value="1" required>
+            <span class="check-item-text">
+              I know my opening line for riders and for logistics companies
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_objections" value="1" required>
+            <span class="check-item-text">
+              I am ready to handle the top 5 objections
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_close" value="1" required>
+            <span class="check-item-text">
+              I am going to set up accounts live on the spot — not just send links
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- TODAY'S DETAILS -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Today's Details</div>
+
+          <label for="zone">Zone / Area today <span style="color:var(--red)">*</span></label>
+          <input type="text" name="zone" id="zone" placeholder="e.g. Ikeja — Allen Avenue, Computer Village" required>
+
+          <label for="targets">Top 3 target locations today <span style="color:var(--red)">*</span></label>
+          <input type="text" name="targets" id="targets" placeholder="e.g. ABC Logistics, 3 rider hubs near Agidingbi" required>
+
+          <label for="notes">Anything else to flag before you go?</label>
+          <textarea name="notes" id="notes" placeholder="Any leads to follow up from yesterday, challenges expected, etc."></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">
+          Submit & Head Into the Field →
+        </button>
+
+      </form>
+    </div>
+
+    <a href="/logout" class="logout-link">Not you? Log out</a>
+  </div>
+
+  <script>
+    // Prevent double submit
+    document.getElementById('checklistForm').addEventListener('submit', function() {
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Submitting...';
+    });
+  </script>
+</body>
+</html>

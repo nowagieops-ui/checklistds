@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashspid — Morning Checklist</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-text">DASHSPID</div>
+      <div class="logo-sub">Morning Field Checklist</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Good morning 👋</div>
+      <div class="card-sub">Select your name and enter your PIN to begin today's checklist.</div>
+
+      <% if (error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/login">
+        <label for="marketer_id">Your Name</label>
+        <select name="marketer_id" id="marketer_id" required>
+          <option value="">— Select your name —</option>
+          <% marketers.forEach(m => { %>
+            <option value="<%= m.id %>"><%= m.name %></option>
+          <% }) %>
+        </select>
+
+        <label for="pin">Your PIN</label>
+        <input
+          type="password"
+          name="pin"
+          id="pin"
+          placeholder="Enter your 4-digit PIN"
+          maxlength="6"
+          required
+          inputmode="numeric"
+          autocomplete="off"
+        >
+
+        <button type="submit" class="btn">Continue →</button>
+      </form>
+    </div>
+
+    <a href="/management-login" class="logout-link">Management access →</a>
+  </div>
+</body>
+</html>
