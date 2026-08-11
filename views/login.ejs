@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#FF5C00">
   <title>Dashspid Ops — Morning Checklist</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
@@ -72,7 +72,7 @@
 
   <script>
     var MARKETERS = <%- JSON.stringify(marketers || []).replace(/</g, '\\u003c') %>;
-    var PALETTE = ['#6366f1', '#0891b2', '#059669', '#dc2626', '#d97706', '#7c3aed', '#db2777', '#ea580c'];
+    var PALETTE = ['#FF5C00', '#0891b2', '#059669', '#dc2626', '#d97706', '#7c3aed', '#db2777', '#ea580c'];
 
     function initials(name) {
       return (name || '').trim().split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase();

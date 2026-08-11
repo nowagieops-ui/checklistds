@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#FF5C00">
   <title>Field Dashboard — Dashspid Ops</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
@@ -15,7 +15,7 @@
     <div class="mgr-header-inner">
       <div class="app-header-badge">D</div>
       <div class="mgr-header-brand">Dashspid Ops</div>
-      <span class="badge badge-indigo" style="background:rgba(99,102,241,0.2);color:#a5b4fc;">Manager</span>
+      <span class="badge badge-orange" style="background:rgba(255,92,0,0.2);color:#ffb37a;">Manager</span>
       <div class="app-header-spacer"></div>
       <a href="/management-logout" class="btn btn-outline" style="width:auto;padding:8px 16px;font-size:13px;margin:0;color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">Log out</a>
     </div>
@@ -35,7 +35,7 @@
         <% var initials = (s.name || '').trim().split(/\s+/).map(w => w[0] || '').join('').slice(0,2).toUpperCase(); %>
         <div class="status-card <%= s.submitted ? (s.isLate ? 'submitted-late' : 'submitted-on-time') : 'not-submitted' %>">
           <div class="status-head">
-            <div class="avatar" style="width:40px;height:40px;font-size:14px;background:rgba(99,102,241,0.14);color:var(--indigo);border:1.5px solid rgba(99,102,241,0.3);"><%= initials %></div>
+            <div class="avatar" style="width:40px;height:40px;font-size:14px;background:rgba(255,92,0,0.14);color:var(--orange);border:1.5px solid rgba(255,92,0,0.3);"><%= initials %></div>
             <div>
               <div class="status-name"><%= s.name %></div>
               <% if (s.submitted && !s.isLate) { %>
