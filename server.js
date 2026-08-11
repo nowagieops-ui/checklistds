@@ -43,20 +43,29 @@ function formatTime(isoStr) {
 
 // ── MARKETER ROUTES ──────────────────────────────────────────────────────────
 
+function publicMarketers() {
+  // Never send pin/active to the client — only what the name-search UI needs.
+  return db.getMarketers().map(m => ({ id: m.id, name: m.name }));
+}
+
 app.get('/', (req, res) => {
   if (req.session.marketerId) return res.redirect('/checklist');
-  const marketers = db.getMarketers();
-  res.render('login', { marketers, error: null });
+  res.render('login', { marketers: publicMarketers(), error: null });
 });
 
 app.post('/login', (req, res) => {
   const { marketer_id, pin } = req.body;
   const marketer = db.getMarketer(marketer_id, pin);
+  const wantsJson = req.get('X-Requested-With') === 'fetch';
+
   if (!marketer) {
-    return res.render('login', { marketers: db.getMarketers(), error: 'Incorrect PIN. Please try again.' });
+    if (wantsJson) return res.status(401).json({ ok: false, error: 'Incorrect PIN. Please try again.' });
+    return res.render('login', { marketers: publicMarketers(), error: 'Incorrect PIN. Please try again.' });
   }
   req.session.marketerId = marketer.id;
   req.session.marketerName = marketer.name;
+
+  if (wantsJson) return res.json({ ok: true, redirect: '/checklist' });
   res.redirect('/checklist');
 });
 
@@ -118,10 +127,14 @@ app.get('/management-login', (req, res) => {
 
 app.post('/management-login', (req, res) => {
   const { pin } = req.body;
+  const wantsJson = req.get('X-Requested-With') === 'fetch';
+
   if (pin === (process.env.MANAGEMENT_PIN || 'dashspid2026')) {
     req.session.isManagement = true;
+    if (wantsJson) return res.json({ ok: true, redirect: '/dashboard' });
     return res.redirect('/dashboard');
   }
+  if (wantsJson) return res.status(401).json({ ok: false, error: 'Incorrect PIN.' });
   res.render('management-login', { error: 'Incorrect PIN.' });
 });
 

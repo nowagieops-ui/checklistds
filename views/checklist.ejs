@@ -3,17 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Morning Checklist — Dashspid</title>
+  <meta name="theme-color" content="#6366f1">
+  <title>Morning Checklist — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <div class="container">
-    <div class="logo">
-      <div class="logo-text">DASHSPID</div>
-      <div class="logo-sub"><%= date %></div>
-      <div class="logo-highlight">Field readiness checklist — quick, clean, and confident</div>
-    </div>
+<body class="app-bg">
 
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </div>
+      <div class="app-header-spacer"></div>
+      <span class="badge badge-indigo"><%= date %></span>
+    </div>
+  </div>
+
+  <div class="container">
     <div class="card">
       <div class="card-title">Morning Checklist</div>
       <div class="card-sub">Hi <%= name %>. Complete every item before heading into the field.</div>
@@ -174,11 +182,18 @@
     <a href="/logout" class="logout-link">Not you? Log out</a>
   </div>
 
+  <div class="loader-overlay" id="loaderOverlay">
+    <div>
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Submitting your checklist...</div>
+    </div>
+  </div>
+
   <script>
-    // Prevent double submit
     document.getElementById('checklistForm').addEventListener('submit', function() {
       document.getElementById('submitBtn').disabled = true;
       document.getElementById('submitBtn').textContent = 'Submitting...';
+      document.getElementById('loaderOverlay').classList.add('active');
     });
   </script>
 </body>

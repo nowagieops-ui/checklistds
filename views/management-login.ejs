@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Management — Dashspid</title>
+  <meta name="theme-color" content="#6366f1">
+  <title>Management — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
+  <noscript><style>.needs-js{display:none !important}</style></noscript>
 </head>
 <body>
+
   <div class="loader-overlay" id="loaderOverlay">
     <div>
       <div class="loader-spinner"></div>
@@ -14,42 +18,102 @@
     </div>
   </div>
 
-  <div class="container">
-    <div class="logo">
-      <div class="logo-text">DASHSPID</div>
-      <div class="logo-sub">Management Access</div>
-      <div class="logo-highlight">Secure management sign-in with the same polished experience.</div>
+  <noscript>
+    <div class="auth-page">
+      <div class="auth-card" style="text-align:center;">
+        <div class="auth-card-title">JavaScript required</div>
+        <p style="color:rgba(255,255,255,0.6);font-size:13px;">Please enable JavaScript to access the management dashboard.</p>
+      </div>
+    </div>
+  </noscript>
+
+  <div class="auth-page needs-js">
+    <div class="auth-header">
+      <div class="brand-badge">D</div>
+      <div class="auth-title">Dashspid Ops</div>
+      <div class="auth-sub">Management Access</div>
     </div>
 
-    <div class="card">
-      <div class="card-title">Management Dashboard</div>
-      <div class="card-sub">Enter your management PIN to view today's check-in status.</div>
+    <div class="auth-card">
+      <div class="pin-header" style="margin-bottom:1rem;">
+        <div class="pin-name" style="margin-top:0;">Management Dashboard</div>
+        <div class="pin-caption">Enter your management PIN</div>
+      </div>
 
-      <% if (error) { %>
-        <div class="error"><%= error %></div>
-      <% } %>
-
-      <form method="POST" action="/management-login" id="managementLoginForm">
-        <label for="pin">Management PIN</label>
-        <input
-          type="password"
-          name="pin"
-          id="pin"
-          placeholder="Enter PIN"
-          required
-          autocomplete="off"
-          inputmode="numeric"
-        >
-        <button type="submit" class="btn">Access Dashboard →</button>
-      </form>
+      <div class="pin-error" id="pinError" style="display:none;"></div>
+      <div class="pin-dots" id="pinDots">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="keypad" id="keypad"></div>
     </div>
 
-    <a href="/" class="logout-link">← Back to field login</a>
+    <a href="/" class="auth-link">← Back to field login</a>
   </div>
 
   <script>
-    document.getElementById('managementLoginForm').addEventListener('submit', function() {
-      document.getElementById('loaderOverlay').classList.add('active');
+    var pinDots = document.getElementById('pinDots');
+    var pinError = document.getElementById('pinError');
+    var keypad = document.getElementById('keypad');
+    var loaderOverlay = document.getElementById('loaderOverlay');
+    var buffer = '';
+    var submitting = false;
+
+    function renderDots() {
+      var dots = pinDots.querySelectorAll('.pin-dot');
+      dots.forEach(function (d, i) { d.classList.toggle('filled', i < buffer.length); });
+    }
+
+    function shakeAndReset(message) {
+      pinError.textContent = message;
+      pinError.style.display = 'block';
+      pinDots.classList.add('shake');
+      setTimeout(function () {
+        pinDots.classList.remove('shake');
+        buffer = '';
+        renderDots();
+      }, 400);
+    }
+
+    function submitPin() {
+      submitting = true;
+      fetch('/management-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+        body: 'pin=' + encodeURIComponent(buffer)
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          submitting = false;
+          if (data.ok) {
+            loaderOverlay.classList.add('active');
+            window.location.href = data.redirect;
+          } else {
+            shakeAndReset(data.error || 'Incorrect PIN.');
+          }
+        })
+        .catch(function () {
+          submitting = false;
+          shakeAndReset('Connection error. Please try again.');
+        });
+    }
+
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
+    keys.forEach(function (k) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'keypad-btn' + (k === '' ? ' blank' : '');
+      btn.textContent = k;
+      if (k === '') { btn.disabled = true; }
+      else {
+        btn.addEventListener('click', function () {
+          if (submitting) return;
+          if (k === '⌫') { buffer = buffer.slice(0, -1); }
+          else if (buffer.length < 4) { buffer += k; }
+          renderDots();
+          if (buffer.length === 4) submitPin();
+        });
+      }
+      keypad.appendChild(btn);
     });
   </script>
 </body>
