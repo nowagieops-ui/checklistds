@@ -37,7 +37,9 @@ button, input, select, textarea { font-family: inherit; }
 /* ── AUTH PAGES (dark, orange) ── */
 .auth-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(255, 92, 0, 0.22), transparent 45%),
+    linear-gradient(160deg, #1a0f08 0%, #120a06 55%, #0d0705 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -175,7 +177,7 @@ button, input, select, textarea { font-family: inherit; }
 .splash {
   position: fixed;
   inset: 0;
-  background: #0a0a14;
+  background: #0d0705;
   display: flex;
   flex-direction: column;
   align-items: center;

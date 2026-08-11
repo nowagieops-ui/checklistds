@@ -11,6 +11,11 @@ const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Bumps on every process start (i.e. every deploy), so /style.css?v=... and
+// /favicon.svg?v=... become new URLs the CDN has never cached — no more
+// stale styling stuck behind Cloudflare's cache after a push.
+app.locals.assetVersion = Date.now();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({
