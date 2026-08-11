@@ -8,8 +8,8 @@ function loadDB() {
   if (!fs.existsSync(DB_PATH)) {
     const initial = {
       marketers: [
-        { id: 1, name: 'Etuka Joseph', pin: '1234', active: true },
-        { id: 2, name: 'Fashi', pin: '5678', active: true }
+        { id: 1, name: 'Etuka Joseph', pin: '1043', active: true },
+        { id: 2, name: 'Chiamaka Nwoke', pin: '2128', active: true }
       ],
       submissions: [],
       nextSubmissionId: 1
