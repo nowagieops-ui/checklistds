@@ -143,6 +143,17 @@ const db = {
     return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
   },
 
+  // Returns 'YYYY-MM-DD' of this marketer's very first attendance record, or
+  // null if they've never checked in — used so a brand-new hire's calendar
+  // doesn't show fabricated "missed" days from before they even started.
+  async getEarliestAttendanceDate(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT MIN(DATE(timestamp)) AS earliest FROM attendance WHERE marketer_id = ?',
+      [parseInt(marketerId)]
+    );
+    return rows[0] ? rows[0].earliest : null;
+  },
+
   async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name }) {
     const [result] = await pool.execute(
       `INSERT INTO riders (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed)
