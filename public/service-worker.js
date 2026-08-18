@@ -28,12 +28,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!isCacheableStatic(url.pathname)) return;
 
+  // Cache by the full request (including the ?v= cache-busting query), not
+  // just the pathname — otherwise a stale cached response from before a
+  // deploy keeps getting served forever, since the query string is exactly
+  // what's supposed to force a fresh fetch on each new version.
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
-      cache.match(url.pathname).then((cached) => {
+      cache.match(event.request).then((cached) => {
         const fetchPromise = fetch(event.request)
           .then((response) => {
-            cache.put(url.pathname, response.clone());
+            cache.put(event.request, response.clone());
             return response;
           })
           .catch(() => cached);

@@ -134,7 +134,7 @@ function buildAttendanceCalendar(events, days, toDateStr) {
     calendar.push({ date: dateStr, label: cursor.getUTCDate(), status });
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
-  return calendar;
+  return calendar.reverse(); // today first, counting backward
 }
 
 app.get('/home', requireAuth, async (req, res) => {
