@@ -25,7 +25,7 @@
 
   <div class="container">
     <div class="card">
-      <div class="card-title">Onboarding Checklist</div>
+      <div class="card-title">Rider/Vendor Onboarding Checklist</div>
       <div class="card-sub">
         Rider: <strong><%= rider.name %></strong><br>
         <%= rider.email %> · <%= rider.phone %>
@@ -33,84 +33,153 @@
 
       <form method="POST" action="/riders/<%= rider.id %>/checklist" id="riderChecklistForm">
         <div class="checklist-section">
-          <div class="checklist-section-title">Onboarding Steps</div>
+          <div class="checklist-section-title">The Pitch</div>
 
           <label class="check-item">
-            <input type="checkbox" name="item_id_verified" value="1" required>
+            <input type="checkbox" name="item_intro" value="1" required>
             <span class="check-item-text">
-              Valid ID verified (Driver's License / National ID / Voter's Card)
+              Introduced yourself and explained who Dashspid is
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_photo" value="1" required>
+            <input type="checkbox" name="item_pitch_problem" value="1" required>
             <span class="check-item-text">
-              Passport photograph taken
+              Explained why they should stop being "slaves" to Uber/Bolt/other apps — commissions eating their money, no ownership of their own customers — and how Dashspid fixes that (their own store, direct orders, they keep more)
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_vehicle" value="1" required>
+            <input type="checkbox" name="item_shield" value="1" required>
             <span class="check-item-text">
-              Vehicle/bike particulars and roadworthiness checked
+              Told them about the Dashspid Shield plan and what it protects them from
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_platform_walkthrough" value="1" required>
+            <input type="checkbox" name="item_referral" value="1" required>
             <span class="check-item-text">
-              Rider walked through the Dashspid app / platform
+              Told them about the Dashspid referral program and how they can earn from referring others
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_account_created" value="1" required>
+            <input type="checkbox" name="item_overview" value="1" required>
             <span class="check-item-text">
-              Rider's Dashspid account created and login tested
+              Asked for their overview — what they currently do, biggest pain point, how many orders/deliveries a day
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="checklist-section">
+          <div class="checklist-section-title">Sign Up</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_signup" value="1" required>
+            <span class="check-item-text">
+              Signed up on Dashspid
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_bank_details" value="1" required>
+            <input type="checkbox" name="item_payout" value="1" required>
             <span class="check-item-text">
-              Bank account / payout details collected
+              Added payout details (bank account)
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_next_of_kin" value="1" required>
+            <input type="checkbox" name="item_whatsapp" value="1" required>
             <span class="check-item-text">
-              Next of kin / emergency contact collected
+              Connected WhatsApp
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_safety_briefing" value="1" required>
+            <input type="checkbox" name="item_availability" value="1" required>
             <span class="check-item-text">
-              Rider briefed on safety and delivery SOPs
+              Set availability / business hours
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_id_card_issued" value="1" required>
+            <input type="checkbox" name="item_pricing" value="1" required>
             <span class="check-item-text">
-              Dashspid ID card / welcome pack issued
+              Set pricing
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="checklist-section">
+          <div class="checklist-section-title">Walkthrough</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_features" value="1" required>
+            <span class="check-item-text">
+              Explained the main features (dashboard, orders, notifications)
               <span class="check-required"> *required</span>
             </span>
           </label>
 
           <label class="check-item">
-            <input type="checkbox" name="item_whatsapp_group" value="1">
+            <input type="checkbox" name="item_test_order" value="1" required>
             <span class="check-item-text">
-              Rider added to the zone/team WhatsApp group
+              Done a test order together, start to finish
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_marketing_kit" value="1" required>
+            <span class="check-item-text">
+              Shown them the Marketing Kit (business card + logo)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_shared_link" value="1" required>
+            <span class="check-item-text">
+              Confirmed they've shared their business card/link to at least one real customer
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="checklist-section">
+          <div class="checklist-section-title">Confirm</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_app_installed" value="1" required>
+            <span class="check-item-text">
+              Installed the app (Android) or added to home screen (iPhone)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_notifications" value="1" required>
+            <span class="check-item-text">
+              Confirmed they're getting order notifications properly
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_contact" value="1" required>
+            <span class="check-item-text">
+              They know who to contact if something breaks
+              <span class="check-required"> *required</span>
             </span>
           </label>
         </div>
