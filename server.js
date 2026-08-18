@@ -104,9 +104,52 @@ app.post('/login', async (req, res) => {
   res.redirect('/home');
 });
 
+// A day counts green only once BOTH a login and a logout event exist for it.
+// Today is never marked missed — it's still "pending" until it becomes a past
+// day, at which point an incomplete day naturally falls into "missed" since
+// this is recomputed fresh from today()'s date on every page load.
+function buildAttendanceCalendar(events, days, toDateStr) {
+  const byDate = {};
+  events.forEach(e => {
+    const d = e.timestamp.split('T')[0];
+    if (!byDate[d]) byDate[d] = { login: false, logout: false };
+    if (e.type === 'login') byDate[d].login = true;
+    if (e.type === 'logout') byDate[d].logout = true;
+  });
+
+  // Pure UTC arithmetic throughout — matches today()'s UTC convention and
+  // avoids local-vs-UTC date parsing mismatches shifting the calendar by a day.
+  const [y, m, d0] = toDateStr.split('-').map(Number);
+  const cursor = new Date(Date.UTC(y, m - 1, d0 - (days - 1)));
+
+  const calendar = [];
+  for (let i = 0; i < days; i++) {
+    const dateStr = cursor.toISOString().split('T')[0];
+    const rec = byDate[dateStr];
+    let status;
+    if (rec && rec.login && rec.logout) status = 'complete';
+    else if (dateStr === toDateStr) status = 'pending';
+    else status = 'missed';
+
+    calendar.push({ date: dateStr, label: cursor.getUTCDate(), status });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return calendar;
+}
+
 app.get('/home', requireAuth, async (req, res) => {
   const submittedToday = !!(await db.getSubmissionByMarketerToday(req.session.marketerId, today()));
-  res.render('home', { name: req.session.marketerName, submittedToday, date: formatDate() });
+
+  const calendarDays = 14;
+  const toDate = today();
+  const fromDateObj = new Date();
+  fromDateObj.setDate(fromDateObj.getDate() - (calendarDays - 1));
+  const fromDate = fromDateObj.toISOString().split('T')[0];
+
+  const events = await db.getAttendanceForMarketerInRange(req.session.marketerId, fromDate, toDate);
+  const attendanceCalendar = buildAttendanceCalendar(events, calendarDays, toDate);
+
+  res.render('home', { name: req.session.marketerName, submittedToday, date: formatDate(), attendanceCalendar });
 });
 
 app.get('/checklist', requireAuth, async (req, res) => {

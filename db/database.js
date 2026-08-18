@@ -135,6 +135,14 @@ const db = {
     return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
   },
 
+  async getAttendanceForMarketerInRange(marketerId, fromDate, toDate) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM attendance WHERE marketer_id = ? AND DATE(timestamp) BETWEEN ? AND ? ORDER BY timestamp ASC',
+      [parseInt(marketerId), fromDate, toDate]
+    );
+    return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
+  },
+
   async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name }) {
     const [result] = await pool.execute(
       `INSERT INTO riders (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed)

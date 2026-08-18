@@ -326,6 +326,29 @@ button, input, select, textarea { font-family: inherit; }
 .home-tile-sub { font-size: 13px; color: var(--gray); margin-top: 3px; }
 .home-tile-arrow { color: var(--orange); font-size: 18px; flex-shrink: 0; }
 
+.attendance-calendar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.attendance-day {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.attendance-day-complete { background: var(--green); }
+.attendance-day-missed { background: var(--red); }
+.attendance-day-pending { background: var(--border); color: var(--gray); }
+
+.attendance-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--gray); }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-dot-complete { background: var(--green); }
+.legend-dot-missed { background: var(--red); }
+.legend-dot-pending { background: var(--border); }
+
 /* ── LOADER (AJAX submit) ── */
 .loader-overlay {
   position: fixed;
@@ -463,12 +486,6 @@ textarea { resize: vertical; min-height: 90px; }
 .check-required { color: var(--red); font-size: 11px; font-weight: 700; }
 
 /* ── SUCCESS ── */
-.success-icon {
-  width: 64px; height: 64px; border-radius: 20px;
-  background: #f0fdf4; color: var(--green);
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 18px;
-}
 .success-title { text-align: center; font-size: 21px; font-weight: 800; color: var(--dark); margin-bottom: 6px; }
 .success-sub { text-align: center; font-size: 14px; color: var(--gray); margin-bottom: 22px; }
 .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }

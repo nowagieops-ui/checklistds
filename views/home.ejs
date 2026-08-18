@@ -60,6 +60,23 @@
     <% if (!submittedToday) { %>
       <a href="/logout" class="logout-link">Not you? Log out</a>
     <% } %>
+
+    <div class="card">
+      <div class="card-title" style="font-size:15px;margin-bottom:2px;">Your Attendance</div>
+      <div class="card-sub" style="margin-bottom:14px;">Last 14 days</div>
+
+      <div class="attendance-calendar">
+        <% attendanceCalendar.forEach(function (d) { %>
+          <div class="attendance-day attendance-day-<%= d.status %>" title="<%= d.date %>"><%= d.label %></div>
+        <% }) %>
+      </div>
+
+      <div class="attendance-legend">
+        <span class="legend-item"><span class="legend-dot legend-dot-complete"></span> Checked in &amp; out</span>
+        <span class="legend-item"><span class="legend-dot legend-dot-missed"></span> Missed</span>
+        <span class="legend-item"><span class="legend-dot legend-dot-pending"></span> Today</span>
+      </div>
+    </div>
   </div>
 
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
