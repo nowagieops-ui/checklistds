@@ -84,7 +84,7 @@
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(function (pos) {
+      function onLocationSuccess(pos) {
         var summary = document.getElementById('summary').value;
         var body = 'lat=' + encodeURIComponent(pos.coords.latitude) +
           '&lng=' + encodeURIComponent(pos.coords.longitude) +
@@ -110,10 +110,23 @@
             resetButton();
             showError('Connection error. Please try again.');
           });
-      }, function () {
-        resetButton();
-        showError('Location access is required to log out. Please enable location and try again.');
-      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+      }
+
+      function onLocationError(err) {
+        if (err && err.code === err.PERMISSION_DENIED) {
+          resetButton();
+          showError('Location access is required to log out. Please enable location and try again.');
+          return;
+        }
+        // GPS fix can take longer than 10s indoors/low signal — retry once
+        // with lower accuracy before giving up, instead of blaming permissions.
+        navigator.geolocation.getCurrentPosition(onLocationSuccess, function () {
+          resetButton();
+          showError('Could not get a location fix. Please move to an area with better GPS/signal and try again.');
+        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+      }
+
+      navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     });
   </script>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

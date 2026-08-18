@@ -232,17 +232,30 @@
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(function (pos) {
+      function onLocationSuccess(pos) {
         document.getElementById('lat').value = pos.coords.latitude;
         document.getElementById('lng').value = pos.coords.longitude;
         document.getElementById('accuracy').value = pos.coords.accuracy;
         submitBtn.textContent = 'Submitting...';
         loaderOverlay.classList.add('active');
         checklistForm.submit();
-      }, function () {
-        resetSubmitBtn();
-        showChecklistError('Location access is required to submit your checklist. Please enable location and try again.');
-      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+      }
+
+      function onLocationError(err) {
+        if (err && err.code === err.PERMISSION_DENIED) {
+          resetSubmitBtn();
+          showChecklistError('Location access is required to submit your checklist. Please enable location and try again.');
+          return;
+        }
+        // GPS fix can take longer than 10s indoors/low signal — retry once
+        // with lower accuracy before giving up, instead of blaming permissions.
+        navigator.geolocation.getCurrentPosition(onLocationSuccess, function () {
+          resetSubmitBtn();
+          showChecklistError('Could not get a location fix. Please move to an area with better GPS/signal and try again.');
+        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+      }
+
+      navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     });
   </script>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
