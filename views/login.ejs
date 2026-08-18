@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Dashspid Ops — Morning Checklist</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
   <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
   <noscript><style>.splash{display:none !important} .needs-js{display:none !important}</style></noscript>
 </head>
@@ -94,6 +98,31 @@
     var selected = null;
     var buffer = '';
     var submitting = false;
+    var currentLocation = null;
+    var locationError = null;
+    var locationPromise = Promise.resolve();
+
+    function requestLocation() {
+      locationError = null;
+      locationPromise = new Promise(function (resolve) {
+        if (!navigator.geolocation) {
+          locationError = 'Location is not supported on this device/browser.';
+          return resolve();
+        }
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            currentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+            resolve();
+          },
+          function () {
+            currentLocation = null;
+            locationError = 'Location access is required to check in. Please enable location and try again.';
+            resolve();
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
 
     nameInput.addEventListener('input', function () {
       var q = nameInput.value.trim().toLowerCase();
@@ -125,6 +154,7 @@
       selected = m;
       buffer = '';
       pinError.style.display = 'none';
+      requestLocation();
       pinAvatar.style.background = colorFor(m.id) + '22';
       pinAvatar.style.color = colorFor(m.id);
       pinAvatar.style.border = '1.5px solid ' + colorFor(m.id) + '55';
@@ -178,25 +208,41 @@
 
     function submitPin() {
       submitting = true;
-      fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
-        body: 'marketer_id=' + encodeURIComponent(selected.id) + '&pin=' + encodeURIComponent(buffer)
-      })
-        .then(function (r) { return r.json().then(function (data) { return { status: r.status, data: data }; }); })
-        .then(function (res) {
+      locationPromise.then(function () {
+        if (!currentLocation) {
           submitting = false;
-          if (res.data.ok) {
-            loaderOverlay.classList.add('active');
-            window.location.href = res.data.redirect;
-          } else {
-            shakeAndReset(res.data.error || 'Incorrect PIN. Please try again.');
-          }
+          shakeAndReset(locationError || 'Location access is required to check in.');
+          requestLocation();
+          return;
+        }
+
+        var body = 'marketer_id=' + encodeURIComponent(selected.id) +
+          '&pin=' + encodeURIComponent(buffer) +
+          '&lat=' + encodeURIComponent(currentLocation.lat) +
+          '&lng=' + encodeURIComponent(currentLocation.lng) +
+          '&accuracy=' + encodeURIComponent(currentLocation.accuracy);
+
+        fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+          body: body
         })
-        .catch(function () {
-          submitting = false;
-          shakeAndReset('Connection error. Please try again.');
-        });
+          .then(function (r) { return r.json().then(function (data) { return { status: r.status, data: data }; }); })
+          .then(function (res) {
+            submitting = false;
+            if (res.data.ok) {
+              loaderOverlay.classList.add('active');
+              window.location.href = res.data.redirect;
+            } else {
+              shakeAndReset(res.data.error || 'Incorrect PIN. Please try again.');
+              if (res.data.needsLocation) requestLocation();
+            }
+          })
+          .catch(function () {
+            submitting = false;
+            shakeAndReset('Connection error. Please try again.');
+          });
+      });
     }
 
     backBtn.addEventListener('click', function () {
@@ -221,5 +267,6 @@
     }, 1600);
     setTimeout(function () { splash.style.display = 'none'; }, 2300);
   </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
 </body>
 </html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Log Out — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">End of Day Summary</div>
+      <div class="card-sub">Hi <%= name %>. Quick summary before you go.</div>
+
+      <div class="detail-row">
+        <span class="detail-label">Riders onboarded today</span>
+        <span class="detail-value"><%= ridersToday %></span>
+      </div>
+
+      <label for="summary">Anything to summarize? (wins, challenges, notes)</label>
+      <textarea id="summary" placeholder="How did today go?"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-sub" style="margin-bottom:12px;">We need your current location to confirm you're logging out for the day.</div>
+
+      <div class="error" id="logoutError" style="display:none;margin-bottom:12px;"></div>
+
+      <button type="button" class="btn" id="confirmLogoutBtn">Confirm Log Out →</button>
+      <a href="/checklist" class="auth-link" style="display:block;text-align:center;margin-top:14px;">← Back, I'm not leaving yet</a>
+    </div>
+  </div>
+
+  <div class="loader-overlay" id="loaderOverlay">
+    <div>
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Logging you out...</div>
+    </div>
+  </div>
+
+  <script>
+    var btn = document.getElementById('confirmLogoutBtn');
+    var errBox = document.getElementById('logoutError');
+    var loaderOverlay = document.getElementById('loaderOverlay');
+    var submitting = false;
+
+    function showError(msg) {
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
+
+    function resetButton() {
+      submitting = false;
+      btn.disabled = false;
+      btn.textContent = 'Confirm Log Out →';
+    }
+
+    btn.addEventListener('click', function () {
+      if (submitting) return;
+      submitting = true;
+      btn.disabled = true;
+      btn.textContent = 'Getting your location...';
+      errBox.style.display = 'none';
+
+      if (!navigator.geolocation) {
+        resetButton();
+        showError('Location is not supported on this device/browser.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var summary = document.getElementById('summary').value;
+        var body = 'lat=' + encodeURIComponent(pos.coords.latitude) +
+          '&lng=' + encodeURIComponent(pos.coords.longitude) +
+          '&accuracy=' + encodeURIComponent(pos.coords.accuracy) +
+          '&summary=' + encodeURIComponent(summary);
+
+        fetch('/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+          body: body
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) {
+              loaderOverlay.classList.add('active');
+              window.location.href = data.redirect;
+            } else {
+              resetButton();
+              showError(data.error || 'Something went wrong. Please try again.');
+            }
+          })
+          .catch(function () {
+            resetButton();
+            showError('Connection error. Please try again.');
+          });
+      }, function () {
+        resetButton();
+        showError('Location access is required to log out. Please enable location and try again.');
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    });
+  </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

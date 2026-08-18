@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Morning Checklist — Dashspid Ops</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
   <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
 </head>
 <body class="app-bg">
@@ -179,6 +183,7 @@
       </form>
     </div>
 
+    <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
     <a href="/logout" class="logout-link">Not you? Log out</a>
   </div>
 
@@ -196,5 +201,6 @@
       document.getElementById('loaderOverlay').classList.add('active');
     });
   </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
 </body>
 </html>

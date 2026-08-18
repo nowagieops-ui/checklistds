@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Rider Onboarding — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Onboarding Checklist</div>
+      <div class="card-sub">
+        Rider: <strong><%= rider.name %></strong><br>
+        <%= rider.email %> · <%= rider.phone %>
+      </div>
+
+      <form method="POST" action="/riders/<%= rider.id %>/checklist" id="riderChecklistForm">
+        <div class="checklist-section">
+          <div class="checklist-section-title">Onboarding Steps</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_id_verified" value="1" required>
+            <span class="check-item-text">
+              Valid ID verified (Driver's License / National ID / Voter's Card)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_photo" value="1" required>
+            <span class="check-item-text">
+              Passport photograph taken
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_vehicle" value="1" required>
+            <span class="check-item-text">
+              Vehicle/bike particulars and roadworthiness checked
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_platform_walkthrough" value="1" required>
+            <span class="check-item-text">
+              Rider walked through the Dashspid app / platform
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_account_created" value="1" required>
+            <span class="check-item-text">
+              Rider's Dashspid account created and login tested
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_bank_details" value="1" required>
+            <span class="check-item-text">
+              Bank account / payout details collected
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_next_of_kin" value="1" required>
+            <span class="check-item-text">
+              Next of kin / emergency contact collected
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_safety_briefing" value="1" required>
+            <span class="check-item-text">
+              Rider briefed on safety and delivery SOPs
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_id_card_issued" value="1" required>
+            <span class="check-item-text">
+              Dashspid ID card / welcome pack issued
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_whatsapp_group" value="1">
+            <span class="check-item-text">
+              Rider added to the zone/team WhatsApp group
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">Complete Onboarding →</button>
+      </form>
+    </div>
+
+    <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
+  </div>
+
+  <div class="loader-overlay" id="loaderOverlay">
+    <div>
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Saving onboarding checklist...</div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('riderChecklistForm').addEventListener('submit', function() {
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Saving...';
+      document.getElementById('loaderOverlay').classList.add('active');
+    });
+  </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

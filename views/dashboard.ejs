@@ -45,10 +45,18 @@
               <% } else { %>
                 <span class="badge badge-red">❌ Not checked in</span>
               <% } %>
+              <% if (s.attendanceFlagged) { %>
+                <span class="badge badge-red">⚠ Flagged login</span>
+              <% } %>
             </div>
           </div>
 
           <div class="status-detail">
+            <strong>Login:</strong> <%= s.loginTime || '—' %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
+            <% if (s.logoutTime) { %>
+              <strong>Riders onboarded today:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
+              <% if (s.daySummary) { %><strong>Day summary:</strong> <%= s.daySummary %><br><% } %>
+            <% } %>
             <% if (s.submitted) { %>
               <strong>Checked in:</strong> <%= s.checkIn %><br>
               <strong>Zone:</strong> <%= s.zone %><br>
@@ -78,8 +86,24 @@
       </div>
     </div>
 
+    <!-- DATE RANGE FILTER -->
+    <div class="dash-header" style="margin-top:8px;">
+      <div class="dash-title" style="font-size:16px;">Historical Records</div>
+    </div>
+    <form method="GET" action="/dashboard" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;">
+        <label for="from">From</label>
+        <input type="date" name="from" id="from" value="<%= from %>" max="<%= to %>" style="margin-bottom:0;">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label for="to">To</label>
+        <input type="date" name="to" id="to" value="<%= to %>" min="<%= from %>" style="margin-bottom:0;">
+      </div>
+      <button type="submit" class="btn" style="width:auto;padding:12px 24px;margin:0;">Filter</button>
+    </form>
+
     <!-- HISTORY TABLE -->
-    <div class="section-title">Last 7 Days — Submission History</div>
+    <div class="section-title">Submission History — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
     <% if (history.length > 0) { %>
       <div class="table-scroll">
         <table class="history-table">
@@ -111,7 +135,126 @@
       </div>
     <% } else { %>
       <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
-        No submissions yet this week.
+        No submissions in this date range.
+      </div>
+    <% } %>
+
+    <!-- ATTENDANCE HISTORY -->
+    <div class="section-title">Attendance History — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
+    <% if (attendanceHistory.length > 0) { %>
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Marketer</th>
+              <th>Login</th>
+              <th>Logout</th>
+              <th>Riders</th>
+              <th>Summary</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% attendanceHistory.forEach(a => { %>
+              <tr>
+                <td><%= a.dateFormatted %></td>
+                <td><strong><%= a.marketer_name %></strong></td>
+                <td><%= a.loginFormatted %></td>
+                <td><%= a.logoutFormatted %></td>
+                <td><%= a.ridersOnboarded != null ? a.ridersOnboarded : '—' %></td>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= a.summary || '—' %></td>
+                <td>
+                  <% if (a.flagged) { %>
+                    <span class="badge badge-red">⚠ Flagged</span>
+                  <% } else { %>
+                    <span class="badge badge-green">✓ Clean</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
+        No attendance recorded yet.
+      </div>
+    <% } %>
+
+    <!-- RIDERS ONBOARDED -->
+    <div class="section-title">Riders Onboarded — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
+    <% if (riders.length > 0) { %>
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date Added</th>
+              <th>Rider</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Added By</th>
+              <th>Checklist Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% riders.forEach(r => { %>
+              <tr>
+                <td><%= r.dateAdded %> <%= r.timeAdded %></td>
+                <td><strong><%= r.name %></strong></td>
+                <td><%= r.email %></td>
+                <td><%= r.phone %></td>
+                <td><%= r.added_by_marketer_name %></td>
+                <td>
+                  <% if (r.completed) { %>
+                    <span class="badge badge-green">✅ Done — <%= r.timeCompleted %></span>
+                  <% } else { %>
+                    <span class="badge badge-amber">⏳ In progress</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
+        No riders onboarded in this date range.
+      </div>
+    <% } %>
+
+    <!-- FLAGGED ATTENDANCE -->
+    <div class="section-title">⚠ Flagged Attendance — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
+    <% if (flaggedEvents.length > 0) { %>
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date/Time</th>
+              <th>Marketer</th>
+              <th>Type</th>
+              <th>IP</th>
+              <th>Location</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% flaggedEvents.forEach(a => { %>
+              <tr>
+                <td><%= formatDateShort(a.timestamp.split('T')[0]) %> <%= formatTime(a.timestamp) %></td>
+                <td><strong><%= a.marketer_name %></strong></td>
+                <td><%= a.type === 'login' ? 'Login' : 'Logout' %></td>
+                <td><%= a.ip %></td>
+                <td><a href="https://www.google.com/maps?q=<%= a.lat %>,<%= a.lng %>" target="_blank" rel="noopener" style="color:var(--orange);">View on map</a></td>
+                <td><%= a.flags.join('; ') %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
+        No flagged attendance in this date range.
       </div>
     <% } %>
 

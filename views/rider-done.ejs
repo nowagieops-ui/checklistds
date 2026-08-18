@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#FF5C00">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Checked In — Dashspid Ops</title>
+  <title>Rider Onboarded — Dashspid Ops</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
   <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
@@ -26,38 +26,29 @@
   <div class="container">
     <div class="card">
       <div class="success-icon">✅</div>
-      <div class="success-title">You're checked in.</div>
-      <div class="success-sub">Go close some accounts, <%= name %>. Have a strong day.</div>
+      <div class="success-title">Rider onboarded.</div>
+      <div class="success-sub"><%= rider.name %> is ready to ride.</div>
 
-      <% if (submission) { %>
+      <div class="detail-row">
+        <span class="detail-label">Email</span>
+        <span class="detail-value"><%= rider.email %></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Phone</span>
+        <span class="detail-value"><%= rider.phone %></span>
+      </div>
+      <% if (time) { %>
         <div class="detail-row">
-          <span class="detail-label">Check-in time</span>
+          <span class="detail-label">Onboarding completed</span>
           <span class="detail-value"><%= time %></span>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Zone today</span>
-          <span class="detail-value"><%= submission.zone || '—' %></span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Targets</span>
-          <span class="detail-value"><%= submission.targets || '—' %></span>
-        </div>
       <% } %>
-
-      <div class="note-box">
-        <div class="note-box-title">Remember today's rules</div>
-        <div class="note-box-body">
-          Every signup goes through your referral link.<br>
-          Set accounts up live — don't just send links.<br>
-          Daily log updated by 5:30pm tonight.
-        </div>
-      </div>
     </div>
 
-    <a href="/riders/new" class="btn" style="margin-bottom:12px;">Onboard a Rider →</a>
+    <a href="/riders/new" class="btn" style="margin-bottom:12px;">Onboard Another Rider →</a>
     <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
-    <a href="/logout" class="logout-link">Log out</a>
   </div>
+
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
 </body>
 </html>
