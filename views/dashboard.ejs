@@ -39,14 +39,14 @@
             <div>
               <div class="status-name"><%= s.name %></div>
               <% if (s.submitted && !s.isLate) { %>
-                <span class="badge badge-green">✅ On time</span>
+                <span class="badge badge-green">On time</span>
               <% } else if (s.submitted && s.isLate) { %>
-                <span class="badge badge-amber">⚠️ Late — <%= s.checkIn %></span>
+                <span class="badge badge-amber">Late — <%= s.checkIn %></span>
               <% } else { %>
-                <span class="badge badge-red">❌ Not checked in</span>
+                <span class="badge badge-red">Not checked in</span>
               <% } %>
               <% if (s.attendanceFlagged) { %>
-                <span class="badge badge-red">⚠ Flagged login</span>
+                <span class="badge badge-red">Flagged login</span>
               <% } %>
             </div>
           </div>
@@ -125,7 +125,7 @@
                 <td><%= new Date(h.date).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'}) %></td>
                 <td><strong><%= h.marketer_name %></strong></td>
                 <td><%= checkTime %></td>
-                <td><span class="<%= late ? 'late' : 'on-time' %>"><%= late ? '⚠️ Late' : '✅ On time' %></span></td>
+                <td><span class="<%= late ? 'late' : 'on-time' %>"><%= late ? 'Late' : 'On time' %></span></td>
                 <td><%= h.zone || '—' %></td>
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= h.targets || '—' %></td>
               </tr>
@@ -166,9 +166,9 @@
                 <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= a.summary || '—' %></td>
                 <td>
                   <% if (a.flagged) { %>
-                    <span class="badge badge-red">⚠ Flagged</span>
+                    <span class="badge badge-red">Flagged</span>
                   <% } else { %>
-                    <span class="badge badge-green">✓ Clean</span>
+                    <span class="badge badge-green">Clean</span>
                   <% } %>
                 </td>
               </tr>
@@ -207,9 +207,9 @@
                 <td><%= r.added_by_marketer_name %></td>
                 <td>
                   <% if (r.completed) { %>
-                    <span class="badge badge-green">✅ Done — <%= r.timeCompleted %></span>
+                    <span class="badge badge-green">Done — <%= r.timeCompleted %></span>
                   <% } else { %>
-                    <span class="badge badge-amber">⏳ In progress</span>
+                    <span class="badge badge-amber">In progress</span>
                   <% } %>
                 </td>
               </tr>
@@ -224,7 +224,7 @@
     <% } %>
 
     <!-- FLAGGED ATTENDANCE -->
-    <div class="section-title">⚠ Flagged Attendance — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
+    <div class="section-title">Flagged Attendance — <%= formatDateShort(from) %> to <%= formatDateShort(to) %></div>
     <% if (flaggedEvents.length > 0) { %>
       <div class="table-scroll">
         <table class="history-table">

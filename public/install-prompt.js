@@ -17,7 +17,7 @@
       '<span class="install-banner-text">' + message + '</span>' +
       '<span class="install-banner-actions">' +
       (buttonText ? '<button type="button" class="install-banner-btn">' + buttonText + '</button>' : '') +
-      '<button type="button" class="install-banner-close" aria-label="Dismiss">✕</button>' +
+      '<button type="button" class="install-banner-close" aria-label="Dismiss">Dismiss</button>' +
       '</span>';
     document.body.appendChild(bar);
 

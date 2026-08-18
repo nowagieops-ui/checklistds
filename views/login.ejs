@@ -118,8 +118,7 @@
         row.className = 'match-row';
         row.innerHTML =
           '<div class="avatar" style="width:44px;height:44px;font-size:15px;background:' + colorFor(m.id) + '22;color:' + colorFor(m.id) + ';border:1.5px solid ' + colorFor(m.id) + '55;">' + initials(m.name) + '</div>' +
-          '<div style="flex:1;"><div class="match-name">' + m.name + '</div><div class="match-tap">Tap to continue</div></div>' +
-          '<span class="match-check">✓</span>';
+          '<div style="flex:1;"><div class="match-name">' + m.name + '</div><div class="match-tap">Tap to continue</div></div>';
         row.addEventListener('click', function () { selectMarketer(m); });
         matchList.appendChild(row);
       });

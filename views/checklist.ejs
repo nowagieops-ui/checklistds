@@ -209,6 +209,7 @@
     function showChecklistError(msg) {
       checklistError.textContent = msg;
       checklistError.style.display = 'block';
+      checklistError.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function resetSubmitBtn() {

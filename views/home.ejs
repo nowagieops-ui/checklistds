@@ -31,23 +31,25 @@
       <div class="card-sub">What do you need to do?</div>
     </div>
 
-    <a href="/checklist" class="home-tile">
-      <div class="home-tile-icon">📋</div>
-      <div class="home-tile-body">
-        <div class="home-tile-title">Daily Checklist</div>
-        <div class="home-tile-sub">
-          <% if (submittedToday) { %>
-            <span class="badge badge-green">✅ Done for today</span>
-          <% } else { %>
-            Not done yet — tap to start
-          <% } %>
+    <% if (submittedToday) { %>
+      <a href="/logout" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Daily Logout</div>
+          <div class="home-tile-sub">Checklist done for today — tap to clock out</div>
         </div>
-      </div>
-      <div class="home-tile-arrow">→</div>
-    </a>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } else { %>
+      <a href="/checklist" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Daily Checklist</div>
+          <div class="home-tile-sub">Not done yet — tap to start</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } %>
 
     <a href="/riders/new" class="home-tile">
-      <div class="home-tile-icon">🛵</div>
       <div class="home-tile-body">
         <div class="home-tile-title">Onboard New Rider</div>
         <div class="home-tile-sub">Add a rider's details and walk through onboarding</div>
@@ -55,7 +57,9 @@
       <div class="home-tile-arrow">→</div>
     </a>
 
-    <a href="/logout" class="logout-link">Log out</a>
+    <% if (!submittedToday) { %>
+      <a href="/logout" class="logout-link">Not you? Log out</a>
+    <% } %>
   </div>
 
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

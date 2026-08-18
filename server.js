@@ -169,7 +169,7 @@ app.post('/submit', requireAuth, async (req, res) => {
   const time = formatTime(sub.submitted_at);
   const cutoff = process.env.CHECKIN_CUTOFF || '08:45';
   const isLate = time > cutoff;
-  const status = isLate ? '⚠️ LATE' : '✅ ON TIME';
+  const status = isLate ? 'LATE' : 'ON TIME';
 
   sendWhatsApp(
     `${status} — ${req.session.marketerName} checked in at ${time}\nZone: ${zone || 'Not set'}\nTargets: ${targets || 'Not set'}`
@@ -409,7 +409,7 @@ app.get('/management-logout', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Dashspid Checklist running on port ${PORT}`);
+  console.log(`Dashspid Checklist running on port ${PORT}`);
   console.log(`   Marketer login: http://localhost:${PORT}`);
   console.log(`   Management:     http://localhost:${PORT}/management-login`);
 });
