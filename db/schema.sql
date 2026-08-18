@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS riders (
   added_by_marketer_name VARCHAR(255) NOT NULL,
   created_at DATETIME NOT NULL,
   checklist_items JSON,
+  notes TEXT,
   completed TINYINT(1) NOT NULL DEFAULT 0,
   completed_at DATETIME,
   FOREIGN KEY (added_by_marketer_id) REFERENCES marketers(id)

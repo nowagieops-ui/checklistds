@@ -158,10 +158,10 @@ const db = {
     return rows[0] ? normalizeRider(rows[0]) : undefined;
   },
 
-  async completeRiderChecklist(riderId, checklistItems) {
+  async completeRiderChecklist(riderId, checklistItems, notes) {
     await pool.execute(
-      'UPDATE riders SET checklist_items = ?, completed = 1, completed_at = NOW() WHERE id = ?',
-      [JSON.stringify(checklistItems || []), parseInt(riderId)]
+      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = NOW() WHERE id = ?',
+      [JSON.stringify(checklistItems || []), notes || null, parseInt(riderId)]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [parseInt(riderId)]);
     return rows[0] ? normalizeRider(rows[0]) : null;

@@ -265,7 +265,7 @@ app.post('/riders/:id/checklist', requireAuth, async (req, res) => {
   if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/home');
 
   const checklistItems = Object.keys(req.body).filter(k => k.startsWith('item_'));
-  await db.completeRiderChecklist(rider.id, checklistItems);
+  await db.completeRiderChecklist(rider.id, checklistItems, req.body.notes);
   res.redirect(`/riders/${rider.id}/done`);
 });
 

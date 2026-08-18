@@ -195,6 +195,7 @@
               <th>Phone</th>
               <th>Added By</th>
               <th>Checklist Status</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -212,6 +213,7 @@
                     <span class="badge badge-amber">In progress</span>
                   <% } %>
                 </td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= r.notes || '—' %></td>
               </tr>
             <% }) %>
           </tbody>
