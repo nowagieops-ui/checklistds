@@ -343,6 +343,7 @@ a.app-header-brand { cursor: pointer; }
 .attendance-day-complete { background: var(--green); }
 .attendance-day-missed { background: var(--red); }
 .attendance-day-pending { background: var(--border); color: var(--gray); }
+.attendance-day-weekend { background: transparent; border: 1px dashed var(--border); color: var(--gray); }
 
 .attendance-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--gray); }
 .legend-item { display: flex; align-items: center; gap: 6px; }
@@ -350,6 +351,7 @@ a.app-header-brand { cursor: pointer; }
 .legend-dot-complete { background: var(--green); }
 .legend-dot-missed { background: var(--red); }
 .legend-dot-pending { background: var(--border); }
+.legend-dot-weekend { background: transparent; border: 1px dashed var(--border); }
 
 /* ── LOADER (AJAX submit) ── */
 .loader-overlay {

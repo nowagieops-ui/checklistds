@@ -31,19 +31,19 @@
       <div class="card-sub">What do you need to do?</div>
     </div>
 
-    <% if (submittedToday) { %>
-      <a href="/logout" class="home-tile">
-        <div class="home-tile-body">
-          <div class="home-tile-title">Daily Logout</div>
-          <div class="home-tile-sub">Checklist done for today — tap to clock out</div>
-        </div>
-        <div class="home-tile-arrow">→</div>
-      </a>
-    <% } else { %>
+    <% if (!submittedToday) { %>
       <a href="/checklist" class="home-tile">
         <div class="home-tile-body">
           <div class="home-tile-title">Daily Checklist</div>
           <div class="home-tile-sub">Not done yet — tap to start</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } else if (canCheckout) { %>
+      <a href="/logout" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Daily Checkout</div>
+          <div class="home-tile-sub">End of day — tap to clock out</div>
         </div>
         <div class="home-tile-arrow">→</div>
       </a>
@@ -57,9 +57,7 @@
       <div class="home-tile-arrow">→</div>
     </a>
 
-    <% if (!submittedToday) { %>
-      <a href="/logout" class="logout-link">Not you? Log out</a>
-    <% } %>
+    <a href="/sign-out" class="logout-link">Not you? Log out</a>
 
     <div class="card">
       <div class="card-title" style="font-size:15px;margin-bottom:2px;">Your Attendance</div>
@@ -75,6 +73,7 @@
         <span class="legend-item"><span class="legend-dot legend-dot-complete"></span> Checked in &amp; out</span>
         <span class="legend-item"><span class="legend-dot legend-dot-missed"></span> Missed</span>
         <span class="legend-item"><span class="legend-dot legend-dot-pending"></span> Today</span>
+        <span class="legend-item"><span class="legend-dot legend-dot-weekend"></span> Weekend</span>
       </div>
     </div>
   </div>

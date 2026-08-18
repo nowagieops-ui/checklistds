@@ -74,6 +74,17 @@ function formatTime(isoStr) {
   return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Checkout only becomes available at 4:30pm Lagos time, regardless of what
+// timezone the server itself runs in.
+function isAfterCheckoutTime() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Lagos', hour12: false, hour: '2-digit', minute: '2-digit'
+  }).formatToParts(new Date());
+  const hour = Number(parts.find(p => p.type === 'hour').value);
+  const minute = Number(parts.find(p => p.type === 'minute').value);
+  return hour > 16 || (hour === 16 && minute >= 30);
+}
+
 // ── MARKETER ROUTES ──────────────────────────────────────────────────────────
 
 async function publicMarketers() {
@@ -114,7 +125,9 @@ function addDaysUTC(dateStr, days) {
 // A day counts green only once BOTH a login and a logout event exist for it.
 // Today is never marked missed — it's still "pending" until it becomes a past
 // day, at which point an incomplete day naturally falls into "missed" since
-// this is recomputed fresh from today()'s date on every page load.
+// this is recomputed fresh from today()'s date on every page load. Weekends
+// aren't workdays, so an empty Saturday/Sunday doesn't count against them —
+// unless they actually worked it, in which case it still shows complete.
 function buildAttendanceCalendar(events, fromDateStr, toDateStr) {
   const byDate = {};
   events.forEach(e => {
@@ -128,8 +141,11 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr) {
   let dateStr = fromDateStr;
   while (dateStr <= toDateStr) {
     const rec = byDate[dateStr];
+    const dayOfWeek = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     let status;
     if (rec && rec.login && rec.logout) status = 'complete';
+    else if (isWeekend) status = 'weekend';
     else if (dateStr === toDateStr) status = 'pending';
     else status = 'missed';
 
@@ -151,8 +167,16 @@ app.get('/home', requireAuth, async (req, res) => {
 
   const events = await db.getAttendanceForMarketerInRange(req.session.marketerId, fromDate, toDate);
   const attendanceCalendar = buildAttendanceCalendar(events, fromDate, toDate);
+  const canCheckout = submittedToday && isAfterCheckoutTime();
 
-  res.render('home', { name: req.session.marketerName, submittedToday, date: formatDate(), attendanceCalendar });
+  res.render('home', { name: req.session.marketerName, submittedToday, canCheckout, date: formatDate(), attendanceCalendar });
+});
+
+// Plain sign-out for "wrong person is logged in on this device" — ends the
+// session immediately with no location/summary questions. The full
+// end-of-day checkout (which does ask those) lives at GET/POST /logout.
+app.get('/sign-out', requireAuth, (req, res) => {
+  req.session.destroy(() => res.redirect('/'));
 });
 
 app.get('/checklist', requireAuth, async (req, res) => {

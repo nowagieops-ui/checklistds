@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#FF5C00">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Log Out — Dashspid Ops</title>
+  <title>Checkout — Dashspid Ops</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
   <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
@@ -42,7 +42,7 @@
 
       <div class="error" id="logoutError" style="display:none;margin-bottom:12px;"></div>
 
-      <button type="button" class="btn" id="confirmLogoutBtn">Confirm Log Out →</button>
+      <button type="button" class="btn" id="confirmLogoutBtn">Confirm Checkout →</button>
       <a href="/checklist" class="auth-link" style="display:block;text-align:center;margin-top:14px;">← Back, I'm not leaving yet</a>
     </div>
   </div>
@@ -68,7 +68,7 @@
     function resetButton() {
       submitting = false;
       btn.disabled = false;
-      btn.textContent = 'Confirm Log Out →';
+      btn.textContent = 'Confirm Checkout →';
     }
 
     btn.addEventListener('click', function () {
@@ -115,7 +115,7 @@
       function onLocationError(err) {
         if (err && err.code === err.PERMISSION_DENIED) {
           resetButton();
-          showError('Location access is required to log out. Please enable location and try again.');
+          showError('Location access is required to check out. Please enable location and try again.');
           return;
         }
         // GPS fix can take longer than 10s indoors/low signal — retry once
