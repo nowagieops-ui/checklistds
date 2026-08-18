@@ -30,7 +30,12 @@
       <div class="card-title">Morning Checklist</div>
       <div class="card-sub">Hi <%= name %>. Complete every item before heading into the field.</div>
 
+      <div class="error" id="checklistError" style="display:none;"></div>
+
       <form method="POST" action="/submit" id="checklistForm">
+        <input type="hidden" name="lat" id="lat">
+        <input type="hidden" name="lng" id="lng">
+        <input type="hidden" name="accuracy" id="accuracy">
 
         <!-- SECTION 1: YOU -->
         <div class="checklist-section">
@@ -195,10 +200,48 @@
   </div>
 
   <script>
-    document.getElementById('checklistForm').addEventListener('submit', function() {
-      document.getElementById('submitBtn').disabled = true;
-      document.getElementById('submitBtn').textContent = 'Submitting...';
-      document.getElementById('loaderOverlay').classList.add('active');
+    var checklistForm = document.getElementById('checklistForm');
+    var submitBtn = document.getElementById('submitBtn');
+    var checklistError = document.getElementById('checklistError');
+    var loaderOverlay = document.getElementById('loaderOverlay');
+    var submitting = false;
+
+    function showChecklistError(msg) {
+      checklistError.textContent = msg;
+      checklistError.style.display = 'block';
+    }
+
+    function resetSubmitBtn() {
+      submitting = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit & Head Into the Field →';
+    }
+
+    checklistForm.addEventListener('submit', function (e) {
+      if (submitting) { e.preventDefault(); return; }
+      e.preventDefault();
+      submitting = true;
+      checklistError.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Getting your location...';
+
+      if (!navigator.geolocation) {
+        resetSubmitBtn();
+        showChecklistError('Location is not supported on this device/browser.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        document.getElementById('lat').value = pos.coords.latitude;
+        document.getElementById('lng').value = pos.coords.longitude;
+        document.getElementById('accuracy').value = pos.coords.accuracy;
+        submitBtn.textContent = 'Submitting...';
+        loaderOverlay.classList.add('active');
+        checklistForm.submit();
+      }, function () {
+        resetSubmitBtn();
+        showChecklistError('Location access is required to submit your checklist. Please enable location and try again.');
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     });
   </script>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

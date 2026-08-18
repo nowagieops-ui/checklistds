@@ -88,7 +88,7 @@ app.get('/', async (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-  const { marketer_id, pin, lat, lng, accuracy } = req.body;
+  const { marketer_id, pin } = req.body;
   const marketer = await db.getMarketer(marketer_id, pin);
   const wantsJson = req.get('X-Requested-With') === 'fetch';
 
@@ -96,39 +96,6 @@ app.post('/login', async (req, res) => {
     if (wantsJson) return res.status(401).json({ ok: false, error: 'Incorrect PIN. Please try again.' });
     return res.render('login', { marketers: await publicMarketers(), error: 'Incorrect PIN. Please try again.' });
   }
-
-  if (lat === undefined || lng === undefined || lat === '' || lng === '') {
-    const error = 'Location access is required to check in. Please enable location and try again.';
-    if (wantsJson) return res.status(400).json({ ok: false, error, needsLocation: true });
-    return res.render('login', { marketers: await publicMarketers(), error });
-  }
-
-  const parsedLat = parseFloat(lat);
-  const parsedLng = parseFloat(lng);
-  const ip = clientIp(req);
-  const owner = await db.getDeviceOwner(req.deviceId);
-
-  const result = await evaluateAttendance({
-    marketerId: marketer.id,
-    deviceOwnerId: owner ? owner.id : null,
-    deviceOwnerName: owner ? owner.name : null,
-    lat: parsedLat, lng: parsedLng, ip
-  });
-
-  await db.registerDevice(marketer.id, req.deviceId);
-  await db.addAttendance({
-    marketer_id: marketer.id,
-    marketer_name: marketer.name,
-    type: 'login',
-    lat: parsedLat,
-    lng: parsedLng,
-    accuracy: accuracy ? parseFloat(accuracy) : null,
-    ip,
-    device_id: req.deviceId,
-    user_agent: req.get('User-Agent') || '',
-    flagged: result.flagged,
-    flags: result.flags
-  });
 
   req.session.marketerId = marketer.id;
   req.session.marketerName = marketer.name;
@@ -152,12 +119,46 @@ app.post('/submit', requireAuth, async (req, res) => {
   const existing = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
   if (existing) return res.redirect('/submitted');
 
-  const { zone, targets, notes } = req.body;
+  const { zone, targets, notes, lat, lng, accuracy } = req.body;
+
+  if (lat === undefined || lng === undefined || lat === '' || lng === '') {
+    return res.status(400).send('Location access is required to submit your checklist. Please enable location and try again.');
+  }
+
+  const parsedLat = parseFloat(lat);
+  const parsedLng = parseFloat(lng);
+  const ip = clientIp(req);
+  const owner = await db.getDeviceOwner(req.deviceId);
+  const marketerId = req.session.marketerId;
+  const marketerName = req.session.marketerName;
+
+  const result = await evaluateAttendance({
+    marketerId,
+    deviceOwnerId: owner ? owner.id : null,
+    deviceOwnerName: owner ? owner.name : null,
+    lat: parsedLat, lng: parsedLng, ip
+  });
+
+  await db.registerDevice(marketerId, req.deviceId);
+  await db.addAttendance({
+    marketer_id: marketerId,
+    marketer_name: marketerName,
+    type: 'login',
+    lat: parsedLat,
+    lng: parsedLng,
+    accuracy: accuracy ? parseFloat(accuracy) : null,
+    ip,
+    device_id: req.deviceId,
+    user_agent: req.get('User-Agent') || '',
+    flagged: result.flagged,
+    flags: result.flags
+  });
+
   const checklistItems = Object.keys(req.body).filter(k => k.startsWith('item_'));
 
   const sub = await db.addSubmission({
-    marketer_id: req.session.marketerId,
-    marketer_name: req.session.marketerName,
+    marketer_id: marketerId,
+    marketer_name: marketerName,
     date: today(),
     zone: zone || '',
     targets: targets || '',
