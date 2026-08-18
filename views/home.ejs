@@ -31,7 +31,7 @@
       <div class="card-sub">What do you need to do?</div>
     </div>
 
-    <% if (!submittedToday) { %>
+    <% if (canCheckin) { %>
       <a href="/checklist" class="home-tile">
         <div class="home-tile-body">
           <div class="home-tile-title">Daily Checklist</div>
@@ -47,6 +47,10 @@
         </div>
         <div class="home-tile-arrow">→</div>
       </a>
+    <% } else if (missedCheckin) { %>
+      <div class="card">
+        <div class="card-sub">You didn't check in before the 12pm cutoff today — no checklist available.</div>
+      </div>
     <% } %>
 
     <a href="/riders/new" class="home-tile">

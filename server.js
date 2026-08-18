@@ -74,15 +74,23 @@ function formatTime(isoStr) {
   return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Checkout only becomes available at 4:30pm Lagos time, regardless of what
-// timezone the server itself runs in.
-function isAfterCheckoutTime() {
+// Minutes since midnight in Lagos time, regardless of what timezone the
+// server itself runs in.
+function getLagosMinutesNow() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Africa/Lagos', hour12: false, hour: '2-digit', minute: '2-digit'
   }).formatToParts(new Date());
   const hour = Number(parts.find(p => p.type === 'hour').value);
   const minute = Number(parts.find(p => p.type === 'minute').value);
-  return hour > 16 || (hour === 16 && minute >= 30);
+  return hour * 60 + minute;
+}
+// Checkout only becomes available at 4:30pm Lagos time.
+function isAfterCheckoutTime() {
+  return getLagosMinutesNow() >= 16 * 60 + 30;
+}
+// Check-in closes at 12pm Lagos time — no clocking in for the day after that.
+function isPastCheckinDeadline() {
+  return getLagosMinutesNow() >= 12 * 60;
 }
 
 // ── MARKETER ROUTES ──────────────────────────────────────────────────────────
@@ -167,9 +175,11 @@ app.get('/home', requireAuth, async (req, res) => {
 
   const events = await db.getAttendanceForMarketerInRange(req.session.marketerId, fromDate, toDate);
   const attendanceCalendar = buildAttendanceCalendar(events, fromDate, toDate);
+  const canCheckin = !submittedToday && !isPastCheckinDeadline();
+  const missedCheckin = !submittedToday && isPastCheckinDeadline();
   const canCheckout = submittedToday && isAfterCheckoutTime();
 
-  res.render('home', { name: req.session.marketerName, submittedToday, canCheckout, date: formatDate(), attendanceCalendar });
+  res.render('home', { name: req.session.marketerName, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
 });
 
 // Plain sign-out for "wrong person is logged in on this device" — ends the
