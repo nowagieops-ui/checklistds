@@ -52,7 +52,7 @@
           </div>
 
           <div class="status-detail">
-            <strong>Login:</strong> <%= s.loginTime || '—' %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
+            <strong>Login:</strong> <%= s.loginTime || '—' %><% if (s.loginLat != null && s.loginLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
             <% if (s.logoutTime) { %>
               <strong>Riders onboarded today:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
               <% if (s.daySummary) { %><strong>Day summary:</strong> <%= s.daySummary %><br><% } %>
@@ -122,7 +122,7 @@
               <% const checkTime = formatTime(h.submitted_at); %>
               <% const late = checkTime > cutoff; %>
               <tr>
-                <td><%= new Date(h.date).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'}) %></td>
+                <td><%= h.dateFormatted %></td>
                 <td><strong><%= h.marketer_name %></strong></td>
                 <td><%= checkTime %></td>
                 <td><span class="<%= late ? 'late' : 'on-time' %>"><%= late ? 'Late' : 'On time' %></span></td>
@@ -243,7 +243,7 @@
           <tbody>
             <% flaggedEvents.forEach(a => { %>
               <tr>
-                <td><%= formatDateShort(a.timestamp.split('T')[0]) %> <%= formatTime(a.timestamp) %></td>
+                <td><%= formatDateShort(a.timestamp.slice(0, 10)) %> <%= formatTime(a.timestamp) %></td>
                 <td><strong><%= a.marketer_name %></strong></td>
                 <td><%= a.type === 'login' ? 'Login' : 'Logout' %></td>
                 <td><%= a.ip %></td>

@@ -8,26 +8,19 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  // DATE columns come back as plain 'YYYY-MM-DD' strings instead of JS Date
-  // objects — avoids toISOString() shifting the calendar date across the
-  // UTC/local boundary (the app runs in a UTC+1 timezone).
-  dateStrings: ['DATE']
+  // DATE/DATETIME columns come back as plain strings instead of JS Date
+  // objects. We always write Lagos wall-clock values into these columns
+  // ourselves (see nowLagos() in server.js) rather than relying on SQL
+  // NOW(), which runs in whatever timezone the DB server happens to be
+  // configured for — a mismatch there was making some marketers' same-day
+  // records silently fail date-range lookups. Returning plain strings
+  // avoids mysql2 re-interpreting those values through a third, unrelated
+  // timezone (the Node process's own) when converting to a JS Date object.
+  dateStrings: ['DATE', 'DATETIME']
 });
 
-// DATETIME columns come back as JS Date objects; normalize to ISO strings so
-// the rest of the app keeps working with plain ISO timestamp strings, same
-// as before this was backed by MySQL.
-function toIso(value) {
-  return value instanceof Date ? value.toISOString() : value;
-}
-
 function normalizeRider(r) {
-  return {
-    ...r,
-    created_at: toIso(r.created_at),
-    completed_at: toIso(r.completed_at),
-    completed: !!r.completed
-  };
+  return { ...r, completed: !!r.completed };
 }
 
 const db = {
@@ -46,7 +39,7 @@ const db = {
 
   async getSubmissionsToday(date) {
     const [rows] = await pool.execute('SELECT * FROM submissions WHERE date = ?', [date]);
-    return rows.map(r => ({ ...r, submitted_at: toIso(r.submitted_at) }));
+    return rows;
   },
 
   async getSubmissionByMarketerToday(marketerId, date) {
@@ -54,20 +47,22 @@ const db = {
       'SELECT * FROM submissions WHERE marketer_id = ? AND date = ? LIMIT 1',
       [parseInt(marketerId), date]
     );
-    return rows[0] ? { ...rows[0], submitted_at: toIso(rows[0].submitted_at) } : undefined;
+    return rows[0];
   },
 
+  // data.submitted_at is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string
+  // (see nowLagos() in server.js) — not SQL NOW().
   async addSubmission(data) {
     const [result] = await pool.execute(
       `INSERT INTO submissions (marketer_id, marketer_name, date, zone, targets, checklist_items, notes, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.marketer_id, data.marketer_name, data.date,
-        data.zone, data.targets, JSON.stringify(data.checklist_items || []), data.notes
+        data.zone, data.targets, JSON.stringify(data.checklist_items || []), data.notes, data.submitted_at
       ]
     );
     const [rows] = await pool.execute('SELECT * FROM submissions WHERE id = ?', [result.insertId]);
-    return { ...rows[0], submitted_at: toIso(rows[0].submitted_at) };
+    return rows[0];
   },
 
   async getSubmissionsInRange(fromDate, toDate) {
@@ -75,7 +70,7 @@ const db = {
       'SELECT * FROM submissions WHERE date BETWEEN ? AND ? ORDER BY submitted_at DESC',
       [fromDate, toDate]
     );
-    return rows.map(r => ({ ...r, submitted_at: toIso(r.submitted_at) }));
+    return rows;
   },
 
   // Returns { id, name } of the marketer this device cookie is already tied
@@ -97,11 +92,13 @@ const db = {
     );
   },
 
+  // entry.timestamp is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see
+  // nowLagos() in server.js) — not SQL NOW().
   async addAttendance(entry) {
     const [result] = await pool.execute(
       `INSERT INTO attendance
         (marketer_id, marketer_name, type, lat, lng, accuracy, ip, device_id, user_agent, flagged, flags, riders_onboarded, summary, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         entry.marketer_id,
         entry.marketer_name,
@@ -115,16 +112,17 @@ const db = {
         entry.flagged ? 1 : 0,
         JSON.stringify(entry.flags || []),
         entry.riders_onboarded != null ? entry.riders_onboarded : null,
-        entry.summary != null ? entry.summary : null
+        entry.summary != null ? entry.summary : null,
+        entry.timestamp
       ]
     );
     const [rows] = await pool.execute('SELECT * FROM attendance WHERE id = ?', [result.insertId]);
-    return { ...rows[0], timestamp: toIso(rows[0].timestamp), flagged: !!rows[0].flagged };
+    return { ...rows[0], flagged: !!rows[0].flagged };
   },
 
   async getAttendanceToday(date) {
     const [rows] = await pool.execute('SELECT * FROM attendance WHERE DATE(timestamp) = ?', [date]);
-    return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
+    return rows.map(r => ({ ...r, flagged: !!r.flagged }));
   },
 
   async getAttendanceInRange(fromDate, toDate) {
@@ -132,7 +130,7 @@ const db = {
       'SELECT * FROM attendance WHERE DATE(timestamp) BETWEEN ? AND ? ORDER BY timestamp DESC',
       [fromDate, toDate]
     );
-    return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
+    return rows.map(r => ({ ...r, flagged: !!r.flagged }));
   },
 
   async getAttendanceForMarketerInRange(marketerId, fromDate, toDate) {
@@ -140,7 +138,7 @@ const db = {
       'SELECT * FROM attendance WHERE marketer_id = ? AND DATE(timestamp) BETWEEN ? AND ? ORDER BY timestamp ASC',
       [parseInt(marketerId), fromDate, toDate]
     );
-    return rows.map(r => ({ ...r, timestamp: toIso(r.timestamp), flagged: !!r.flagged }));
+    return rows.map(r => ({ ...r, flagged: !!r.flagged }));
   },
 
   // Returns 'YYYY-MM-DD' of this marketer's very first attendance record, or
@@ -154,11 +152,13 @@ const db = {
     return rows[0] ? rows[0].earliest : null;
   },
 
-  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name }) {
+  // createdAt is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see
+  // nowLagos() in server.js) — not SQL NOW().
+  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name }, createdAt) {
     const [result] = await pool.execute(
       `INSERT INTO riders (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed)
-       VALUES (?, ?, ?, ?, ?, NOW(), ?, 0)`,
-      [name, email, phone, added_by_marketer_id, added_by_marketer_name, JSON.stringify([])]
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+      [name, email, phone, added_by_marketer_id, added_by_marketer_name, createdAt, JSON.stringify([])]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [result.insertId]);
     return normalizeRider(rows[0]);
@@ -169,10 +169,10 @@ const db = {
     return rows[0] ? normalizeRider(rows[0]) : undefined;
   },
 
-  async completeRiderChecklist(riderId, checklistItems, notes) {
+  async completeRiderChecklist(riderId, checklistItems, notes, completedAt) {
     await pool.execute(
-      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = NOW() WHERE id = ?',
-      [JSON.stringify(checklistItems || []), notes || null, parseInt(riderId)]
+      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = ? WHERE id = ?',
+      [JSON.stringify(checklistItems || []), notes || null, completedAt, parseInt(riderId)]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [parseInt(riderId)]);
     return rows[0] ? normalizeRider(rows[0]) : null;

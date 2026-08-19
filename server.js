@@ -61,28 +61,47 @@ function requireManagement(req, res, next) {
   if (req.session.isManagement) return next();
   res.redirect('/management-login');
 }
+// Everything time-related is pinned to Africa/Lagos explicitly, never left
+// to the server's own timezone. The app runs on shared hosting whose local
+// time isn't guaranteed, and a mismatch between how a timestamp gets
+// written (e.g. MySQL's NOW(), or a JS Date's default local formatting)
+// and how "today" gets computed on read can make a same-day record vanish
+// from date-range queries entirely — that's what was happening.
+function lagosParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Lagos', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).formatToParts(date);
+  const get = t => parts.find(p => p.type === t).value;
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
+}
 function today() {
-  return new Date().toISOString().split('T')[0];
+  const p = lagosParts();
+  return `${p.year}-${p.month}-${p.day}`;
+}
+// Lagos wall-clock datetime as 'YYYY-MM-DD HH:MM:SS', for writing to
+// DATETIME columns instead of relying on MySQL's NOW().
+function nowLagos() {
+  const p = lagosParts();
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
 function formatDate() {
-  return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date().toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 function formatDateShort(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'short', day: 'numeric', month: 'short' });
 }
-function formatTime(isoStr) {
-  return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+// datetimeStr is already a 'YYYY-MM-DD HH:MM:SS' Lagos wall-clock string
+// (see nowLagos()), so this is a plain substring — no further timezone
+// conversion needed or wanted.
+function formatTime(datetimeStr) {
+  return datetimeStr.slice(11, 16);
 }
 
-// Minutes since midnight in Lagos time, regardless of what timezone the
-// server itself runs in.
+// Minutes since midnight in Lagos time.
 function getLagosMinutesNow() {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Lagos', hour12: false, hour: '2-digit', minute: '2-digit'
-  }).formatToParts(new Date());
-  const hour = Number(parts.find(p => p.type === 'hour').value);
-  const minute = Number(parts.find(p => p.type === 'minute').value);
-  return hour * 60 + minute;
+  const p = lagosParts();
+  return Number(p.hour) * 60 + Number(p.minute);
 }
 // Checkout only becomes available at 4:30pm Lagos time.
 function isAfterCheckoutTime() {
@@ -139,7 +158,7 @@ function addDaysUTC(dateStr, days) {
 function buildAttendanceCalendar(events, fromDateStr, toDateStr) {
   const byDate = {};
   events.forEach(e => {
-    const d = e.timestamp.split('T')[0];
+    const d = e.timestamp.slice(0, 10);
     if (!byDate[d]) byDate[d] = { login: false, logout: false };
     if (e.type === 'login') byDate[d].login = true;
     if (e.type === 'logout') byDate[d].logout = true;
@@ -231,7 +250,8 @@ app.post('/submit', requireAuth, async (req, res) => {
     device_id: req.deviceId,
     user_agent: req.get('User-Agent') || '',
     flagged: result.flagged,
-    flags: result.flags
+    flags: result.flags,
+    timestamp: nowLagos()
   });
 
   const checklistItems = Object.keys(req.body).filter(k => k.startsWith('item_'));
@@ -243,7 +263,8 @@ app.post('/submit', requireAuth, async (req, res) => {
     zone: zone || '',
     targets: targets || '',
     checklist_items: checklistItems,
-    notes: notes || ''
+    notes: notes || '',
+    submitted_at: nowLagos()
   });
 
   const time = formatTime(sub.submitted_at);
@@ -285,7 +306,7 @@ app.post('/riders', requireAuth, async (req, res) => {
     phone: phone.trim(),
     added_by_marketer_id: req.session.marketerId,
     added_by_marketer_name: req.session.marketerName
-  });
+  }, nowLagos());
 
   res.redirect(`/riders/${rider.id}/checklist`);
 });
@@ -302,7 +323,7 @@ app.post('/riders/:id/checklist', requireAuth, async (req, res) => {
   if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/home');
 
   const checklistItems = Object.keys(req.body).filter(k => k.startsWith('item_'));
-  await db.completeRiderChecklist(rider.id, checklistItems, req.body.notes);
+  await db.completeRiderChecklist(rider.id, checklistItems, req.body.notes, nowLagos());
   res.redirect(`/riders/${rider.id}/done`);
 });
 
@@ -356,7 +377,8 @@ app.post('/logout', requireAuth, async (req, res) => {
     flagged: result.flagged,
     flags: result.flags,
     riders_onboarded: ridersToday,
-    summary: (summary || '').trim()
+    summary: (summary || '').trim(),
+    timestamp: nowLagos()
   });
 
   req.session.destroy(() => {
@@ -391,7 +413,7 @@ app.post('/management-login', (req, res) => {
 function buildAttendanceHistory(events) {
   const grouped = {};
   events.forEach(e => {
-    const date = e.timestamp.split('T')[0];
+    const date = e.timestamp.slice(0, 10);
     const key = date + '_' + e.marketer_id;
     if (!grouped[key]) {
       grouped[key] = { date, marketer_id: e.marketer_id, marketer_name: e.marketer_name, login: null, logout: null, flagged: false, ridersOnboarded: null, summary: '' };
@@ -421,9 +443,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const cutoff = process.env.CHECKIN_CUTOFF || '08:45';
 
   const defaultTo = today();
-  const defaultFromDate = new Date();
-  defaultFromDate.setDate(defaultFromDate.getDate() - 6);
-  const defaultFrom = defaultFromDate.toISOString().split('T')[0];
+  const defaultFrom = addDaysUTC(defaultTo, -6);
 
   const from = isValidDateParam(req.query.from) ? req.query.from : defaultFrom;
   const to = isValidDateParam(req.query.to) ? req.query.to : defaultTo;
@@ -442,6 +462,8 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     return { ...m, submitted: !!sub, checkIn, isLate,
       zone: sub?.zone || '—', targets: sub?.targets || '—', notes: sub?.notes || '—',
       loginTime: lastLogin ? formatTime(lastLogin.timestamp) : null,
+      loginLat: lastLogin ? lastLogin.lat : null,
+      loginLng: lastLogin ? lastLogin.lng : null,
       logoutTime: lastLogout ? formatTime(lastLogout.timestamp) : null,
       ridersOnboardedToday: lastLogout ? lastLogout.riders_onboarded : null,
       daySummary: lastLogout ? lastLogout.summary : null,
@@ -469,7 +491,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const ridersInRange = await db.getRidersInRange(from, to);
   const riders = ridersInRange.map(r => ({
     ...r,
-    dateAdded: formatDateShort(r.created_at.split('T')[0]),
+    dateAdded: formatDateShort(r.created_at.slice(0, 10)),
     timeAdded: formatTime(r.created_at),
     timeCompleted: r.completed_at ? formatTime(r.completed_at) : null
   }));
