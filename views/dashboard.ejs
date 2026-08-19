@@ -52,7 +52,7 @@
           </div>
 
           <div class="status-detail">
-            <strong>Login:</strong> <%= s.loginTime || '—' %><% if (s.loginLat != null && s.loginLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
+            <strong>Login:</strong> <%= s.loginTime || '—' %><% if (s.loginLat != null && s.loginLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><% if (s.logoutLat != null && s.logoutLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.logoutLat %>,<%= s.logoutLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %><br>
             <% if (s.logoutTime) { %>
               <strong>Riders onboarded today:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
               <% if (s.daySummary) { %><strong>Day summary:</strong> <%= s.daySummary %><br><% } %>

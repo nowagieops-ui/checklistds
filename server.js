@@ -465,6 +465,8 @@ app.get('/dashboard', requireManagement, async (req, res) => {
       loginLat: lastLogin ? lastLogin.lat : null,
       loginLng: lastLogin ? lastLogin.lng : null,
       logoutTime: lastLogout ? formatTime(lastLogout.timestamp) : null,
+      logoutLat: lastLogout ? lastLogout.lat : null,
+      logoutLng: lastLogout ? lastLogout.lng : null,
       ridersOnboardedToday: lastLogout ? lastLogout.riders_onboarded : null,
       daySummary: lastLogout ? lastLogout.summary : null,
       attendanceFlagged: events.some(e => e.flagged)
