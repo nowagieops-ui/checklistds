@@ -38,7 +38,12 @@ async function reverseGeocode(lat, lng) {
     });
     return data && data.display_name ? data.display_name : null;
   } catch (e) {
-    // ignore — address is a nice-to-have, never blocks check-in/out
+    // Address is a nice-to-have, never blocks check-in/out — but log the
+    // real cause (timeout, DNS, 4xx/5xx from Nominatim) so a run of
+    // "Address unavailable" entries is diagnosable from the runtime logs
+    // instead of a silent, unexplained failure.
+    const detail = e.response ? `HTTP ${e.response.status}` : e.code || e.message;
+    console.error(`[reverseGeocode] failed for ${lat},${lng}: ${detail}`);
   }
   return null;
 }

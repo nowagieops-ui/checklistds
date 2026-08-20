@@ -75,6 +75,7 @@
                 <%= s.loginLat %>, <%= s.loginLng %>
                 <a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener">View on map</a>
               </div>
+              <% if (s.loginDevice) { %><div class="location-block-coords">Device: <%= s.loginDevice %></div><% } %>
             </div>
           <% } %>
 
@@ -86,6 +87,7 @@
                 <%= s.logoutLat %>, <%= s.logoutLng %>
                 <a href="https://www.google.com/maps?q=<%= s.logoutLat %>,<%= s.logoutLng %>" target="_blank" rel="noopener">View on map</a>
               </div>
+              <% if (s.logoutDevice) { %><div class="location-block-coords">Device: <%= s.logoutDevice %></div><% } %>
             </div>
           <% } %>
         </div>
@@ -258,6 +260,7 @@
               <th>Marketer</th>
               <th>Type</th>
               <th>IP</th>
+              <th>Device</th>
               <th>Location</th>
               <th>Reason</th>
             </tr>
@@ -269,6 +272,7 @@
                 <td><strong><%= a.marketer_name %></strong></td>
                 <td><%= a.type === 'login' ? 'Login' : 'Logout' %></td>
                 <td><%= a.ip %></td>
+                <td><%= a.device || 'Unknown device' %></td>
                 <td style="min-width:200px;">
                   <div class="location-block-address"><%= a.address || 'Address unavailable' %></div>
                   <div class="location-block-coords">

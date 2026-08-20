@@ -98,6 +98,32 @@ function formatTime(datetimeStr) {
   return datetimeStr.slice(11, 16);
 }
 
+// Turns a raw User-Agent string into a short "device · browser" label for
+// the dashboard (e.g. "iPhone · Safari") instead of the full unreadable UA
+// string. Best-effort pattern matching, not a full UA parser.
+function describeDevice(userAgent) {
+  if (!userAgent) return null;
+
+  let device = null;
+  if (/iPhone/i.test(userAgent)) device = 'iPhone';
+  else if (/iPad/i.test(userAgent)) device = 'iPad';
+  else if (/Android/i.test(userAgent)) {
+    const model = userAgent.match(/Android [\d.]+;\s*([^)]+)\)/);
+    device = model ? `Android (${model[1].trim()})` : 'Android';
+  } else if (/Windows/i.test(userAgent)) device = 'Windows PC';
+  else if (/Macintosh/i.test(userAgent)) device = 'Mac';
+  else if (/Linux/i.test(userAgent)) device = 'Linux';
+
+  let browser = null;
+  if (/EdgA|Edge/i.test(userAgent)) browser = 'Edge';
+  else if (/CriOS|Chrome/i.test(userAgent)) browser = 'Chrome';
+  else if (/FxiOS|Firefox/i.test(userAgent)) browser = 'Firefox';
+  else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) browser = 'Safari';
+
+  if (device && browser) return `${device} · ${browser}`;
+  return device || browser || 'Unknown device';
+}
+
 // Minutes since midnight in Lagos time.
 function getLagosMinutesNow() {
   const p = lagosParts();
@@ -467,10 +493,12 @@ app.get('/dashboard', requireManagement, async (req, res) => {
       loginLat: lastLogin ? lastLogin.lat : null,
       loginLng: lastLogin ? lastLogin.lng : null,
       loginAddress: lastLogin ? lastLogin.address : null,
+      loginDevice: lastLogin ? describeDevice(lastLogin.user_agent) : null,
       logoutTime: lastLogout ? formatTime(lastLogout.timestamp) : null,
       logoutLat: lastLogout ? lastLogout.lat : null,
       logoutLng: lastLogout ? lastLogout.lng : null,
       logoutAddress: lastLogout ? lastLogout.address : null,
+      logoutDevice: lastLogout ? describeDevice(lastLogout.user_agent) : null,
       ridersOnboardedToday: lastLogout ? lastLogout.riders_onboarded : null,
       daySummary: lastLogout ? lastLogout.summary : null,
       attendanceFlagged: events.some(e => e.flagged)
@@ -478,7 +506,10 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   });
 
   const rangedAttendance = await db.getAttendanceInRange(from, to);
-  const flaggedEvents = rangedAttendance.filter(a => a.flagged);
+  const flaggedEvents = rangedAttendance.filter(a => a.flagged).map(a => ({
+    ...a,
+    device: describeDevice(a.user_agent)
+  }));
   const attendanceHistory = buildAttendanceHistory(rangedAttendance).map(g => ({
     ...g,
     dateFormatted: formatDateShort(g.date),
