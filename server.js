@@ -175,18 +175,23 @@ function addDaysUTC(dateStr, days) {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().split('T')[0];
 }
 
-// A day counts green only once BOTH a login and a logout event exist for it.
-// Today is never marked missed — it's still "pending" until it becomes a past
-// day, at which point an incomplete day naturally falls into "missed" since
-// this is recomputed fresh from today()'s date on every page load. Weekends
-// aren't workdays, so an empty Saturday/Sunday doesn't count against them —
-// unless they actually worked it, in which case it still shows complete.
-function buildAttendanceCalendar(events, fromDateStr, toDateStr) {
+// A day counts green only once BOTH a login and a logout event exist for it
+// AND the login happened before the cutoff — a late-but-complete day shows
+// amber instead, not green. Today is never marked missed — it's still
+// "pending" until it becomes a past day, at which point an incomplete day
+// naturally falls into "missed" since this is recomputed fresh from
+// today()'s date on every page load. Weekends aren't workdays, so an empty
+// Saturday/Sunday doesn't count against them — unless they actually worked
+// it, in which case it still shows complete/late like any other day.
+function buildAttendanceCalendar(events, fromDateStr, toDateStr, cutoff) {
   const byDate = {};
   events.forEach(e => {
     const d = e.timestamp.slice(0, 10);
-    if (!byDate[d]) byDate[d] = { login: false, logout: false };
-    if (e.type === 'login') byDate[d].login = true;
+    if (!byDate[d]) byDate[d] = { login: false, logout: false, loginTime: null };
+    if (e.type === 'login') {
+      byDate[d].login = true;
+      byDate[d].loginTime = e.timestamp.slice(11, 16);
+    }
     if (e.type === 'logout') byDate[d].logout = true;
   });
 
@@ -197,7 +202,7 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr) {
     const dayOfWeek = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 0 = Sunday, 6 = Saturday
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     let status;
-    if (rec && rec.login && rec.logout) status = 'complete';
+    if (rec && rec.login && rec.logout) status = rec.loginTime > cutoff ? 'late' : 'complete';
     else if (isWeekend) status = 'weekend';
     else if (dateStr === toDateStr) status = 'pending';
     else status = 'missed';
@@ -219,7 +224,8 @@ app.get('/home', requireAuth, async (req, res) => {
   const fromDate = !earliestDate ? toDate : (earliestDate > maxLookback ? earliestDate : maxLookback);
 
   const events = await db.getAttendanceForMarketerInRange(req.session.marketerId, fromDate, toDate);
-  const attendanceCalendar = buildAttendanceCalendar(events, fromDate, toDate);
+  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
+  const attendanceCalendar = buildAttendanceCalendar(events, fromDate, toDate, cutoff);
   const canCheckin = !submittedToday && !isPastCheckinDeadline();
   const missedCheckin = !submittedToday && isPastCheckinDeadline();
   const canCheckout = submittedToday && isAfterCheckoutTime();
@@ -295,7 +301,7 @@ app.post('/submit', requireAuth, async (req, res) => {
   });
 
   const time = formatTime(sub.submitted_at);
-  const cutoff = process.env.CHECKIN_CUTOFF || '08:45';
+  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
   const isLate = time > cutoff;
   const status = isLate ? 'LATE' : 'ON TIME';
 
@@ -486,7 +492,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const marketers = await db.getMarketers();
   const todaySubs = await db.getSubmissionsToday(today());
   const todayAttendance = await db.getAttendanceToday(today());
-  const cutoff = process.env.CHECKIN_CUTOFF || '08:45';
+  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
 
   const defaultTo = today();
   const defaultFrom = addDaysUTC(defaultTo, -6);
