@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   flags JSON,
   riders_onboarded INT,
   summary TEXT,
+  address VARCHAR(500),
   timestamp DATETIME NOT NULL,
   FOREIGN KEY (marketer_id) REFERENCES marketers(id)
 );

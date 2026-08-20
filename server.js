@@ -251,6 +251,7 @@ app.post('/submit', requireAuth, async (req, res) => {
     user_agent: req.get('User-Agent') || '',
     flagged: result.flagged,
     flags: result.flags,
+    address: result.address,
     timestamp: nowLagos()
   });
 
@@ -378,6 +379,7 @@ app.post('/logout', requireAuth, async (req, res) => {
     flags: result.flags,
     riders_onboarded: ridersToday,
     summary: (summary || '').trim(),
+    address: result.address,
     timestamp: nowLagos()
   });
 
@@ -464,9 +466,11 @@ app.get('/dashboard', requireManagement, async (req, res) => {
       loginTime: lastLogin ? formatTime(lastLogin.timestamp) : null,
       loginLat: lastLogin ? lastLogin.lat : null,
       loginLng: lastLogin ? lastLogin.lng : null,
+      loginAddress: lastLogin ? lastLogin.address : null,
       logoutTime: lastLogout ? formatTime(lastLogout.timestamp) : null,
       logoutLat: lastLogout ? lastLogout.lat : null,
       logoutLng: lastLogout ? lastLogout.lng : null,
+      logoutAddress: lastLogout ? lastLogout.address : null,
       ridersOnboardedToday: lastLogout ? lastLogout.riders_onboarded : null,
       daySummary: lastLogout ? lastLogout.summary : null,
       attendanceFlagged: events.some(e => e.flagged)

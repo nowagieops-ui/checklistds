@@ -97,8 +97,8 @@ const db = {
   async addAttendance(entry) {
     const [result] = await pool.execute(
       `INSERT INTO attendance
-        (marketer_id, marketer_name, type, lat, lng, accuracy, ip, device_id, user_agent, flagged, flags, riders_onboarded, summary, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (marketer_id, marketer_name, type, lat, lng, accuracy, ip, device_id, user_agent, flagged, flags, riders_onboarded, summary, address, timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         entry.marketer_id,
         entry.marketer_name,
@@ -113,6 +113,7 @@ const db = {
         JSON.stringify(entry.flags || []),
         entry.riders_onboarded != null ? entry.riders_onboarded : null,
         entry.summary != null ? entry.summary : null,
+        entry.address != null ? entry.address : null,
         entry.timestamp
       ]
     );

@@ -52,7 +52,7 @@
           </div>
 
           <div class="status-detail">
-            <strong>Login:</strong> <%= s.loginTime || '—' %><% if (s.loginLat != null && s.loginLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><% if (s.logoutLat != null && s.logoutLng != null) { %> (<a href="https://www.google.com/maps?q=<%= s.logoutLat %>,<%= s.logoutLng %>" target="_blank" rel="noopener" style="color:var(--orange);">map</a>)<% } %><br>
+            <strong>Login:</strong> <%= s.loginTime || '—' %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
             <% if (s.logoutTime) { %>
               <strong>Riders onboarded today:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
               <% if (s.daySummary) { %><strong>Day summary:</strong> <%= s.daySummary %><br><% } %>
@@ -66,6 +66,28 @@
               Has not submitted today's checklist yet.
             <% } %>
           </div>
+
+          <% if (s.loginLat != null && s.loginLng != null) { %>
+            <div class="location-block">
+              <div class="location-block-label">Login location</div>
+              <div class="location-block-address"><%= s.loginAddress || 'Address unavailable' %></div>
+              <div class="location-block-coords">
+                <%= s.loginLat %>, <%= s.loginLng %>
+                <a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener">View on map</a>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (s.logoutLat != null && s.logoutLng != null) { %>
+            <div class="location-block">
+              <div class="location-block-label">Logout location</div>
+              <div class="location-block-address"><%= s.logoutAddress || 'Address unavailable' %></div>
+              <div class="location-block-coords">
+                <%= s.logoutLat %>, <%= s.logoutLng %>
+                <a href="https://www.google.com/maps?q=<%= s.logoutLat %>,<%= s.logoutLng %>" target="_blank" rel="noopener">View on map</a>
+              </div>
+            </div>
+          <% } %>
         </div>
       <% }) %>
     </div>
@@ -247,7 +269,13 @@
                 <td><strong><%= a.marketer_name %></strong></td>
                 <td><%= a.type === 'login' ? 'Login' : 'Logout' %></td>
                 <td><%= a.ip %></td>
-                <td><a href="https://www.google.com/maps?q=<%= a.lat %>,<%= a.lng %>" target="_blank" rel="noopener" style="color:var(--orange);">View on map</a></td>
+                <td style="min-width:200px;">
+                  <div class="location-block-address"><%= a.address || 'Address unavailable' %></div>
+                  <div class="location-block-coords">
+                    <%= a.lat %>, <%= a.lng %>
+                    <a href="https://www.google.com/maps?q=<%= a.lat %>,<%= a.lng %>" target="_blank" rel="noopener">View on map</a>
+                  </div>
+                </td>
                 <td><%= a.flags.join('; ') %></td>
               </tr>
             <% }) %>

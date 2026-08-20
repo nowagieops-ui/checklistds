@@ -353,6 +353,21 @@ a.app-header-brand { cursor: pointer; }
 .legend-dot-pending { background: var(--border); }
 .legend-dot-weekend { background: transparent; border: 1px dashed var(--border); }
 
+.location-block {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.location-block-label { font-weight: 700; color: var(--dark); }
+.location-block-address { color: var(--dark); }
+.location-block-coords { color: var(--gray); }
+.location-block-coords a { color: var(--orange); text-decoration: none; margin-left: 6px; }
+.location-block-coords a:hover { text-decoration: underline; }
+
 /* ── LOADER (AJAX submit) ── */
 .loader-overlay {
   position: fixed;
