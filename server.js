@@ -333,12 +333,26 @@ app.post('/riders', requireAuth, async (req, res) => {
     return res.render('rider-new', { name: req.session.marketerName, error: 'Please fill in the rider\'s name, email, and phone number.' });
   }
 
+  const marketerId = req.session.marketerId;
+
+  // Same device-ownership check used for attendance — flags (never blocks)
+  // when the phone that logged this rider was last tied to a different
+  // marketer, which is exactly the "same phone, different account" signal.
+  const owner = await db.getDeviceOwner(req.deviceId);
+  const deviceFlagged = !!(owner && owner.id !== marketerId);
+  const deviceFlagReason = deviceFlagged ? `This device was last used to check in as ${owner.name}` : null;
+  await db.registerDevice(marketerId, req.deviceId);
+
   const rider = await db.addRider({
     name: name.trim(),
     email: email.trim(),
     phone: phone.trim(),
-    added_by_marketer_id: req.session.marketerId,
-    added_by_marketer_name: req.session.marketerName
+    added_by_marketer_id: marketerId,
+    added_by_marketer_name: req.session.marketerName,
+    device_id: req.deviceId,
+    user_agent: req.get('User-Agent') || '',
+    device_flagged: deviceFlagged,
+    device_flag_reason: deviceFlagReason
   }, nowLagos());
 
   res.redirect(`/riders/${rider.id}/checklist`);
@@ -554,7 +568,8 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     ...r,
     dateAdded: formatDateShort(r.created_at.slice(0, 10)),
     timeAdded: formatTime(r.created_at),
-    timeCompleted: r.completed_at ? formatTime(r.completed_at) : null
+    timeCompleted: r.completed_at ? formatTime(r.completed_at) : null,
+    device: describeDevice(r.user_agent)
   }));
 
   res.render('dashboard', {

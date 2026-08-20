@@ -219,6 +219,7 @@
               <th>Email</th>
               <th>Phone</th>
               <th>Added By</th>
+              <th>Device Used</th>
               <th>Checklist Status</th>
               <th>Notes</th>
             </tr>
@@ -231,6 +232,12 @@
                 <td><%= r.email %></td>
                 <td><%= r.phone %></td>
                 <td><%= r.added_by_marketer_name %></td>
+                <td>
+                  <%= r.device || 'Unknown device' %>
+                  <% if (r.device_flagged) { %>
+                    <br><span class="badge badge-red" title="<%= r.device_flag_reason %>">Flagged</span>
+                  <% } %>
+                </td>
                 <td>
                   <% if (r.completed) { %>
                     <span class="badge badge-green">Done — <%= r.timeCompleted %></span>

@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS riders (
   notes TEXT,
   completed TINYINT(1) NOT NULL DEFAULT 0,
   completed_at DATETIME,
+  device_id VARCHAR(64),
+  user_agent TEXT,
+  device_flagged TINYINT(1) NOT NULL DEFAULT 0,
+  device_flag_reason VARCHAR(500),
   FOREIGN KEY (added_by_marketer_id) REFERENCES marketers(id)
 );
 

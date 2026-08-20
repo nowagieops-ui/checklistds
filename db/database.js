@@ -20,7 +20,7 @@ const pool = mysql.createPool({
 });
 
 function normalizeRider(r) {
-  return { ...r, completed: !!r.completed };
+  return { ...r, completed: !!r.completed, device_flagged: !!r.device_flagged };
 }
 
 const db = {
@@ -164,11 +164,18 @@ const db = {
 
   // createdAt is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see
   // nowLagos() in server.js) — not SQL NOW().
-  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name }, createdAt) {
+  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name, device_id, user_agent, device_flagged, device_flag_reason }, createdAt) {
     const [result] = await pool.execute(
-      `INSERT INTO riders (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-      [name, email, phone, added_by_marketer_id, added_by_marketer_name, createdAt, JSON.stringify([])]
+      `INSERT INTO riders
+        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, device_id, user_agent, device_flagged, device_flag_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+      [
+        name, email, phone, added_by_marketer_id, added_by_marketer_name, createdAt, JSON.stringify([]),
+        device_id || null,
+        user_agent || null,
+        device_flagged ? 1 : 0,
+        device_flag_reason || null
+      ]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [result.insertId]);
     return normalizeRider(rows[0]);
