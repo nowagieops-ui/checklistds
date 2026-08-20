@@ -435,6 +435,24 @@ app.post('/management-login', (req, res) => {
   res.render('management-login', { error: 'Incorrect PIN.' });
 });
 
+app.get('/management/staff/new', requireManagement, (req, res) => {
+  res.render('staff-new', { error: null });
+});
+
+app.post('/management/staff', requireManagement, async (req, res) => {
+  const { name, pin } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.render('staff-new', { error: 'Enter the staff member\'s name.' });
+  }
+  if (!/^\d{4}$/.test(pin || '')) {
+    return res.render('staff-new', { error: 'PIN must be exactly 4 digits.' });
+  }
+
+  await db.addMarketer({ name: name.trim(), pin });
+  res.redirect('/dashboard');
+});
+
 // Collapses a flat list of login/logout events into one row per marketer per
 // day (earliest login, latest logout) so management can scan a week of
 // attendance without wading through every raw event.

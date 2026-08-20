@@ -37,6 +37,15 @@ const db = {
     return rows[0];
   },
 
+  async addMarketer({ name, pin }) {
+    const [result] = await pool.execute(
+      'INSERT INTO marketers (name, pin, active) VALUES (?, ?, 1)',
+      [name, pin]
+    );
+    const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [result.insertId]);
+    return rows[0];
+  },
+
   async getSubmissionsToday(date) {
     const [rows] = await pool.execute('SELECT * FROM submissions WHERE date = ?', [date]);
     return rows;
