@@ -25,11 +25,21 @@
 
     <div class="dash-header" style="margin-top:1.5rem;">
       <div>
-        <div class="dash-title">Today's Check-In Status</div>
-        <div class="dash-date"><%= today %> · Cutoff <%= cutoff %> · Auto-refreshes every 2 minutes</div>
+        <div class="dash-title"><%= statusDate === todayDateStr ? "Today's Check-In Status" : 'Check-In Status' %></div>
+        <div class="dash-date"><%= statusDateFormatted %> · Cutoff <%= cutoff %><%= statusDate === todayDateStr ? ' · Auto-refreshes every 2 minutes' : '' %></div>
       </div>
       <a href="/management/staff/new" class="btn btn-outline" style="width:auto;padding:10px 18px;margin:0;">+ Add Staff</a>
     </div>
+
+    <form method="GET" action="/dashboard" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;">
+        <label for="date">View check-in status for</label>
+        <input type="date" name="date" id="date" value="<%= statusDate %>" max="<%= todayDateStr %>" style="margin-bottom:0;">
+      </div>
+      <button type="submit" class="btn" style="width:auto;padding:12px 24px;margin:0;">View</button>
+      <input type="hidden" name="from" value="<%= from %>">
+      <input type="hidden" name="to" value="<%= to %>">
+    </form>
 
     <div class="status-grid">
       <% status.forEach(s => { %>
@@ -55,7 +65,7 @@
           <div class="status-detail">
             <strong>Login:</strong> <%= s.loginTime || '—' %> · <strong>Logout:</strong> <%= s.logoutTime || '—' %><br>
             <% if (s.logoutTime) { %>
-              <strong>Riders onboarded today:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
+              <strong>Riders onboarded:</strong> <%= s.ridersOnboardedToday != null ? s.ridersOnboardedToday : '—' %><br>
               <% if (s.daySummary) { %><strong>Day summary:</strong> <%= s.daySummary %><br><% } %>
             <% } %>
             <% if (s.submitted) { %>
@@ -64,7 +74,7 @@
               <strong>Targets:</strong> <%= s.targets %><br>
               <% if (s.notes && s.notes !== '—') { %><strong>Notes:</strong> <%= s.notes %><% } %>
             <% } else { %>
-              Has not submitted today's checklist yet.
+              Has not submitted a checklist for this day.
             <% } %>
           </div>
 
@@ -76,6 +86,9 @@
                 <%= s.loginLat %>, <%= s.loginLng %>
                 <a href="https://www.google.com/maps?q=<%= s.loginLat %>,<%= s.loginLng %>" target="_blank" rel="noopener">View on map</a>
               </div>
+              <% if (s.loginAccuracy != null) { %>
+                <div class="location-block-coords">Accuracy: ±<%= Math.round(s.loginAccuracy) %>m<% if (s.loginAccuracy > 500) { %> (low precision — could be a weak GPS/network fix, not necessarily wrong)<% } %></div>
+              <% } %>
               <% if (s.loginDevice) { %><div class="location-block-coords">Device: <%= s.loginDevice %></div><% } %>
             </div>
           <% } %>
@@ -88,6 +101,9 @@
                 <%= s.logoutLat %>, <%= s.logoutLng %>
                 <a href="https://www.google.com/maps?q=<%= s.logoutLat %>,<%= s.logoutLng %>" target="_blank" rel="noopener">View on map</a>
               </div>
+              <% if (s.logoutAccuracy != null) { %>
+                <div class="location-block-coords">Accuracy: ±<%= Math.round(s.logoutAccuracy) %>m<% if (s.logoutAccuracy > 500) { %> (low precision — could be a weak GPS/network fix, not necessarily wrong)<% } %></div>
+              <% } %>
               <% if (s.logoutDevice) { %><div class="location-block-coords">Device: <%= s.logoutDevice %></div><% } %>
             </div>
           <% } %>
@@ -103,7 +119,7 @@
     %>
     <div class="card" style="margin-bottom:28px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--dark);">Team check-in today</div>
+        <div style="font-size:13px;font-weight:700;color:var(--dark);">Team check-in</div>
         <div style="font-size:18px;font-weight:800;color:<%= checkedIn === total ? '#059669' : '#DC2626' %>"><%= checkedIn %>/<%= total %></div>
       </div>
       <div class="progress-bar-wrap">
@@ -287,6 +303,9 @@
                     <%= a.lat %>, <%= a.lng %>
                     <a href="https://www.google.com/maps?q=<%= a.lat %>,<%= a.lng %>" target="_blank" rel="noopener">View on map</a>
                   </div>
+                  <% if (a.accuracy != null) { %>
+                    <div class="location-block-coords">Accuracy: ±<%= Math.round(a.accuracy) %>m<% if (a.accuracy > 500) { %> (low precision)<% } %></div>
+                  <% } %>
                 </td>
                 <td><%= a.flags.join('; ') %></td>
               </tr>

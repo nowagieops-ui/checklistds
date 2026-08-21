@@ -91,6 +91,9 @@ function formatDate() {
 function formatDateShort(dateStr) {
   return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'short', day: 'numeric', month: 'short' });
 }
+function formatDateLong(dateStr) {
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
 // datetimeStr is already a 'YYYY-MM-DD HH:MM:SS' Lagos wall-clock string
 // (see nowLagos()), so this is a plain substring — no further timezone
 // conversion needed or wanted.
@@ -504,8 +507,9 @@ function isValidDateParam(value) {
 
 app.get('/dashboard', requireManagement, async (req, res) => {
   const marketers = await db.getMarketers();
-  const todaySubs = await db.getSubmissionsToday(today());
-  const todayAttendance = await db.getAttendanceToday(today());
+  const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
+  const statusSubs = await db.getSubmissionsToday(statusDate);
+  const statusAttendance = await db.getAttendanceToday(statusDate);
   const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
 
   const defaultTo = today();
@@ -515,11 +519,11 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const to = isValidDateParam(req.query.to) ? req.query.to : defaultTo;
 
   const status = marketers.map(m => {
-    const sub = todaySubs.find(s => s.marketer_id === m.id);
+    const sub = statusSubs.find(s => s.marketer_id === m.id);
     const checkIn = sub ? formatTime(sub.submitted_at) : null;
     const isLate = checkIn ? checkIn > cutoff : false;
 
-    const events = todayAttendance
+    const events = statusAttendance
       .filter(a => a.marketer_id === m.id)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const lastLogin = [...events].reverse().find(e => e.type === 'login');
@@ -530,11 +534,13 @@ app.get('/dashboard', requireManagement, async (req, res) => {
       loginTime: lastLogin ? formatTime(lastLogin.timestamp) : null,
       loginLat: lastLogin ? lastLogin.lat : null,
       loginLng: lastLogin ? lastLogin.lng : null,
+      loginAccuracy: lastLogin ? lastLogin.accuracy : null,
       loginAddress: lastLogin ? lastLogin.address : null,
       loginDevice: lastLogin ? describeDevice(lastLogin.user_agent) : null,
       logoutTime: lastLogout ? formatTime(lastLogout.timestamp) : null,
       logoutLat: lastLogout ? lastLogout.lat : null,
       logoutLng: lastLogout ? lastLogout.lng : null,
+      logoutAccuracy: lastLogout ? lastLogout.accuracy : null,
       logoutAddress: lastLogout ? lastLogout.address : null,
       logoutDevice: lastLogout ? describeDevice(lastLogout.user_agent) : null,
       ridersOnboardedToday: lastLogout ? lastLogout.riders_onboarded : null,
@@ -575,7 +581,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   res.render('dashboard', {
     status, history, flaggedEvents, attendanceHistory, riders,
     from, to,
-    today: formatDate(),
+    statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
     formatTime, formatDateShort
   });
