@@ -36,7 +36,12 @@
     </div>
 
     <!-- GROWTH OS: COMPANY OVERVIEW (L1) -->
-    <div class="section-title">Growth Overview (All-Time)</div>
+    <div class="section-title">Growth Overview</div>
+    <div class="priority-tabs">
+      <a href="/dashboard?overviewPeriod=today&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'today' ? 'priority-tab-active' : '' %>">Today</a>
+      <a href="/dashboard?overviewPeriod=week&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'week' ? 'priority-tab-active' : '' %>">This Week</a>
+      <a href="/dashboard?overviewPeriod=all&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'all' ? 'priority-tab-active' : '' %>">All-Time</a>
+    </div>
     <div class="status-grid">
       <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Registrations</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.registrations %></div></div>
       <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Activations</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.activations %></div></div>

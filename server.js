@@ -697,7 +697,13 @@ app.post('/management/experiments/:id/result', requireManagement, async (req, re
 });
 
 app.get('/dashboard', requireManagement, async (req, res) => {
-  const companyOverview = await performance.getCompanyOverview();
+  const overviewPeriod = ['all', 'today', 'week'].includes(req.query.overviewPeriod) ? req.query.overviewPeriod : 'all';
+  const overviewToDate = today();
+  const overviewFromDate = overviewPeriod === 'today' ? overviewToDate : addDaysUTC(overviewToDate, -6);
+  const companyOverview = overviewPeriod === 'all'
+    ? await performance.getCompanyOverview()
+    : await performance.getCompanyOverview(overviewFromDate, overviewToDate);
+
   const marketers = await db.getMarketers();
   const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
   const statusSubs = await db.getSubmissionsToday(statusDate);
@@ -776,7 +782,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
     formatTime, formatDateShort,
-    companyOverview
+    companyOverview, overviewPeriod
   });
 });
 

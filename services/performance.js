@@ -21,13 +21,24 @@ function sumCase(column, alias) {
   return `SUM(CASE WHEN ${column} IS NOT NULL THEN 1 ELSE 0 END) AS ${alias}`;
 }
 
-// All-time company snapshot — "what does the business look like right now,"
-// not a flow over a date range. Matches the spec's Management Overview
-// (completed orders, activations, etc. as running totals).
-async function getCompanyOverview() {
-  const selects = STAGE_COLUMNS.map(s => sumCase(s.column, s.key)).join(', ');
+// Company-wide numbers, either as an all-time running total (omit
+// fromDate/toDate — matches the spec's Management Overview sample, e.g.
+// "184 activated businesses") or scoped to a date range (pass both — same
+// flow view as getStaffScorecard, just company-wide). biggestLeak is always
+// the live snapshot regardless of period, since "who's stuck right now" in
+// a priority list isn't itself a historical-range concept.
+async function getCompanyOverview(fromDate, toDate) {
+  const ranged = fromDate && toDate;
+  const selects = STAGE_COLUMNS.map(s =>
+    ranged
+      ? `SUM(CASE WHEN ${s.column} IS NOT NULL AND DATE(${s.column}) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS ${s.key}`
+      : sumCase(s.column, s.key)
+  ).join(', ');
+  const params = ranged ? STAGE_COLUMNS.flatMap(() => [fromDate, toDate]) : [];
+
   const rows = await db.query(
-    `SELECT COUNT(*) AS total_prospects, SUM(repeat_customer_count) AS total_repeat_customers, ${selects} FROM riders`
+    `SELECT COUNT(*) AS total_prospects, SUM(repeat_customer_count) AS total_repeat_customers, ${selects} FROM riders`,
+    params
   );
   const biggestLeak = (await priorityLists.getAllListCounts(null)).sort((a, b) => b.count - a.count)[0];
   return { ...rows[0], biggestLeak };
