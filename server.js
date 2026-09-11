@@ -7,6 +7,8 @@ const path = require('path');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
+const { lagosParts, today, nowLagos, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
+const platformSync = require('./services/platformSync');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,46 +63,6 @@ function requireManagement(req, res, next) {
   if (req.session.isManagement) return next();
   res.redirect('/management-login');
 }
-// Everything time-related is pinned to Africa/Lagos explicitly, never left
-// to the server's own timezone. The app runs on shared hosting whose local
-// time isn't guaranteed, and a mismatch between how a timestamp gets
-// written (e.g. MySQL's NOW(), or a JS Date's default local formatting)
-// and how "today" gets computed on read can make a same-day record vanish
-// from date-range queries entirely — that's what was happening.
-function lagosParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Lagos', hour12: false,
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
-  }).formatToParts(date);
-  const get = t => parts.find(p => p.type === t).value;
-  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
-}
-function today() {
-  const p = lagosParts();
-  return `${p.year}-${p.month}-${p.day}`;
-}
-// Lagos wall-clock datetime as 'YYYY-MM-DD HH:MM:SS', for writing to
-// DATETIME columns instead of relying on MySQL's NOW().
-function nowLagos() {
-  const p = lagosParts();
-  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
-}
-function formatDate() {
-  return new Date().toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-function formatDateShort(dateStr) {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'short', day: 'numeric', month: 'short' });
-}
-function formatDateLong(dateStr) {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-// datetimeStr is already a 'YYYY-MM-DD HH:MM:SS' Lagos wall-clock string
-// (see nowLagos()), so this is a plain substring — no further timezone
-// conversion needed or wanted.
-function formatTime(datetimeStr) {
-  return datetimeStr.slice(11, 16);
-}
-
 // Turns a raw User-Agent string into a short "device · browser" label for
 // the dashboard (e.g. "iPhone · Safari") instead of the full unreadable UA
 // string. Best-effort pattern matching, not a full UA parser.
@@ -346,6 +308,12 @@ app.post('/riders', requireAuth, async (req, res) => {
   const deviceFlagReason = deviceFlagged ? `This device was last used to check in as ${owner.name}` : null;
   await db.registerDevice(marketerId, req.deviceId);
 
+  // Channel attribution follows the staff member's own role — a telemarketer
+  // onboarding a prospect over the phone counts as the telemarketer channel,
+  // not field, for the growth-OS priority lists and dashboard rollups.
+  const marketer = await db.getMarketerById(marketerId);
+  const channel = marketer && marketer.role === 'telemarketer' ? 'telemarketer' : 'field_marketer';
+
   const rider = await db.addRider({
     name: name.trim(),
     email: email.trim(),
@@ -355,7 +323,8 @@ app.post('/riders', requireAuth, async (req, res) => {
     device_id: req.deviceId,
     user_agent: req.get('User-Agent') || '',
     device_flagged: deviceFlagged,
-    device_flag_reason: deviceFlagReason
+    device_flag_reason: deviceFlagReason,
+    channel
   }, nowLagos());
 
   res.redirect(`/riders/${rider.id}/checklist`);
@@ -587,6 +556,19 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   });
 });
 
+// Manual trigger for platformSync — lets management (and, during Phase 1
+// build-out, us) confirm a match/outcome without waiting for the 5-minute
+// interval. Returns counts only, no sensitive data.
+app.post('/management/sync-platform', requireManagement, async (req, res) => {
+  try {
+    const result = await platformSync.runSync();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Manual platform sync failed:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/management-logout', (req, res) => {
   req.session.isManagement = false;
   res.redirect('/management-login');
@@ -597,3 +579,5 @@ app.listen(PORT, () => {
   console.log(`   Marketer login: http://localhost:${PORT}`);
   console.log(`   Management:     http://localhost:${PORT}/management-login`);
 });
+
+platformSync.startInterval();

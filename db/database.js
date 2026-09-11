@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -37,10 +38,15 @@ const db = {
     return rows[0];
   },
 
-  async addMarketer({ name, pin }) {
+  async getMarketerById(id) {
+    const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [parseInt(id)]);
+    return rows[0];
+  },
+
+  async addMarketer({ name, pin, role }) {
     const [result] = await pool.execute(
-      'INSERT INTO marketers (name, pin, active) VALUES (?, ?, 1)',
-      [name, pin]
+      'INSERT INTO marketers (name, pin, active, role) VALUES (?, ?, 1, ?)',
+      [name, pin, role || 'field_marketer']
     );
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [result.insertId]);
     return rows[0];
@@ -164,17 +170,18 @@ const db = {
 
   // createdAt is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see
   // nowLagos() in server.js) — not SQL NOW().
-  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name, device_id, user_agent, device_flagged, device_flag_reason }, createdAt) {
+  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name, device_id, user_agent, device_flagged, device_flag_reason, channel }, createdAt) {
     const [result] = await pool.execute(
       `INSERT INTO riders
-        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, device_id, user_agent, device_flagged, device_flag_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, device_id, user_agent, device_flagged, device_flag_reason, channel)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
       [
         name, email, phone, added_by_marketer_id, added_by_marketer_name, createdAt, JSON.stringify([]),
         device_id || null,
         user_agent || null,
         device_flagged ? 1 : 0,
-        device_flag_reason || null
+        device_flag_reason || null,
+        channel || 'field_marketer'
       ]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [result.insertId]);
@@ -187,12 +194,89 @@ const db = {
   },
 
   async completeRiderChecklist(riderId, checklistItems, notes, completedAt) {
+    // Generated once, here, rather than at rider creation — this is the
+    // attribution/join code staff relay to the business, and it shouldn't be
+    // handed out before onboarding is actually confirmed complete.
+    const staffOpsCode = await this._generateUniqueStaffOpsCode();
     await pool.execute(
-      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = ? WHERE id = ?',
-      [JSON.stringify(checklistItems || []), notes || null, completedAt, parseInt(riderId)]
+      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = ?, staff_ops_code = ? WHERE id = ?',
+      [JSON.stringify(checklistItems || []), notes || null, completedAt, staffOpsCode, parseInt(riderId)]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [parseInt(riderId)]);
     return rows[0] ? normalizeRider(rows[0]) : null;
+  },
+
+  // 7 chars from an unambiguous charset (no 0/O/1/I/L), mirroring the
+  // platform's own referral-code style — checked for collisions against
+  // live rows since this becomes a real join key against businesses.marketer_code.
+  async _generateUniqueStaffOpsCode() {
+    const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let code = '';
+      for (let i = 0; i < 7; i++) code += chars[crypto.randomInt(chars.length)];
+      const [rows] = await pool.execute('SELECT id FROM riders WHERE staff_ops_code = ? LIMIT 1', [code]);
+      if (rows.length === 0) return code;
+    }
+    throw new Error('Could not generate a unique staff_ops_code after 10 attempts');
+  },
+
+  // ── GROWTH OS: FUNNEL / ATTRIBUTION SYNC ────────────────────────────────────
+
+  // Prospects that have a join code but haven't been matched to a platform
+  // business yet — what platformSync.matchProspects() works through.
+  async getUnmatchedProspectsWithCode() {
+    const [rows] = await pool.execute(
+      'SELECT id, staff_ops_code FROM riders WHERE staff_ops_code IS NOT NULL AND platform_business_id IS NULL'
+    );
+    return rows;
+  },
+
+  // Sets the canonical platform reference once a code match is found.
+  // Never overwrites an existing platform_business_id — a code is
+  // single-use by construction (unmatched-only query above), but this
+  // guards against a re-run linking a prospect a second time.
+  async linkRiderToPlatformBusiness(riderId, platformBusinessId, registeredAt) {
+    await pool.execute(
+      'UPDATE riders SET platform_business_id = ?, registered_at = COALESCE(registered_at, ?) WHERE id = ? AND platform_business_id IS NULL',
+      [platformBusinessId, registeredAt, parseInt(riderId)]
+    );
+  },
+
+  // Prospects already linked to a platform business — what
+  // platformSync.syncOutcomes() re-checks against live Supabase data on
+  // every run. Deliberately not filtered by funnel_stage: repeat-order and
+  // repeat-customer fields can still change long after "completed_order".
+  async getLinkedProspects() {
+    const [rows] = await pool.execute(
+      `SELECT id, platform_business_id, is_accepting_orders, activated_at, link_shared_at,
+              first_activity_at, first_order_at, completed_order_at, repeat_business_order_at,
+              first_repeat_customer_at, repeat_customer_count
+       FROM riders WHERE platform_business_id IS NOT NULL`
+    );
+    return rows;
+  },
+
+  // Applies whichever funnel timestamps/fields are newly known. Every
+  // timestamp field uses COALESCE so a sync run can never regress or
+  // overwrite a stage that already fired — only fill in what was NULL.
+  async updateRiderFunnelOutcomes(riderId, fields) {
+    const settable = ['is_accepting_orders', 'activated_at', 'first_activity_at', 'first_order_at',
+      'completed_order_at', 'repeat_business_order_at', 'first_repeat_customer_at', 'repeat_customer_count'];
+    const sets = [];
+    const values = [];
+    for (const key of settable) {
+      if (!(key in fields)) continue;
+      if (key === 'is_accepting_orders' || key === 'repeat_customer_count') {
+        sets.push(`${key} = ?`);
+        values.push(fields[key]);
+      } else {
+        sets.push(`${key} = COALESCE(${key}, ?)`);
+        values.push(fields[key]);
+      }
+    }
+    if (sets.length === 0) return;
+    values.push(parseInt(riderId));
+    await pool.execute(`UPDATE riders SET ${sets.join(', ')} WHERE id = ?`, values);
   },
 
   async getRidersAddedByOnDate(marketerId, date) {
