@@ -184,10 +184,18 @@ async function syncOutcomes() {
     }
 
     if (!prospect.first_order_at || !prospect.completed_order_at || !prospect.repeat_business_order_at) {
+      // customer_id IS NOT NULL excludes self-test orders — confirmed against
+      // real data that every order placed by the business itself from its own
+      // dashboard (source='dashboard') or bulk-imported (source='csv_import')
+      // has no customer_id, while every order actually placed by a customer
+      // (source in 'customer'/'website'/'whatsapp') always has one. Without
+      // this, a business testing their own storefront on day one would show
+      // up as their own "first order" — exactly the fake signal to avoid.
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('created_at, delivered_at, status')
         .eq('business_id', businessId)
+        .not('customer_id', 'is', null)
         .order('created_at', { ascending: true });
       if (ordersError) console.error('platformSync.syncOutcomes orders:', ordersError.message);
       else if (orders && orders.length > 0) {
