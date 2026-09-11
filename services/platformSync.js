@@ -34,13 +34,16 @@ function getClient() {
 }
 
 // True if the free-text marketer_code a business typed in plausibly names
-// this staff member — exact full-name match, or any single word they typed
-// matches any single word of the staff member's name (handles "Chiamaka"
-// matching "Chiamaka Nwoke", and "Joseph" matching "Etuka Joseph").
+// this staff member — exact full-name match, any single word they typed
+// matching any single word of the staff member's name ("Chiamaka" matching
+// "Chiamaka Nwoke", "Joseph" matching "Etuka Joseph"), or a >=4-letter
+// nickname/short form contained in one of the staff member's name words
+// ("Amaka" matching "Chiamaka" — a very common short form that drops the
+// "Chi-" prefix).
 //
 // This is deliberately loose, matching real behavior rather than an ideal
 // unique code. It only stays safe while no two active staff members share a
-// name token — with a bigger team, this needs tightening (e.g. requiring
+// name/nickname — with a bigger team, this needs tightening (e.g. requiring
 // the generated code, or a disambiguation step) before it's trustworthy.
 function namesMatch(marketerCode, staffName) {
   const normalize = s => (s || '').toLowerCase().trim().replace(/[^a-z\s]/g, '');
@@ -48,9 +51,14 @@ function namesMatch(marketerCode, staffName) {
   const name = normalize(staffName);
   if (!code || !name) return false;
   if (code === name) return true;
+
   const nameTokens = name.split(/\s+/).filter(Boolean);
   const codeTokens = code.split(/\s+/).filter(Boolean);
-  return codeTokens.some(t => nameTokens.includes(t));
+  if (codeTokens.some(t => nameTokens.includes(t))) return true;
+
+  // Nickname/short-form containment, guarded to 4+ letters so short
+  // fragments (e.g. "jo") can't loosely match everything.
+  return codeTokens.some(ct => ct.length >= 4 && nameTokens.some(nt => nt.includes(ct) || ct.includes(nt)));
 }
 
 async function matchProspects() {
