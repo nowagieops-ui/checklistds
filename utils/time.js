@@ -45,4 +45,18 @@ function formatTime(datetimeStr) {
   return datetimeStr.slice(11, 16);
 }
 
-module.exports = { lagosParts, today, nowLagos, toLagosDateTime, formatDate, formatDateShort, formatDateLong, formatTime };
+// Whole days between a 'YYYY-MM-DD...' timestamp and today (Lagos), for
+// "how long has this prospect been sitting in this stage" on the
+// priority-list screens. Date-only arithmetic (like addDaysUTC elsewhere in
+// this codebase) — deliberately ignores time-of-day, so this is a day
+// count, not a precise duration.
+function daysSince(datetimeStr) {
+  if (!datetimeStr) return null;
+  const [y1, m1, d1] = datetimeStr.slice(0, 10).split('-').map(Number);
+  const [y2, m2, d2] = today().split('-').map(Number);
+  const then = Date.UTC(y1, m1 - 1, d1);
+  const now = Date.UTC(y2, m2 - 1, d2);
+  return Math.round((now - then) / 86400000);
+}
+
+module.exports = { lagosParts, today, nowLagos, toLagosDateTime, daysSince, formatDate, formatDateShort, formatDateLong, formatTime };

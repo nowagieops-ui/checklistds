@@ -23,7 +23,7 @@
   <div class="container">
     <div class="card">
       <div class="card-title">Add Staff</div>
-      <div class="card-sub">Adds a new field marketer who can log into the app.</div>
+      <div class="card-sub">Adds a new staff member who can log into the app.</div>
 
       <% if (error) { %>
         <div class="error"><%= error %></div>
@@ -35,6 +35,12 @@
 
         <label for="pin">4-digit PIN <span style="color:var(--red)">*</span></label>
         <input type="text" name="pin" id="pin" placeholder="e.g. 4821" inputmode="numeric" pattern="\d{4}" maxlength="4" required>
+
+        <label for="role">Role <span style="color:var(--red)">*</span></label>
+        <select name="role" id="role" required>
+          <option value="field_marketer" <%= (role || 'field_marketer') === 'field_marketer' ? 'selected' : '' %>>Field Marketer</option>
+          <option value="telemarketer" <%= role === 'telemarketer' ? 'selected' : '' %>>Telemarketer</option>
+        </select>
 
         <button type="submit" class="btn" id="submitBtn">Add Staff →</button>
       </form>

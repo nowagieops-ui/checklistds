@@ -25,6 +25,14 @@ function normalizeRider(r) {
 }
 
 const db = {
+  // Generic escape hatch for callers with genuinely dynamic SQL (e.g.
+  // services/priorityLists.js, whose stage list/filters vary per list) —
+  // everything else in this module stays a named, purpose-specific method.
+  async query(sql, params) {
+    const [rows] = await pool.execute(sql, params);
+    return rows.map(r => ('completed' in r || 'device_flagged' in r) ? normalizeRider(r) : r);
+  },
+
   async getMarketers() {
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE active = 1');
     return rows;
@@ -293,6 +301,44 @@ const db = {
   // Applies whichever funnel timestamps/fields are newly known. Every
   // timestamp field uses COALESCE so a sync run can never regress or
   // overwrite a stage that already fired — only fill in what was NULL.
+  // The only thing that ever sets link_shared_at — a staff member confirming
+  // it in a follow-up, never inferred from a storefront visit. COALESCE'd so
+  // it can only be set once, same guarantee as updateRiderFunnelOutcomes.
+  async confirmLinkShared(riderId, when) {
+    await pool.execute(
+      'UPDATE riders SET link_shared_at = COALESCE(link_shared_at, ?) WHERE id = ?',
+      [when, parseInt(riderId)]
+    );
+  },
+
+  async getReasonCodes() {
+    const [rows] = await pool.execute('SELECT code, label FROM reason_codes WHERE active = 1 ORDER BY label ASC');
+    return rows;
+  },
+
+  async getFollowupsForRider(riderId) {
+    const [rows] = await pool.execute(
+      `SELECT f.*, m.name AS staff_name FROM followups f
+       JOIN marketers m ON m.id = f.staff_id
+       WHERE f.rider_id = ? ORDER BY f.created_at DESC`,
+      [parseInt(riderId)]
+    );
+    return rows;
+  },
+
+  async addFollowup(data) {
+    await pool.execute(
+      `INSERT INTO followups
+        (rider_id, staff_id, type, stage_before, stage_after, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.rider_id, data.staff_id, data.type, data.stage_before, data.stage_after,
+        data.reason_code || null, data.desired_action || null, data.action_completed ? 1 : 0,
+        data.link_shared_confirmed ? 1 : 0, data.notes || null, data.next_followup_date || null, data.created_at
+      ]
+    );
+  },
+
   async updateRiderFunnelOutcomes(riderId, fields) {
     const settable = ['is_accepting_orders', 'activated_at', 'first_activity_at', 'first_order_at',
       'completed_order_at', 'repeat_business_order_at', 'first_repeat_customer_at', 'repeat_customer_count'];

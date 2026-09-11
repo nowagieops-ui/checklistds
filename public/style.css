@@ -328,6 +328,18 @@ a.app-header-brand { cursor: pointer; }
 .home-tile-sub { font-size: 13px; color: var(--gray); margin-top: 3px; }
 .home-tile-arrow { color: var(--orange); font-size: 18px; flex-shrink: 0; }
 
+/* ── PRIORITY LISTS (P1-P6) ── */
+.priority-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.priority-tab {
+  display: flex; align-items: center; gap: 7px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 14px; text-decoration: none; color: var(--dark);
+  font-size: 13px; font-weight: 700; transition: background .15s, border-color .15s;
+}
+.priority-tab-count { background: var(--light); color: var(--gray); border-radius: 10px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+.priority-tab-active { border-color: var(--orange); background: rgba(255,92,0,0.08); color: var(--orange-dark); }
+.priority-tab-active .priority-tab-count { background: var(--orange); color: #fff; }
+
 .attendance-calendar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .attendance-day {
   width: 30px;

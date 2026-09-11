@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title><%= rider.name %> — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title"><%= rider.name %></div>
+      <div class="card-sub" style="margin-bottom:10px;"><%= rider.phone %><% if (rider.email) { %> · <%= rider.email %><% } %></div>
+      <span class="badge <%= rider.platform_business_id ? 'badge-green' : 'badge-amber' %>"><%= stageLabel %></span>
+      <% if (rider.is_accepting_orders != null) { %>
+        <span class="badge <%= rider.is_accepting_orders ? 'badge-green' : 'badge-red' %>">
+          <%= rider.is_accepting_orders ? 'Accepting orders' : 'Not accepting orders' %>
+        </span>
+      <% } %>
+      <% if (rider.repeat_customer_count > 0) { %>
+        <span class="badge badge-orange"><%= rider.repeat_customer_count %> repeat customer<%= rider.repeat_customer_count === 1 ? '' : 's' %></span>
+      <% } %>
+    </div>
+
+    <% if (timeline.length > 0) { %>
+      <div class="card">
+        <div class="card-title" style="font-size:15px;margin-bottom:10px;">Funnel Timeline</div>
+        <% timeline.forEach(function (t) { %>
+          <div class="detail-row">
+            <span class="detail-label"><%= t.label %></span>
+            <span class="detail-value"><%= t.dateFormatted %> <%= t.timeFormatted %></span>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-title" style="font-size:15px;margin-bottom:12px;">Log a Follow-Up</div>
+      <form method="POST" action="/riders/<%= rider.id %>/followups">
+        <label for="type">Type</label>
+        <select name="type" id="type">
+          <option value="call">Call</option>
+          <option value="visit">Visit</option>
+        </select>
+
+        <label for="desired_action">Desired action</label>
+        <input type="text" name="desired_action" id="desired_action" placeholder="e.g. Get them to share their link">
+
+        <% if (!rider.link_shared_at) { %>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:500;margin:10px 0;">
+            <input type="checkbox" name="link_shared_confirmed" value="1" style="width:auto;margin:0;">
+            Rider confirmed they've shared their storefront link
+          </label>
+        <% } %>
+
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;margin:10px 0;">
+          <input type="checkbox" name="action_completed" value="1" style="width:auto;margin:0;">
+          Desired action completed
+        </label>
+
+        <label for="reason_code">Reason / objection (if any)</label>
+        <select name="reason_code" id="reason_code">
+          <option value="">— None —</option>
+          <% reasonCodes.forEach(function (rc) { %>
+            <option value="<%= rc.code %>"><%= rc.label %></option>
+          <% }) %>
+        </select>
+
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" rows="3" placeholder="Anything else worth recording"></textarea>
+
+        <label for="next_followup_date">Next follow-up date</label>
+        <input type="date" name="next_followup_date" id="next_followup_date" min="<%= today %>">
+
+        <button type="submit" class="btn">Save Follow-Up →</button>
+      </form>
+    </div>
+
+    <% if (followups.length > 0) { %>
+      <div class="section-title">Follow-Up History</div>
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Staff</th>
+              <th>Type</th>
+              <th>Stage Change</th>
+              <th>Reason</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% followups.forEach(function (f) { %>
+              <tr>
+                <td><%= f.dateFormatted %> <%= f.timeFormatted %></td>
+                <td><%= f.staff_name %></td>
+                <td><%= f.type === 'visit' ? 'Visit' : 'Call' %></td>
+                <td>
+                  <% if (f.stage_before !== f.stage_after) { %>
+                    <%= f.stageBeforeLabel %> → <strong><%= f.stageAfterLabel %></strong>
+                  <% } else { %>
+                    <%= f.stageBeforeLabel %> (no change)
+                  <% } %>
+                </td>
+                <td><%= f.reason_code || '—' %></td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= f.notes || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <a href="/priority-lists" class="logout-link">← Back to Priority Lists</a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

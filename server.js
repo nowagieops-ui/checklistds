@@ -7,8 +7,9 @@ const path = require('path');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
-const { lagosParts, today, nowLagos, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
+const { lagosParts, today, nowLagos, daysSince, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
 const platformSync = require('./services/platformSync');
+const priorityLists = require('./services/priorityLists');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -179,6 +180,11 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr, cutoff) {
 }
 
 app.get('/home', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const role = marketer ? marketer.role : 'field_marketer';
+  const priorityCounts = await priorityLists.getAllListCounts(req.session.marketerId);
+  const openProspects = priorityCounts.reduce((sum, l) => sum + l.count, 0);
+
   const submittedToday = !!(await db.getSubmissionByMarketerToday(req.session.marketerId, today()));
 
   const toDate = today();
@@ -195,7 +201,7 @@ app.get('/home', requireAuth, async (req, res) => {
   const missedCheckin = !submittedToday && isPastCheckinDeadline();
   const canCheckout = submittedToday && isAfterCheckoutTime();
 
-  res.render('home', { name: req.session.marketerName, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
+  res.render('home', { name: req.session.marketerName, role, openProspects, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
 });
 
 // Plain sign-out for "wrong person is logged in on this device" — ends the
@@ -352,6 +358,117 @@ app.get('/riders/:id/done', requireAuth, async (req, res) => {
   res.render('rider-done', { rider, time: rider.completed_at ? formatTime(rider.completed_at) : null });
 });
 
+// ── CORE PRIORITY LISTS (P1-P6) ──────────────────────────────────────────────
+// Shared by field marketer and telemarketer alike — same underlying queries
+// (services/priorityLists.js), scoped to the logged-in staff member's own
+// prospects. The view adapts its own copy/labels by role.
+
+app.get('/priority-lists', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const role = marketer ? marketer.role : 'field_marketer';
+  const marketerId = req.session.marketerId;
+
+  const counts = await priorityLists.getAllListCounts(marketerId);
+  const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
+  const meta = priorityLists.LISTS[activeList];
+
+  const rawRows = await priorityLists.getListRows(activeList, marketerId);
+  const rows = rawRows.map(r => ({
+    ...r,
+    daysInStage: daysSince(r[meta.orderByColumn] || r.created_at)
+  }));
+
+  res.render('priority-lists', {
+    name: req.session.marketerName,
+    role,
+    counts,
+    activeList,
+    activeMeta: priorityLists.listMeta(activeList),
+    rows
+  });
+});
+
+const FUNNEL_STAGE_LABELS = {
+  new: 'New',
+  registered: 'Registered',
+  activated: 'Activated',
+  link_shared: 'Link Shared',
+  customer_activity: 'Customer Activity',
+  first_order: 'First Order',
+  completed_order: 'Completed Order'
+};
+
+// Every stage timestamp worth showing on the prospect detail screen, in
+// funnel order — only the ones actually set get rendered.
+const FUNNEL_TIMELINE_FIELDS = [
+  { key: 'registered_at', label: 'Registered' },
+  { key: 'activated_at', label: 'Activated' },
+  { key: 'link_shared_at', label: 'Link Shared' },
+  { key: 'first_activity_at', label: 'First Customer Activity' },
+  { key: 'first_order_at', label: 'First Order' },
+  { key: 'completed_order_at', label: 'Completed Order' },
+  { key: 'repeat_business_order_at', label: 'Repeat Order (Business)' },
+  { key: 'first_repeat_customer_at', label: 'First Repeat Customer' }
+];
+
+app.get('/riders/:id', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/priority-lists');
+
+  const followups = (await db.getFollowupsForRider(rider.id)).map(f => ({
+    ...f,
+    stageBeforeLabel: FUNNEL_STAGE_LABELS[f.stage_before] || f.stage_before,
+    stageAfterLabel: FUNNEL_STAGE_LABELS[f.stage_after] || f.stage_after,
+    dateFormatted: formatDateShort(f.created_at.slice(0, 10)),
+    timeFormatted: formatTime(f.created_at)
+  }));
+  const reasonCodes = await db.getReasonCodes();
+
+  const timeline = FUNNEL_TIMELINE_FIELDS
+    .filter(f => rider[f.key])
+    .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
+
+  res.render('rider-detail', {
+    rider,
+    stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
+    timeline,
+    followups,
+    reasonCodes,
+    today: today()
+  });
+});
+
+app.post('/riders/:id/followups', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/priority-lists');
+
+  const { type, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date } = req.body;
+  const stageBefore = rider.funnel_stage;
+
+  if (link_shared_confirmed) {
+    await db.confirmLinkShared(rider.id, nowLagos());
+  }
+
+  const updatedRider = await db.getRider(rider.id);
+
+  await db.addFollowup({
+    rider_id: rider.id,
+    staff_id: req.session.marketerId,
+    type: type === 'visit' ? 'visit' : 'call',
+    stage_before: stageBefore,
+    stage_after: updatedRider.funnel_stage,
+    reason_code: reason_code || null,
+    desired_action: desired_action || null,
+    action_completed: !!action_completed,
+    link_shared_confirmed: !!link_shared_confirmed,
+    notes: notes || null,
+    next_followup_date: next_followup_date || null,
+    created_at: nowLagos()
+  });
+
+  res.redirect(`/riders/${rider.id}`);
+});
+
 app.get('/logout', requireAuth, async (req, res) => {
   const ridersToday = (await db.getRidersAddedByOnDate(req.session.marketerId, today())).length;
   res.render('logout', { name: req.session.marketerName, ridersToday });
@@ -428,20 +545,23 @@ app.post('/management-login', (req, res) => {
 });
 
 app.get('/management/staff/new', requireManagement, (req, res) => {
-  res.render('staff-new', { error: null });
+  res.render('staff-new', { error: null, role: null });
 });
 
 app.post('/management/staff', requireManagement, async (req, res) => {
-  const { name, pin } = req.body;
+  const { name, pin, role } = req.body;
 
   if (!name || !name.trim()) {
-    return res.render('staff-new', { error: 'Enter the staff member\'s name.' });
+    return res.render('staff-new', { error: 'Enter the staff member\'s name.', role });
   }
   if (!/^\d{4}$/.test(pin || '')) {
-    return res.render('staff-new', { error: 'PIN must be exactly 4 digits.' });
+    return res.render('staff-new', { error: 'PIN must be exactly 4 digits.', role });
+  }
+  if (!['field_marketer', 'telemarketer'].includes(role)) {
+    return res.render('staff-new', { error: 'Choose a role.', role });
   }
 
-  await db.addMarketer({ name: name.trim(), pin });
+  await db.addMarketer({ name: name.trim(), pin, role });
   res.redirect('/dashboard');
 });
 
