@@ -31,6 +31,16 @@
       <a href="/management/staff/new" class="btn btn-outline" style="width:auto;padding:10px 18px;margin:0;">+ Add Staff</a>
     </div>
 
+    <!-- GROWTH OS: PLATFORM SYNC -->
+    <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:14px;">Platform sync</div>
+        <div style="font-size:13px;color:var(--gray);">Matches onboarded riders to their DashSpid platform account and pulls in order/storefront outcomes.</div>
+      </div>
+      <button id="sync-platform-btn" type="button" class="btn" style="width:auto;padding:10px 20px;margin:0;">Sync now</button>
+      <div id="sync-platform-result" style="width:100%;font-size:13px;color:var(--gray);"></div>
+    </div>
+
     <form method="GET" action="/dashboard" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;">
         <label for="date">View check-in status for</label>
@@ -237,6 +247,8 @@
               <th>Added By</th>
               <th>Device Used</th>
               <th>Checklist Status</th>
+              <th>Attribution Code</th>
+              <th>Funnel Stage</th>
               <th>Notes</th>
             </tr>
           </thead>
@@ -259,6 +271,14 @@
                     <span class="badge badge-green">Done — <%= r.timeCompleted %></span>
                   <% } else { %>
                     <span class="badge badge-amber">In progress</span>
+                  <% } %>
+                </td>
+                <td style="font-family:'SF Mono',Consolas,monospace;"><%= r.staff_ops_code || '—' %></td>
+                <td>
+                  <% if (r.platform_business_id) { %>
+                    <span class="badge badge-green"><%= r.funnel_stage %></span>
+                  <% } else { %>
+                    <span class="badge badge-amber"><%= r.funnel_stage || 'new' %></span>
                   <% } %>
                 </td>
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= r.notes || '—' %></td>
@@ -321,5 +341,27 @@
 
     <a href="/management-logout" class="logout-link">Log out of management</a>
   </div>
+
+  <script>
+    document.getElementById('sync-platform-btn').addEventListener('click', async function () {
+      var btn = this;
+      var result = document.getElementById('sync-platform-result');
+      btn.disabled = true;
+      btn.textContent = 'Syncing…';
+      result.textContent = '';
+      try {
+        var res = await fetch('/management/sync-platform', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+        var data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Sync failed');
+        result.textContent = 'Matched ' + data.matchResult.matched + ' of ' + data.matchResult.checked +
+          ' pending codes · checked ' + data.syncResult.checked + ' linked prospect(s) for order/storefront updates.';
+      } catch (err) {
+        result.textContent = 'Sync failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync now';
+      }
+    });
+  </script>
 </body>
 </html>
