@@ -242,6 +242,40 @@ const db = {
     );
   },
 
+  // Every platform business.id already linked to some prospect — used to
+  // skip re-evaluating businesses the sync has already matched (whether via
+  // exact code or the name-based fallback below).
+  async getLinkedPlatformBusinessIds() {
+    const [rows] = await pool.execute('SELECT platform_business_id FROM riders WHERE platform_business_id IS NOT NULL');
+    return rows.map(r => r.platform_business_id);
+  },
+
+  // Best-effort pairing for the name-based fallback match: if this staff
+  // member already has a prospect they onboarded but haven't linked yet,
+  // prefer attaching the platform signup to that real record (keeps any
+  // onboarding-checklist data) over creating a fresh one.
+  async getOldestUnmatchedProspectForMarketer(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT id FROM riders WHERE added_by_marketer_id = ? AND platform_business_id IS NULL ORDER BY created_at ASC LIMIT 1',
+      [parseInt(marketerId)]
+    );
+    return rows[0] || null;
+  },
+
+  // Creates the funnel-tracking record directly from a platform signup that
+  // was never onboarded through the app's checklist flow — the reality for
+  // most signups right now, since riders just tell the platform a staff
+  // member's name rather than relaying a generated code.
+  async createLinkedProspectFromPlatform({ name, email, phone, marketerId, marketerName, channel, platformBusinessId, registeredAt }) {
+    const [result] = await pool.execute(
+      `INSERT INTO riders
+        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, channel, platform_business_id, registered_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+      [name || 'Unnamed business', email || '', phone || '', marketerId, marketerName, registeredAt, JSON.stringify([]), channel, platformBusinessId, registeredAt]
+    );
+    return result.insertId;
+  },
+
   // Prospects already linked to a platform business — what
   // platformSync.syncOutcomes() re-checks against live Supabase data on
   // every run. Deliberately not filtered by funnel_stage: repeat-order and

@@ -353,8 +353,9 @@
         var res = await fetch('/management/sync-platform', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
         var data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || 'Sync failed');
-        result.textContent = 'Matched ' + data.matchResult.matched + ' of ' + data.matchResult.checked +
-          ' pending codes · checked ' + data.syncResult.checked + ' linked prospect(s) for order/storefront updates.';
+        result.textContent = 'Matched ' + data.matchResult.matched + ' of ' + data.matchResult.checked + ' pending codes · ' +
+          'attributed ' + data.nameMatchResult.attributed + ' of ' + data.nameMatchResult.checked + ' name-matched signups · ' +
+          'checked ' + data.syncResult.checked + ' linked prospect(s) for order/storefront updates.';
       } catch (err) {
         result.textContent = 'Sync failed: ' + err.message;
       } finally {

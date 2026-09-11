@@ -50,18 +50,13 @@
       <% } %>
     </div>
 
-    <% if (rider.staff_ops_code) { %>
-      <div class="card" style="margin-top:12px;text-align:center;">
-        <div class="success-sub" style="margin-bottom:8px;">Attribution code</div>
-        <div style="font-family:'SF Mono',Consolas,monospace;font-size:clamp(22px,7vw,28px);font-weight:700;letter-spacing:3px;color:var(--dark);word-break:break-all;">
-          <%= rider.staff_ops_code %>
-        </div>
-        <p style="margin-top:10px;font-size:13.5px;color:var(--gray);line-height:1.5;">
-          Give this code to <%= rider.name %>. When they sign up on the DashSpid platform, they must enter it
-          exactly where it asks how they heard about DashSpid — this is what credits the signup to you.
-        </p>
-      </div>
-    <% } %>
+    <div class="card" style="margin-top:12px;">
+      <p style="font-size:13.5px;color:var(--gray);line-height:1.5;">
+        Remind <%= rider.name %> to mention your name when they sign up on the DashSpid platform (where it
+        asks how they heard about DashSpid) — Staff Ops picks it up automatically from there and links this
+        record to their account on its own.
+      </p>
+    </div>
 
     <a href="/riders/new" class="btn" style="margin-bottom:12px;">Onboard Another Rider →</a>
     <a href="/home" class="btn btn-outline">← Back to Home</a>

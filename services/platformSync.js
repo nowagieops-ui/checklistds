@@ -4,11 +4,20 @@
 // the growth-OS implementation plan for exactly what each stage means and
 // why — this file is the executable version of those rules, nothing more.
 //
-// Two responsibilities, run on an interval from server.js:
-//   matchProspects() — resolves a prospect's staff_ops_code (a one-time
-//     attribution/join token) to the platform's businesses.id (the durable,
-//     canonical reference — see plan). Once matched, staff_ops_code is never
-//     consulted again.
+// Three responsibilities, run on an interval from server.js:
+//   matchProspects() — resolves a prospect's staff_ops_code (a one-time,
+//     precise attribution/join token) to the platform's businesses.id (the
+//     durable, canonical reference — see plan). Once matched, staff_ops_code
+//     is never consulted again.
+//   attributeUnlinkedPlatformSignups() — the fallback that reflects how
+//     attribution actually happens today: riders just tell the platform a
+//     staff member's NAME (e.g. "Chiamaka" or "Joseph"), not a generated
+//     code. For any business sourced from field_marketer/telemarketer whose
+//     marketer_code names a known staff member and isn't linked to any
+//     prospect yet, this attaches it to that staff member's oldest
+//     unmatched onboarded prospect if one exists, or creates a new
+//     funnel-tracking record on the spot. Safe only while staff names don't
+//     collide — see namesMatch() below.
 //   syncOutcomes()   — for already-matched prospects, re-derives funnel
 //     timestamps from live platform data. Every write is COALESCE'd in
 //     db.updateRiderFunnelOutcomes so a stage can only be filled in, never
@@ -22,6 +31,26 @@ function getClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null; // sync is a no-op until platform credentials are configured
   return createClient(url, key, { auth: { persistSession: false } });
+}
+
+// True if the free-text marketer_code a business typed in plausibly names
+// this staff member — exact full-name match, or any single word they typed
+// matches any single word of the staff member's name (handles "Chiamaka"
+// matching "Chiamaka Nwoke", and "Joseph" matching "Etuka Joseph").
+//
+// This is deliberately loose, matching real behavior rather than an ideal
+// unique code. It only stays safe while no two active staff members share a
+// name token — with a bigger team, this needs tightening (e.g. requiring
+// the generated code, or a disambiguation step) before it's trustworthy.
+function namesMatch(marketerCode, staffName) {
+  const normalize = s => (s || '').toLowerCase().trim().replace(/[^a-z\s]/g, '');
+  const code = normalize(marketerCode);
+  const name = normalize(staffName);
+  if (!code || !name) return false;
+  if (code === name) return true;
+  const nameTokens = name.split(/\s+/).filter(Boolean);
+  const codeTokens = code.split(/\s+/).filter(Boolean);
+  return codeTokens.some(t => nameTokens.includes(t));
 }
 
 async function matchProspects() {
@@ -43,6 +72,45 @@ async function matchProspects() {
     }
   }
   return { checked: unmatched.length, matched };
+}
+
+async function attributeUnlinkedPlatformSignups() {
+  const supabase = getClient();
+  if (!supabase) return { checked: 0, attributed: 0 };
+
+  const alreadyLinked = new Set(await db.getLinkedPlatformBusinessIds());
+  const marketers = await db.getMarketers(); // active staff only — matches real attribution intent
+
+  const { data: businesses, error } = await supabase
+    .from('businesses')
+    .select('id, name, email, phone, how_heard, marketer_code, created_at')
+    .in('how_heard', ['field_marketer', 'telemarketer'])
+    .not('marketer_code', 'is', null);
+  if (error) { console.error('platformSync.attributeUnlinkedPlatformSignups:', error.message); return { checked: 0, attributed: 0 }; }
+
+  let attributed = 0;
+  for (const business of businesses || []) {
+    if (alreadyLinked.has(business.id)) continue;
+
+    const staff = marketers.find(m => namesMatch(business.marketer_code, m.name));
+    if (!staff) continue; // no known staff member matches this text — leave unmatched rather than guess
+
+    const channel = staff.role === 'telemarketer' ? 'telemarketer' : 'field_marketer';
+    const registeredAt = toLagosDateTime(business.created_at);
+
+    const existingProspect = await db.getOldestUnmatchedProspectForMarketer(staff.id);
+    if (existingProspect) {
+      await db.linkRiderToPlatformBusiness(existingProspect.id, business.id, registeredAt);
+    } else {
+      await db.createLinkedProspectFromPlatform({
+        name: business.name, email: business.email, phone: business.phone,
+        marketerId: staff.id, marketerName: staff.name, channel,
+        platformBusinessId: business.id, registeredAt
+      });
+    }
+    attributed++;
+  }
+  return { checked: (businesses || []).length, attributed };
 }
 
 // Activated = account live AND WhatsApp connected AND pricing configured —
@@ -164,8 +232,9 @@ async function syncOutcomes() {
 
 async function runSync() {
   const matchResult = await matchProspects();
+  const nameMatchResult = await attributeUnlinkedPlatformSignups();
   const syncResult = await syncOutcomes();
-  return { matchResult, syncResult };
+  return { matchResult, nameMatchResult, syncResult };
 }
 
 function startInterval(intervalMs = 5 * 60 * 1000) {
@@ -179,4 +248,4 @@ function startInterval(intervalMs = 5 * 60 * 1000) {
   }, intervalMs);
 }
 
-module.exports = { matchProspects, syncOutcomes, runSync, startInterval };
+module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval };
