@@ -7,9 +7,10 @@ const path = require('path');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
-const { lagosParts, today, nowLagos, daysSince, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
+const { lagosParts, today, nowLagos, daysSince, addDaysUTC, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
 const platformSync = require('./services/platformSync');
 const priorityLists = require('./services/priorityLists');
+const performance = require('./services/performance');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -133,13 +134,6 @@ app.post('/login', async (req, res) => {
   if (wantsJson) return res.json({ ok: true, redirect: '/home' });
   res.redirect('/home');
 });
-
-// Pure UTC date-string arithmetic — matches today()'s UTC convention and
-// avoids local-vs-UTC date parsing mismatches shifting a date by a day.
-function addDaysUTC(dateStr, days) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().split('T')[0];
-}
 
 // A day counts green only once BOTH a login and a logout event exist for it
 // AND the login happened before the cutoff — a late-but-complete day shows
@@ -379,8 +373,40 @@ app.get('/priority-lists', requireAuth, async (req, res) => {
   }));
 
   res.render('priority-lists', {
-    name: req.session.marketerName,
-    role,
+    heading: role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists',
+    baseUrl: '/priority-lists',
+    riderBaseUrl: '/riders',
+    backHref: '/home',
+    backLabel: '← Back to Home',
+    viewerIsManagement: false,
+    counts,
+    activeList,
+    activeMeta: priorityLists.listMeta(activeList),
+    rows
+  });
+});
+
+// Management's read-only drill-down into one staff member's own priority
+// lists — same queries, same template, just a different base URL/back link
+// and no self-service "My Performance" shortcut.
+app.get('/management/staff/:id/priority-lists', requireManagement, async (req, res) => {
+  const staff = await db.getMarketerById(req.params.id);
+  if (!staff) return res.redirect('/management/staff-performance');
+
+  const counts = await priorityLists.getAllListCounts(staff.id);
+  const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
+  const meta = priorityLists.LISTS[activeList];
+
+  const rawRows = await priorityLists.getListRows(activeList, staff.id);
+  const rows = rawRows.map(r => ({ ...r, daysInStage: daysSince(r[meta.orderByColumn] || r.created_at) }));
+
+  res.render('priority-lists', {
+    heading: `${staff.name}'s Priority Lists`,
+    baseUrl: `/management/staff/${staff.id}/priority-lists`,
+    riderBaseUrl: '/management/riders',
+    backHref: '/management/staff-performance',
+    backLabel: '← Back to Staff Performance',
+    viewerIsManagement: true,
     counts,
     activeList,
     activeMeta: priorityLists.listMeta(activeList),
@@ -411,6 +437,15 @@ const FUNNEL_TIMELINE_FIELDS = [
   { key: 'first_repeat_customer_at', label: 'First Repeat Customer' }
 ];
 
+app.get('/my-performance', requireAuth, async (req, res) => {
+  const period = ['today', 'week', 'month'].includes(req.query.period) ? req.query.period : 'week';
+  const toDate = today();
+  const fromDate = period === 'today' ? toDate : period === 'week' ? addDaysUTC(toDate, -6) : addDaysUTC(toDate, -29);
+
+  const scorecard = await performance.getStaffScorecard(req.session.marketerId, fromDate, toDate);
+  res.render('my-performance', { name: req.session.marketerName, period, scorecard });
+});
+
 app.get('/riders/:id', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
   if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/priority-lists');
@@ -434,7 +469,43 @@ app.get('/riders/:id', requireAuth, async (req, res) => {
     timeline,
     followups,
     reasonCodes,
-    today: today()
+    today: today(),
+    viewerIsManagement: false,
+    backHref: '/priority-lists',
+    backLabel: '← Back to Priority Lists'
+  });
+});
+
+// Management's read-only view of any prospect — same funnel timeline and
+// follow-up history as the staff-facing screen, but no follow-up form (a
+// follow-up should be attributed to whoever actually did it, not whoever's
+// viewing it) and shows who sourced the prospect.
+app.get('/management/riders/:id', requireManagement, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  if (!rider) return res.redirect('/management/staff-performance');
+
+  const followups = (await db.getFollowupsForRider(rider.id)).map(f => ({
+    ...f,
+    stageBeforeLabel: FUNNEL_STAGE_LABELS[f.stage_before] || f.stage_before,
+    stageAfterLabel: FUNNEL_STAGE_LABELS[f.stage_after] || f.stage_after,
+    dateFormatted: formatDateShort(f.created_at.slice(0, 10)),
+    timeFormatted: formatTime(f.created_at)
+  }));
+
+  const timeline = FUNNEL_TIMELINE_FIELDS
+    .filter(f => rider[f.key])
+    .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
+
+  res.render('rider-detail', {
+    rider,
+    stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
+    timeline,
+    followups,
+    reasonCodes: [],
+    today: today(),
+    viewerIsManagement: true,
+    backHref: `/management/staff/${rider.added_by_marketer_id}/priority-lists`,
+    backLabel: '← Back to Priority Lists'
   });
 });
 
@@ -594,7 +665,39 @@ function isValidDateParam(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+app.get('/management/staff-performance', requireManagement, async (req, res) => {
+  const channels = await performance.getChannelBreakdown();
+  const staff = await performance.getStaffBreakdown();
+  res.render('staff-performance', { channels, staff });
+});
+
+app.get('/management/experiments', requireManagement, async (req, res) => {
+  const experiments = (await db.getExperiments()).map(e => ({
+    ...e,
+    startFormatted: formatDateShort(e.start_date),
+    endFormatted: e.end_date ? formatDateShort(e.end_date) : null
+  }));
+  res.render('experiments', { experiments, error: null });
+});
+
+app.post('/management/experiments', requireManagement, async (req, res) => {
+  const { problem, hypothesis, change_description, start_date, target_metric } = req.body;
+  if (!problem || !hypothesis || !change_description || !start_date || !target_metric) {
+    const experiments = await db.getExperiments();
+    return res.render('experiments', { experiments, error: 'Fill in problem, hypothesis, change, start date, and target metric.' });
+  }
+  await db.addExperiment({ ...req.body, created_by_staff_id: null, created_at: nowLagos() });
+  res.redirect('/management/experiments');
+});
+
+app.post('/management/experiments/:id/result', requireManagement, async (req, res) => {
+  const { result, decision, end_date } = req.body;
+  await db.updateExperimentResult(req.params.id, { result, decision: decision || null, end_date: end_date || null });
+  res.redirect('/management/experiments');
+});
+
 app.get('/dashboard', requireManagement, async (req, res) => {
+  const companyOverview = await performance.getCompanyOverview();
   const marketers = await db.getMarketers();
   const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
   const statusSubs = await db.getSubmissionsToday(statusDate);
@@ -672,7 +775,8 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     from, to,
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
-    formatTime, formatDateShort
+    formatTime, formatDateShort,
+    companyOverview
   });
 });
 

@@ -339,6 +339,26 @@ const db = {
     );
   },
 
+  async getExperiments() {
+    const [rows] = await pool.execute('SELECT * FROM experiments ORDER BY start_date DESC, id DESC');
+    return rows;
+  },
+
+  async addExperiment(data) {
+    await pool.execute(
+      `INSERT INTO experiments (problem, hypothesis, change_description, start_date, target_metric, created_by_staff_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [data.problem, data.hypothesis, data.change_description, data.start_date, data.target_metric, data.created_by_staff_id || null, data.created_at]
+    );
+  },
+
+  async updateExperimentResult(id, { result, decision, end_date }) {
+    await pool.execute(
+      'UPDATE experiments SET result = ?, decision = ?, end_date = COALESCE(?, end_date) WHERE id = ?',
+      [result || null, decision || null, end_date || null, parseInt(id)]
+    );
+  },
+
   async updateRiderFunnelOutcomes(riderId, fields) {
     const settable = ['is_accepting_orders', 'activated_at', 'first_activity_at', 'first_order_at',
       'completed_order_at', 'repeat_business_order_at', 'first_repeat_customer_at', 'repeat_customer_count'];

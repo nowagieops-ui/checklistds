@@ -26,7 +26,10 @@
   <div class="container">
     <div class="card">
       <div class="card-title"><%= rider.name %></div>
-      <div class="card-sub" style="margin-bottom:10px;"><%= rider.phone %><% if (rider.email) { %> · <%= rider.email %><% } %></div>
+      <div class="card-sub" style="margin-bottom:10px;">
+        <%= rider.phone %><% if (rider.email) { %> · <%= rider.email %><% } %>
+        <% if (viewerIsManagement) { %> · Sourced by <%= rider.added_by_marketer_name %><% } %>
+      </div>
       <span class="badge <%= rider.platform_business_id ? 'badge-green' : 'badge-amber' %>"><%= stageLabel %></span>
       <% if (rider.is_accepting_orders != null) { %>
         <span class="badge <%= rider.is_accepting_orders ? 'badge-green' : 'badge-red' %>">
@@ -50,6 +53,7 @@
       </div>
     <% } %>
 
+    <% if (!viewerIsManagement) { %>
     <div class="card">
       <div class="card-title" style="font-size:15px;margin-bottom:12px;">Log a Follow-Up</div>
       <form method="POST" action="/riders/<%= rider.id %>/followups">
@@ -91,6 +95,7 @@
         <button type="submit" class="btn">Save Follow-Up →</button>
       </form>
     </div>
+    <% } %>
 
     <% if (followups.length > 0) { %>
       <div class="section-title">Follow-Up History</div>
@@ -128,7 +133,7 @@
       </div>
     <% } %>
 
-    <a href="/priority-lists" class="logout-link">← Back to Priority Lists</a>
+    <a href="<%= backHref %>" class="logout-link"><%= backLabel %></a>
   </div>
 
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

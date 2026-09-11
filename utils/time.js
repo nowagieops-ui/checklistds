@@ -45,6 +45,13 @@ function formatTime(datetimeStr) {
   return datetimeStr.slice(11, 16);
 }
 
+// Pure UTC date-string arithmetic — matches today()'s UTC convention and
+// avoids local-vs-UTC date parsing mismatches shifting a date by a day.
+function addDaysUTC(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().split('T')[0];
+}
+
 // Whole days between a 'YYYY-MM-DD...' timestamp and today (Lagos), for
 // "how long has this prospect been sitting in this stage" on the
 // priority-list screens. Date-only arithmetic (like addDaysUTC elsewhere in
@@ -59,4 +66,4 @@ function daysSince(datetimeStr) {
   return Math.round((now - then) / 86400000);
 }
 
-module.exports = { lagosParts, today, nowLagos, toLagosDateTime, daysSince, formatDate, formatDateShort, formatDateLong, formatTime };
+module.exports = { lagosParts, today, nowLagos, toLagosDateTime, daysSince, addDaysUTC, formatDate, formatDateShort, formatDateLong, formatTime };

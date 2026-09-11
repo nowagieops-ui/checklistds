@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>My Performance — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">My Performance</div>
+      <div class="card-sub" style="margin-bottom:0;">What actually moved — not just how much you did.</div>
+    </div>
+
+    <div class="priority-tabs">
+      <a href="/my-performance?period=today" class="priority-tab <%= period === 'today' ? 'priority-tab-active' : '' %>">Today</a>
+      <a href="/my-performance?period=week" class="priority-tab <%= period === 'week' ? 'priority-tab-active' : '' %>">This Week</a>
+      <a href="/my-performance?period=month" class="priority-tab <%= period === 'month' ? 'priority-tab-active' : '' %>">This Month</a>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="font-size:15px;margin-bottom:10px;">Funnel Movement This Period</div>
+      <div class="detail-row"><span class="detail-label">Follow-ups logged</span><span class="detail-value"><%= scorecard.followups %></span></div>
+      <div class="detail-row"><span class="detail-label">Registrations</span><span class="detail-value"><%= scorecard.registrations %></span></div>
+      <div class="detail-row"><span class="detail-label">Activations</span><span class="detail-value"><%= scorecard.activations %></span></div>
+      <div class="detail-row"><span class="detail-label">Links Shared</span><span class="detail-value"><%= scorecard.links_shared %></span></div>
+      <div class="detail-row"><span class="detail-label">New Customer Activity</span><span class="detail-value"><%= scorecard.customer_activity %></span></div>
+      <div class="detail-row"><span class="detail-label">First Orders</span><span class="detail-value"><%= scorecard.first_orders %></span></div>
+      <div class="detail-row"><span class="detail-label">Completed Orders</span><span class="detail-value"><%= scorecard.completed_orders %></span></div>
+      <div class="detail-row"><span class="detail-label">Repeat Orders</span><span class="detail-value"><%= scorecard.repeat_business_orders %></span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="font-size:15px;margin-bottom:10px;">Your Priority Lists Right Now</div>
+      <% scorecard.priorityCounts.forEach(function (l) { %>
+        <div class="detail-row">
+          <span class="detail-label"><%= l.id %> — <%= l.label %></span>
+          <span class="detail-value"><%= l.count %></span>
+        </div>
+      <% }) %>
+      <% if (scorecard.biggestLeak && scorecard.biggestLeak.count > 0) { %>
+        <p style="margin-top:12px;font-size:13px;color:var(--gray);">
+          Biggest leak right now: <strong><%= scorecard.biggestLeak.id %> — <%= scorecard.biggestLeak.label %></strong>
+          (<%= scorecard.biggestLeak.count %> prospect<%= scorecard.biggestLeak.count === 1 ? '' : 's' %> stuck here).
+        </p>
+      <% } %>
+    </div>
+
+    <a href="/priority-lists" class="logout-link">← Back to Priority Lists</a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>
