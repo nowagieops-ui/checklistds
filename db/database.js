@@ -303,10 +303,10 @@ const db = {
   // overwrite a stage that already fired — only fill in what was NULL.
   // Live facts, not one-time milestones — always overwritten with the
   // latest known value, unlike the COALESCE'd funnel timestamps.
-  async updateRiderStorefrontInfo(riderId, { storefrontUrl, uniqueVisitorCount }) {
+  async updateRiderStorefrontInfo(riderId, { storefrontUrl, uniqueVisitorCount, linkShareCount }) {
     await pool.execute(
-      'UPDATE riders SET storefront_url = ?, unique_visitor_count = ? WHERE id = ?',
-      [storefrontUrl || null, uniqueVisitorCount || 0, parseInt(riderId)]
+      'UPDATE riders SET storefront_url = ?, unique_visitor_count = ?, link_share_count = ? WHERE id = ?',
+      [storefrontUrl || null, uniqueVisitorCount || 0, linkShareCount || 0, parseInt(riderId)]
     );
   },
 

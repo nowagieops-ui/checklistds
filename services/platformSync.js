@@ -265,7 +265,17 @@ async function syncOutcomes() {
     if (visitorError) console.error('platformSync.syncOutcomes visitor count:', visitorError.message);
     const uniqueVisitorCount = visitorError ? 0 : new Set((visitorRows || []).map(v => v.visitor_id)).size;
 
-    await db.updateRiderStorefrontInfo(prospect.id, { storefrontUrl, uniqueVisitorCount });
+    // Real share ATTEMPTS (Copy link clicks), not reach — see plan/migration
+    // notes. link_share_events may not exist yet on older platform
+    // deployments, so a missing-table error is swallowed rather than
+    // spamming the log every run.
+    const { count: linkShareCount, error: shareError } = await supabase
+      .from('link_share_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId);
+    if (shareError && shareError.code !== 'PGRST205') console.error('platformSync.syncOutcomes link shares:', shareError.message);
+
+    await db.updateRiderStorefrontInfo(prospect.id, { storefrontUrl, uniqueVisitorCount, linkShareCount: linkShareCount || 0 });
   }
   return { checked: linked.length };
 }
