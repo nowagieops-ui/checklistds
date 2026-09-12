@@ -301,6 +301,15 @@ const db = {
   // Applies whichever funnel timestamps/fields are newly known. Every
   // timestamp field uses COALESCE so a sync run can never regress or
   // overwrite a stage that already fired — only fill in what was NULL.
+  // Live facts, not one-time milestones — always overwritten with the
+  // latest known value, unlike the COALESCE'd funnel timestamps.
+  async updateRiderStorefrontInfo(riderId, { storefrontUrl, uniqueVisitorCount }) {
+    await pool.execute(
+      'UPDATE riders SET storefront_url = ?, unique_visitor_count = ? WHERE id = ?',
+      [storefrontUrl || null, uniqueVisitorCount || 0, parseInt(riderId)]
+    );
+  },
+
   // The only thing that ever sets link_shared_at — a staff member confirming
   // it in a follow-up, never inferred from a storefront visit. COALESCE'd so
   // it can only be set once, same guarantee as updateRiderFunnelOutcomes.

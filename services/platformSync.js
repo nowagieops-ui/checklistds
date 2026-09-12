@@ -151,7 +151,7 @@ async function syncOutcomes() {
 
     const { data: business, error: businessError } = await supabase
       .from('businesses')
-      .select('id, is_active, is_accepting_orders, whatsapp_phone_number_id')
+      .select('id, is_active, is_accepting_orders, whatsapp_phone_number_id, slug, custom_domain, custom_domain_verified')
       .eq('id', businessId)
       .maybeSingle();
     if (businessError) { console.error('platformSync.syncOutcomes business:', businessError.message); continue; }
@@ -242,6 +242,30 @@ async function syncOutcomes() {
     }
 
     await db.updateRiderFunnelOutcomes(prospect.id, fields);
+
+    // Storefront link + reach — kept in sync every run since both can
+    // legitimately change (a custom domain gets added/verified later;
+    // visitor count only grows), unlike the once-true-stays-true funnel
+    // timestamps above.
+    const storefrontUrl = business.custom_domain && business.custom_domain_verified
+      ? `https://${business.custom_domain}`
+      : business.slug ? `https://${business.slug}.dashspid.com` : null;
+
+    // PostgREST's count:'exact'+head:true counts ROWS matching the filter,
+    // not distinct values of the selected column — it can't compute
+    // COUNT(DISTINCT visitor_id) server-side without a custom RPC, which
+    // doesn't exist here. So this fetches the actual visitor_id values and
+    // dedupes in JS — fine at current volumes, would need revisiting (an
+    // RPC, or a materialized count) if any single business's visit count
+    // grows into the thousands.
+    const { data: visitorRows, error: visitorError } = await supabase
+      .from('storefront_visits')
+      .select('visitor_id')
+      .eq('business_id', businessId);
+    if (visitorError) console.error('platformSync.syncOutcomes visitor count:', visitorError.message);
+    const uniqueVisitorCount = visitorError ? 0 : new Set((visitorRows || []).map(v => v.visitor_id)).size;
+
+    await db.updateRiderStorefrontInfo(prospect.id, { storefrontUrl, uniqueVisitorCount });
   }
   return { checked: linked.length };
 }

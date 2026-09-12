@@ -39,6 +39,17 @@
       <% if (rider.repeat_customer_count > 0) { %>
         <span class="badge badge-orange"><%= rider.repeat_customer_count %> repeat customer<%= rider.repeat_customer_count === 1 ? '' : 's' %></span>
       <% } %>
+
+      <% if (rider.storefront_url) { %>
+        <div class="detail-row" style="margin-top:12px;">
+          <span class="detail-label">Storefront</span>
+          <span class="detail-value"><a href="<%= rider.storefront_url %>" target="_blank" rel="noopener"><%= rider.storefront_url.replace('https://', '') %></a></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Unique Visitors</span>
+          <span class="detail-value"><%= rider.unique_visitor_count %> — real visits, not the same as how many people they've shared the link with</span>
+        </div>
+      <% } %>
     </div>
 
     <% if (timeline.length > 0) { %>
