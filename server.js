@@ -176,7 +176,7 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr, cutoff) {
 app.get('/home', requireAuth, async (req, res) => {
   const marketer = await db.getMarketerById(req.session.marketerId);
   const role = marketer ? marketer.role : 'field_marketer';
-  const priorityCounts = await priorityLists.getAllListCounts(req.session.marketerId);
+  const priorityCounts = await priorityLists.getAllListCounts(scopeMarketerId(marketer));
   const openProspects = priorityCounts.reduce((sum, l) => sum + l.count, 0);
 
   const submittedToday = !!(await db.getSubmissionByMarketerToday(req.session.marketerId, today()));
@@ -354,23 +354,49 @@ app.get('/riders/:id/done', requireAuth, async (req, res) => {
 
 // ── CORE PRIORITY LISTS (P1-P6) ──────────────────────────────────────────────
 // Shared by field marketer and telemarketer alike — same underlying queries
-// (services/priorityLists.js), scoped to the logged-in staff member's own
-// prospects. The view adapts its own copy/labels by role.
+// (services/priorityLists.js). The view adapts its own copy/labels by role.
+//
+// Scope differs by role, and deliberately so: a field marketer works the
+// specific people they sourced face-to-face, but the telemarketer's job is
+// working the whole company-wide funnel by phone regardless of which
+// channel originally registered someone — ownership of who onboarded a
+// prospect doesn't change whose job it is to call them forward. This only
+// stays correct with exactly one telemarketer; with more than one, "sees
+// everyone" needs a real assignment mechanism instead.
+function scopeMarketerId(marketer) {
+  return marketer && marketer.role === 'telemarketer' ? null : (marketer ? marketer.id : null);
+}
+
+// A prospect can be acted on by whoever sourced them, OR by the
+// telemarketer (who can act on anyone, per the scope rule above).
+function canAccessRider(rider, marketer) {
+  if (!rider || !marketer) return false;
+  return rider.added_by_marketer_id === marketer.id || marketer.role === 'telemarketer';
+}
+
+// Only a same-origin path is ever accepted for a query-string redirect
+// target — rejects absolute URLs and protocol-relative ones (e.g.
+// "//evil.com", which starts with "/" but is an open redirect).
+function isSafeLocalRedirect(value) {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+}
 
 app.get('/priority-lists', requireAuth, async (req, res) => {
   const marketer = await db.getMarketerById(req.session.marketerId);
   const role = marketer ? marketer.role : 'field_marketer';
-  const marketerId = req.session.marketerId;
+  const scopeId = scopeMarketerId(marketer);
 
-  const counts = await priorityLists.getAllListCounts(marketerId);
+  const counts = await priorityLists.getAllListCounts(scopeId);
   const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
   const meta = priorityLists.LISTS[activeList];
 
-  const rawRows = await priorityLists.getListRows(activeList, marketerId);
+  const rawRows = await priorityLists.getListRows(activeList, scopeId);
   const rows = rawRows.map(r => ({
     ...r,
     daysInStage: daysSince(r[meta.orderByColumn] || r.created_at)
   }));
+
+  const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
 
   res.render('priority-lists', {
     heading: role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists',
@@ -379,6 +405,7 @@ app.get('/priority-lists', requireAuth, async (req, res) => {
     backHref: '/home',
     backLabel: '← Back to Home',
     viewerIsManagement: false,
+    callSummary,
     counts,
     activeList,
     activeMeta: priorityLists.listMeta(activeList),
@@ -393,12 +420,14 @@ app.get('/management/staff/:id/priority-lists', requireManagement, async (req, r
   const staff = await db.getMarketerById(req.params.id);
   if (!staff) return res.redirect('/management/staff-performance');
 
-  const counts = await priorityLists.getAllListCounts(staff.id);
+  const scopeId = scopeMarketerId(staff);
+  const counts = await priorityLists.getAllListCounts(scopeId);
   const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
   const meta = priorityLists.LISTS[activeList];
 
-  const rawRows = await priorityLists.getListRows(activeList, staff.id);
+  const rawRows = await priorityLists.getListRows(activeList, scopeId);
   const rows = rawRows.map(r => ({ ...r, daysInStage: daysSince(r[meta.orderByColumn] || r.created_at) }));
+  const callSummary = await performance.getTodayCallSummary(staff.id, today());
 
   res.render('priority-lists', {
     heading: `${staff.name}'s Priority Lists`,
@@ -407,6 +436,7 @@ app.get('/management/staff/:id/priority-lists', requireManagement, async (req, r
     backHref: '/management/staff-performance',
     backLabel: '← Back to Staff Performance',
     viewerIsManagement: true,
+    callSummary,
     counts,
     activeList,
     activeMeta: priorityLists.listMeta(activeList),
@@ -448,7 +478,8 @@ app.get('/my-performance', requireAuth, async (req, res) => {
 
 app.get('/riders/:id', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
-  if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/priority-lists');
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
 
   const followups = (await db.getFollowupsForRider(rider.id)).map(f => ({
     ...f,
@@ -511,7 +542,8 @@ app.get('/management/riders/:id', requireManagement, async (req, res) => {
 
 app.post('/riders/:id/followups', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
-  if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/priority-lists');
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
 
   const { type, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date } = req.body;
   const stageBefore = rider.funnel_stage;
@@ -538,6 +570,35 @@ app.post('/riders/:id/followups', requireAuth, async (req, res) => {
   });
 
   res.redirect(`/riders/${rider.id}`);
+});
+
+// One-tap "I called/visited this person today" — a bare-bones followups row
+// with no stage change, for when there's genuinely nothing more to record
+// than the contact itself. Deliberately the same table as the full
+// follow-up form (not a separate counter), so "200 calls logged, 3 moved a
+// stage" stays computable from one source of truth rather than two.
+app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  await db.addFollowup({
+    rider_id: rider.id,
+    staff_id: req.session.marketerId,
+    type: 'call',
+    stage_before: rider.funnel_stage,
+    stage_after: rider.funnel_stage,
+    reason_code: null,
+    desired_action: null,
+    action_completed: false,
+    link_shared_confirmed: false,
+    notes: null,
+    next_followup_date: null,
+    created_at: nowLagos()
+  });
+
+  const redirectTo = isSafeLocalRedirect(req.query.redirect) ? req.query.redirect : '/priority-lists';
+  res.redirect(redirectTo);
 });
 
 app.get('/logout', requireAuth, async (req, res) => {

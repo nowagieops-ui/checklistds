@@ -97,4 +97,19 @@ async function getStaffScorecard(marketerId, fromDate, toDate) {
   return { ...totals, followups: followupTotals.followups, priorityCounts, biggestLeak };
 }
 
-module.exports = { getCompanyOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard };
+// "200 calls, 3 moved a stage" — the roll-up the spec insists a raw call
+// count must be shown alongside (§8: "a total call count may be shown only
+// as a roll-up"). moved_stage counts a followup only where the funnel stage
+// actually changed, so a quick-call tick (which never changes stage) or a
+// full follow-up that didn't move anything both correctly count as "no
+// movement," not silently as a win.
+async function getTodayCallSummary(staffId, todayDate) {
+  const [row] = await db.query(
+    `SELECT COUNT(*) AS total_calls, SUM(CASE WHEN stage_before <> stage_after THEN 1 ELSE 0 END) AS moved_stage
+     FROM followups WHERE staff_id = ? AND DATE(created_at) = ?`,
+    [staffId, todayDate]
+  );
+  return { total_calls: row.total_calls, moved_stage: row.moved_stage || 0 };
+}
+
+module.exports = { getCompanyOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary };
