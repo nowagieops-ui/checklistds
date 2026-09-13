@@ -36,8 +36,14 @@ async function getCompanyOverview(fromDate, toDate) {
   ).join(', ');
   const params = ranged ? STAGE_COLUMNS.flatMap(() => [fromDate, toDate]) : [];
 
+  // total_link_shares/total_unique_visitors are cumulative running totals
+  // synced onto each rider (not date-stamped events in MySQL), so these two
+  // are always all-time regardless of the requested period — labeled as
+  // such wherever they're shown.
   const rows = await db.query(
-    `SELECT COUNT(*) AS total_prospects, SUM(repeat_customer_count) AS total_repeat_customers, ${selects} FROM riders`,
+    `SELECT COUNT(*) AS total_prospects, SUM(repeat_customer_count) AS total_repeat_customers,
+            SUM(link_share_count) AS total_link_shares, SUM(unique_visitor_count) AS total_unique_visitors,
+            ${selects} FROM riders`,
     params
   );
   const biggestLeak = (await priorityLists.getAllListCounts(null)).sort((a, b) => b.count - a.count)[0];

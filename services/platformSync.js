@@ -332,6 +332,32 @@ async function getRecentUsage(platformBusinessId, days = 7) {
   return data || [];
 }
 
+// Company-wide app-usage rollup for the manager dashboard's Growth
+// Overview — total opens, total active minutes, and how many distinct
+// linked businesses had any activity, across whichever window
+// (sinceDate undefined = all-time). Scoped to businesses actually linked
+// to a Staff Ops prospect (via riders.platform_business_id), not every
+// business on the platform — this dashboard is about staff-driven growth,
+// not organic signups nobody here sourced.
+async function getCompanyUsageSummary(sinceDate) {
+  const supabase = getClient();
+  const empty = { totalOpens: 0, totalMinutes: 0, activeBusinesses: 0 };
+  if (!supabase) return empty;
+
+  const linkedIds = await db.getLinkedPlatformBusinessIds();
+  if (linkedIds.length === 0) return empty;
+
+  let query = supabase.from('business_activity_pings').select('business_id, open_count, active_seconds').in('business_id', linkedIds);
+  if (sinceDate) query = query.gte('day', sinceDate);
+  const { data, error } = await query;
+  if (error) { console.error('platformSync.getCompanyUsageSummary:', error.message); return empty; }
+
+  const totalOpens = (data || []).reduce((sum, r) => sum + (r.open_count || 0), 0);
+  const totalSeconds = (data || []).reduce((sum, r) => sum + (r.active_seconds || 0), 0);
+  const activeBusinesses = new Set((data || []).map(r => r.business_id)).size;
+  return { totalOpens, totalMinutes: Math.round(totalSeconds / 60), activeBusinesses };
+}
+
 function startInterval(intervalMs = 5 * 60 * 1000) {
   if (!getClient()) {
     console.log('platformSync: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — platform sync disabled');
@@ -343,4 +369,4 @@ function startInterval(intervalMs = 5 * 60 * 1000) {
   }, intervalMs);
 }
 
-module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage, getUnmatchedCandidatesForStaff };
+module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage, getUnmatchedCandidatesForStaff, getCompanyUsageSummary };

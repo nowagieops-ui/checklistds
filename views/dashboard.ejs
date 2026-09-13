@@ -60,6 +60,15 @@
       </div>
     <% } %>
 
+    <div class="section-title">Engagement — <%= overviewPeriod === 'all' ? 'All-Time' : overviewPeriod === 'today' ? "Usage Today (shares/visitors are always all-time)" : "Usage This Week (shares/visitors are always all-time)" %></div>
+    <div class="status-grid">
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Link Shares</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.total_link_shares || 0 %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Unique Storefront Visitors</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.total_unique_visitors || 0 %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Dashboard Opens</div><div class="dash-title" style="font-size:24px;"><%= usageSummary.totalOpens %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Minutes Active in App</div><div class="dash-title" style="font-size:24px;"><%= usageSummary.totalMinutes %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ App Activity</div><div class="dash-title" style="font-size:24px;"><%= usageSummary.activeBusinesses %></div></div>
+    </div>
+
     <!-- GROWTH OS: PLATFORM SYNC -->
     <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;">
