@@ -863,6 +863,9 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const companyOverview = overviewPeriod === 'all'
     ? await performance.getCompanyOverview()
     : await performance.getCompanyOverview(overviewFromDate, overviewToDate);
+  const cohortOverview = overviewPeriod === 'all'
+    ? await performance.getCohortOverview()
+    : await performance.getCohortOverview(overviewFromDate, overviewToDate);
   const usageSummary = await platformSync.getCompanyUsageSummary(overviewPeriod === 'all' ? undefined : overviewFromDate);
 
   const marketers = await db.getMarketers();
@@ -943,7 +946,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
     formatTime, formatDateShort,
-    companyOverview, overviewPeriod, usageSummary
+    companyOverview, cohortOverview, overviewPeriod, usageSummary
   });
 });
 

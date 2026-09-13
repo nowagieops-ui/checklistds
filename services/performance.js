@@ -50,6 +50,33 @@ async function getCompanyOverview(fromDate, toDate) {
   return { ...rows[0], biggestLeak };
 }
 
+// Cohort conversion: of everyone who REGISTERED within this window, how
+// many have (as of right now, regardless of when it happened) reached each
+// later stage. Deliberately different from getCompanyOverview above, which
+// counts each stage's own event date independently of registration date —
+// this answers "how well is this batch of signups actually converting,"
+// which is what a ratio display needs as its denominator. Omit
+// fromDate/toDate for the all-time cohort (everyone ever registered).
+async function getCohortOverview(fromDate, toDate) {
+  const ranged = fromDate && toDate;
+  const where = ranged ? 'WHERE registered_at IS NOT NULL AND DATE(registered_at) BETWEEN ? AND ?' : 'WHERE registered_at IS NOT NULL';
+  const params = ranged ? [fromDate, toDate] : [];
+
+  const [row] = await db.query(
+    `SELECT COUNT(*) AS cohort_size,
+            SUM(CASE WHEN activated_at IS NOT NULL THEN 1 ELSE 0 END) AS activated,
+            SUM(CASE WHEN link_shared_at IS NOT NULL THEN 1 ELSE 0 END) AS link_shared,
+            SUM(CASE WHEN first_activity_at IS NOT NULL THEN 1 ELSE 0 END) AS customer_activity,
+            SUM(CASE WHEN first_order_at IS NOT NULL THEN 1 ELSE 0 END) AS first_order,
+            SUM(CASE WHEN completed_order_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_order,
+            SUM(CASE WHEN repeat_business_order_at IS NOT NULL THEN 1 ELSE 0 END) AS repeat_order,
+            SUM(CASE WHEN first_repeat_customer_at IS NOT NULL THEN 1 ELSE 0 END) AS repeat_customer_businesses
+     FROM riders ${where}`,
+    params
+  );
+  return row;
+}
+
 // Channel rollup (field_marketer/telemarketer/pioneer/referral/ads/other) —
 // channel is purely an attribution dimension on riders, never part of the
 // funnel-stage definition itself (see plan).
@@ -118,4 +145,4 @@ async function getTodayCallSummary(staffId, todayDate) {
   return { total_calls: row.total_calls, moved_stage: row.moved_stage || 0 };
 }
 
-module.exports = { getCompanyOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary };
+module.exports = { getCompanyOverview, getCohortOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary };

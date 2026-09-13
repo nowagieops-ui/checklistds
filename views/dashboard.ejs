@@ -42,15 +42,19 @@
       <a href="/dashboard?overviewPeriod=week&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'week' ? 'priority-tab-active' : '' %>">This Week</a>
       <a href="/dashboard?overviewPeriod=all&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'all' ? 'priority-tab-active' : '' %>">All-Time</a>
     </div>
+    <div class="card-sub" style="margin-bottom:10px;">
+      Registered <strong><%= cohortOverview.cohort_size %></strong> in this window — everything below is how many of
+      those same <%= cohortOverview.cohort_size %> have reached each stage so far, regardless of when.
+    </div>
     <div class="status-grid">
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Registrations</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.registrations %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Activations</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.activations %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Links Shared</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.links_shared %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Customer Activity</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.customer_activity %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">First Orders</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.first_orders %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Completed Orders</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.completed_orders %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Repeat Orders (Business)</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.repeat_business_orders %></div></div>
-      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Repeat Customers</div><div class="dash-title" style="font-size:24px;"><%= companyOverview.repeat_customer_businesses %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Registrations</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Activations</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.activated %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Links Shared</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.link_shared %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Customer Activity</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.customer_activity %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">First Orders</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.first_order %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Completed Orders</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.completed_order %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Repeat Orders (Business)</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.repeat_order %>/<%= cohortOverview.cohort_size %></div></div>
+      <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Repeat Customers</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.repeat_customer_businesses %>/<%= cohortOverview.cohort_size %></div></div>
     </div>
     <% if (companyOverview.biggestLeak && companyOverview.biggestLeak.count > 0) { %>
       <div class="card" style="margin-bottom:20px;">
