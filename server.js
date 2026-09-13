@@ -381,6 +381,24 @@ app.post('/prospects', requireAuth, async (req, res) => {
     channel
   }, nowLagos());
 
+  // Logging a new lead IS the day's first contact with them — telemarketer
+  // called, field marketer visited. No separate "Called" tap needed right
+  // after adding someone.
+  await db.addFollowup({
+    rider_id: rider.id,
+    staff_id: marketerId,
+    type: channel === 'telemarketer' ? 'call' : 'visit',
+    stage_before: 'new',
+    stage_after: 'new',
+    reason_code: null,
+    desired_action: null,
+    action_completed: false,
+    link_shared_confirmed: false,
+    notes: null,
+    next_followup_date: null,
+    created_at: nowLagos()
+  });
+
   res.redirect(`/riders/${rider.id}`);
 });
 
@@ -422,10 +440,12 @@ app.get('/priority-lists', requireAuth, async (req, res) => {
   const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
   const meta = priorityLists.LISTS[activeList];
 
+  const contactedTodayIds = new Set(await db.getContactedTodayRiderIds(req.session.marketerId, today()));
   const rawRows = await priorityLists.getListRows(activeList, scopeId);
   const rows = rawRows.map(r => ({
     ...r,
-    daysInStage: daysSince(r[meta.orderByColumn] || r.created_at)
+    daysInStage: daysSince(r[meta.orderByColumn] || r.created_at),
+    contactedToday: contactedTodayIds.has(r.id)
   }));
 
   const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
@@ -681,20 +701,26 @@ app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
   const marketer = await db.getMarketerById(req.session.marketerId);
   if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
 
-  await db.addFollowup({
-    rider_id: rider.id,
-    staff_id: req.session.marketerId,
-    type: 'call',
-    stage_before: rider.funnel_stage,
-    stage_after: rider.funnel_stage,
-    reason_code: null,
-    desired_action: null,
-    action_completed: false,
-    link_shared_confirmed: false,
-    notes: null,
-    next_followup_date: null,
-    created_at: nowLagos()
-  });
+  // Caps at one contact per prospect per day — the whole point of a
+  // one-tap button is "I touched this today," not a raw click counter. A
+  // second tap the same day is a no-op, not a second logged contact.
+  const alreadyContacted = await db.hasContactedToday(req.session.marketerId, rider.id, today());
+  if (!alreadyContacted) {
+    await db.addFollowup({
+      rider_id: rider.id,
+      staff_id: req.session.marketerId,
+      type: 'call',
+      stage_before: rider.funnel_stage,
+      stage_after: rider.funnel_stage,
+      reason_code: null,
+      desired_action: null,
+      action_completed: false,
+      link_shared_confirmed: false,
+      notes: null,
+      next_followup_date: null,
+      created_at: nowLagos()
+    });
+  }
 
   const redirectTo = isSafeLocalRedirect(req.query.redirect) ? req.query.redirect : '/priority-lists';
   res.redirect(redirectTo);

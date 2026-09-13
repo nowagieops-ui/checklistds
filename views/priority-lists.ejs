@@ -77,9 +77,13 @@
             <div class="home-tile-arrow">→</div>
           </a>
           <% if (!viewerIsManagement) { %>
-            <form method="POST" action="/riders/<%= r.id %>/quick-call?redirect=<%= encodeURIComponent(baseUrl + '?list=' + activeList) %>" style="margin:0;flex-shrink:0;">
-              <button type="submit" class="btn btn-outline" style="width:auto;padding:8px 12px;margin:0;font-size:12px;white-space:nowrap;" title="Log that you called or visited them today, with no other details">☎ Called</button>
-            </form>
+            <% if (r.contactedToday) { %>
+              <span class="badge badge-green" style="flex-shrink:0;white-space:nowrap;" title="Already logged today — one contact per prospect per day">✓ Contacted today</span>
+            <% } else { %>
+              <form method="POST" action="/riders/<%= r.id %>/quick-call?redirect=<%= encodeURIComponent(baseUrl + '?list=' + activeList) %>" style="margin:0;flex-shrink:0;">
+                <button type="submit" class="btn btn-outline" style="width:auto;padding:8px 12px;margin:0;font-size:12px;white-space:nowrap;" title="Log that you called or visited them today, with no other details">☎ Called</button>
+              </form>
+            <% } %>
           <% } %>
         </div>
       <% }) %>

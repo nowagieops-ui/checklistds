@@ -335,6 +335,26 @@ const db = {
     return rows;
   },
 
+  // Every rider_id this staff member has already logged ANY followup
+  // against today — used to grey out the quick-call button (it should only
+  // ever add one contact per prospect per day) and to know which rows don't
+  // need it shown at all.
+  async getContactedTodayRiderIds(staffId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT DISTINCT rider_id FROM followups WHERE staff_id = ? AND DATE(created_at) = ?',
+      [staffId, todayDate]
+    );
+    return rows.map(r => r.rider_id);
+  },
+
+  async hasContactedToday(staffId, riderId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT id FROM followups WHERE staff_id = ? AND rider_id = ? AND DATE(created_at) = ? LIMIT 1',
+      [staffId, parseInt(riderId), todayDate]
+    );
+    return rows.length > 0;
+  },
+
   async addFollowup(data) {
     await pool.execute(
       `INSERT INTO followups

@@ -50,20 +50,31 @@ async function getCompanyOverview(fromDate, toDate) {
   return { ...rows[0], biggestLeak };
 }
 
-// Cohort conversion: of everyone who REGISTERED within this window, how
-// many have (as of right now, regardless of when it happened) reached each
-// later stage. Deliberately different from getCompanyOverview above, which
-// counts each stage's own event date independently of registration date —
-// this answers "how well is this batch of signups actually converting,"
-// which is what a ratio display needs as its denominator. Omit
-// fromDate/toDate for the all-time cohort (everyone ever registered).
-async function getCohortOverview(fromDate, toDate) {
+// Cohort conversion: of everyone LOGGED (created_at) within this window —
+// a field marketer's warm leads (services/priorityLists's "new" stage,
+// added via /prospects) plus everyone onboarded via the full checklist
+// (/riders), since both land in the same table — how many have, as of
+// right now regardless of when it happened, reached each later stage.
+//
+// Deliberately seeded by created_at, not registered_at: registration is
+// something the prospect does later, on the platform, on their own time —
+// it's not the field/telemarketer's own top-of-funnel number. "I spoke to
+// 50 people today, 5 have activated so far" needs 50 (everyone logged
+// today) as the denominator, not however many of them happen to have
+// registered yet. Pass marketerId to scope to one staff member (their own
+// leads); omit for company-wide. Omit fromDate/toDate for the all-time
+// cohort (everyone ever logged).
+async function getCohortOverview(fromDate, toDate, marketerId) {
   const ranged = fromDate && toDate;
-  const where = ranged ? 'WHERE registered_at IS NOT NULL AND DATE(registered_at) BETWEEN ? AND ?' : 'WHERE registered_at IS NOT NULL';
-  const params = ranged ? [fromDate, toDate] : [];
+  const conditions = [];
+  const params = [];
+  if (ranged) { conditions.push('DATE(created_at) BETWEEN ? AND ?'); params.push(fromDate, toDate); }
+  if (marketerId) { conditions.push('added_by_marketer_id = ?'); params.push(marketerId); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const [row] = await db.query(
-    `SELECT COUNT(*) AS cohort_size,
+    `SELECT COUNT(*) AS total_leads,
+            SUM(CASE WHEN registered_at IS NOT NULL THEN 1 ELSE 0 END) AS registered,
             SUM(CASE WHEN activated_at IS NOT NULL THEN 1 ELSE 0 END) AS activated,
             SUM(CASE WHEN link_shared_at IS NOT NULL THEN 1 ELSE 0 END) AS link_shared,
             SUM(CASE WHEN first_activity_at IS NOT NULL THEN 1 ELSE 0 END) AS customer_activity,
@@ -103,21 +114,11 @@ async function getStaffBreakdown() {
   return result;
 }
 
-// Date-range scorecard for one staff member's own "My Performance" screen —
-// this is the flow view (what moved in this window), unlike the company
-// overview above, which is a snapshot.
+// One staff member's own "My Performance" screen — the same created_at-
+// seeded cohort as getCohortOverview, scoped to their own leads, plus their
+// follow-up/call count and current priority-list snapshot.
 async function getStaffScorecard(marketerId, fromDate, toDate) {
-  const selects = STAGE_COLUMNS.map(s =>
-    `SUM(CASE WHEN ${s.column} IS NOT NULL AND DATE(${s.column}) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS ${s.key}`
-  ).join(', ');
-  const params = [];
-  STAGE_COLUMNS.forEach(() => params.push(fromDate, toDate));
-  params.push(marketerId);
-
-  const [totals] = await db.query(
-    `SELECT ${selects} FROM riders WHERE added_by_marketer_id = ?`,
-    params
-  );
+  const cohort = await getCohortOverview(fromDate, toDate, marketerId);
 
   const [followupTotals] = await db.query(
     `SELECT COUNT(*) AS followups FROM followups WHERE staff_id = ? AND DATE(created_at) BETWEEN ? AND ?`,
@@ -127,7 +128,7 @@ async function getStaffScorecard(marketerId, fromDate, toDate) {
   const priorityCounts = await priorityLists.getAllListCounts(marketerId);
   const biggestLeak = [...priorityCounts].sort((a, b) => b.count - a.count)[0];
 
-  return { ...totals, followups: followupTotals.followups, priorityCounts, biggestLeak };
+  return { ...cohort, followups: followupTotals.followups, priorityCounts, biggestLeak };
 }
 
 // "200 calls, 3 moved a stage" — the roll-up the spec insists a raw call
