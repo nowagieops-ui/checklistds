@@ -56,6 +56,23 @@
       <% } %>
     </div>
 
+    <% if (linkCandidates.length > 0) { %>
+      <div class="card">
+        <div class="card-title" style="font-size:15px;margin-bottom:4px;">Just signed up? Link them</div>
+        <div class="card-sub" style="margin-bottom:10px;">Recent signups under your name that aren't linked to anyone yet — pick the one that's actually <%= rider.name %>.</div>
+        <% linkCandidates.forEach(function (c) { %>
+          <form method="POST" action="/riders/<%= rider.id %>/link-business" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <div>
+              <div style="font-weight:600;font-size:13.5px;"><%= c.name %></div>
+              <div style="font-size:12px;color:var(--gray);"><%= c.phone || '—' %> · signed up as "<%= c.marketer_code %>"</div>
+            </div>
+            <input type="hidden" name="platform_business_id" value="<%= c.id %>">
+            <button type="submit" class="btn btn-outline" style="width:auto;padding:8px 14px;margin:0;font-size:12px;white-space:nowrap;">This is them</button>
+          </form>
+        <% }) %>
+      </div>
+    <% } %>
+
     <% if (usageDays.length > 0) { %>
       <div class="card">
         <div class="card-title" style="font-size:15px;margin-bottom:4px;">App Usage (Last 7 Days With Activity)</div>

@@ -352,6 +352,38 @@ app.get('/riders/:id/done', requireAuth, async (req, res) => {
   res.render('rider-done', { rider, time: rider.completed_at ? formatTime(rider.completed_at) : null });
 });
 
+// ── QUICK-ADD LEAD (no checklist) ────────────────────────────────────────────
+// For a telemarketer (or a field marketer) to log a brand-new warm prospect
+// they're about to work, without the in-person onboarding checklist — that
+// stays specific to "Onboard New Rider" (device-flag checks, QC checklist,
+// the whole flow), which doesn't make sense for someone reached by phone.
+
+app.get('/prospects/new', requireAuth, (req, res) => {
+  res.render('prospect-new', { error: null });
+});
+
+app.post('/prospects', requireAuth, async (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !name.trim() || !phone || !phone.trim()) {
+    return res.render('prospect-new', { error: "Enter the lead's name and phone number." });
+  }
+
+  const marketerId = req.session.marketerId;
+  const marketer = await db.getMarketerById(marketerId);
+  const channel = marketer && marketer.role === 'telemarketer' ? 'telemarketer' : 'field_marketer';
+
+  const rider = await db.addRider({
+    name: name.trim(),
+    email: '',
+    phone: phone.trim(),
+    added_by_marketer_id: marketerId,
+    added_by_marketer_name: req.session.marketerName,
+    channel
+  }, nowLagos());
+
+  res.redirect(`/riders/${rider.id}`);
+});
+
 // ── CORE PRIORITY LISTS (P1-P6) ──────────────────────────────────────────────
 // Shared by field marketer and telemarketer alike — same underlying queries
 // (services/priorityLists.js). The view adapts its own copy/labels by role.
@@ -490,6 +522,33 @@ async function getUsageDays(rider) {
   }));
 }
 
+// Full roster — "everyone I've ever worked," not just who currently needs
+// action. Scoped the same way as the priority lists (own leads for a field
+// marketer, everyone for the telemarketer — see scopeMarketerId above).
+app.get('/prospects', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const rows = await priorityLists.getAllProspects(scopeMarketerId(marketer));
+
+  const prospects = rows.map(r => ({
+    ...r,
+    stageLabel: FUNNEL_STAGE_LABELS[r.funnel_stage] || r.funnel_stage,
+    dateAdded: formatDateShort(r.created_at.slice(0, 10))
+  }));
+
+  const summary = {
+    total: rows.length,
+    registered: rows.filter(r => r.registered_at).length,
+    activated: rows.filter(r => r.activated_at).length,
+    linkShared: rows.filter(r => r.link_shared_at).length,
+    customerActivity: rows.filter(r => r.first_activity_at).length,
+    firstOrder: rows.filter(r => r.first_order_at).length,
+    completedOrder: rows.filter(r => r.completed_order_at).length,
+    repeatOrder: rows.filter(r => r.repeat_business_order_at).length
+  };
+
+  res.render('prospects-roster', { prospects, summary });
+});
+
 app.get('/riders/:id', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
   const marketer = await db.getMarketerById(req.session.marketerId);
@@ -509,12 +568,16 @@ app.get('/riders/:id', requireAuth, async (req, res) => {
     .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
 
   const usageDays = await getUsageDays(rider);
+  const linkCandidates = (!rider.platform_business_id)
+    ? await platformSync.getUnmatchedCandidatesForStaff(marketer.name)
+    : [];
 
   res.render('rider-detail', {
     rider,
     stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
     timeline,
     usageDays,
+    linkCandidates,
     followups,
     reasonCodes,
     today: today(),
@@ -522,6 +585,21 @@ app.get('/riders/:id', requireAuth, async (req, res) => {
     backHref: '/priority-lists',
     backLabel: '← Back to Priority Lists'
   });
+});
+
+// Manual override for the ambiguous case: staff confirms a specific
+// "new"-stage prospect is the same person as a specific recent platform
+// signup, rather than waiting on (or second-guessing) the automatic
+// oldest-unmatched-prospect heuristic in platformSync.js.
+app.post('/riders/:id/link-business', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  if (req.body.platform_business_id && !rider.platform_business_id) {
+    await db.linkRiderToPlatformBusiness(rider.id, req.body.platform_business_id, nowLagos());
+  }
+  res.redirect(`/riders/${rider.id}`);
 });
 
 // Management's read-only view of any prospect — same funnel timeline and
@@ -551,6 +629,7 @@ app.get('/management/riders/:id', requireManagement, async (req, res) => {
     stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
     timeline,
     usageDays,
+    linkCandidates: [],
     followups,
     reasonCodes: [],
     today: today(),

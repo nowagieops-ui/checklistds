@@ -61,6 +61,32 @@ function namesMatch(marketerCode, staffName) {
   return codeTokens.some(ct => ct.length >= 4 && nameTokens.some(nt => nt.includes(ct) || ct.includes(nt)));
 }
 
+// For a "new" stage prospect that hasn't been auto-linked yet: recent
+// platform signups whose marketer_code names this staff member and aren't
+// already linked to any prospect. Deliberately manual rather than
+// auto-picking one (like attributeUnlinkedPlatformSignups's oldest-unmatched
+// heuristic does for the fully-automatic path) — when a staff member has
+// several concurrent unregistered leads, only a human knows which specific
+// one just signed up.
+async function getUnmatchedCandidatesForStaff(staffName, limit = 10) {
+  const supabase = getClient();
+  if (!supabase) return [];
+
+  const alreadyLinked = new Set(await db.getLinkedPlatformBusinessIds());
+  const { data: businesses, error } = await supabase
+    .from('businesses')
+    .select('id, name, phone, marketer_code, created_at')
+    .in('how_heard', ['field_marketer', 'telemarketer'])
+    .not('marketer_code', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) { console.error('platformSync.getUnmatchedCandidatesForStaff:', error.message); return []; }
+
+  return (businesses || [])
+    .filter(b => !alreadyLinked.has(b.id) && namesMatch(b.marketer_code, staffName))
+    .slice(0, limit);
+}
+
 async function matchProspects() {
   const supabase = getClient();
   if (!supabase) return { checked: 0, matched: 0 };
@@ -317,4 +343,4 @@ function startInterval(intervalMs = 5 * 60 * 1000) {
   }, intervalMs);
 }
 
-module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage };
+module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage, getUnmatchedCandidatesForStaff };

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Add New Lead — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Add New Lead</div>
+      <div class="card-sub">A warm/new prospect to call — no checklist needed, just enough to start working them.</div>
+
+      <% if (error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/prospects" id="prospectForm">
+        <label for="name">Name <span style="color:var(--red)">*</span></label>
+        <input type="text" name="name" id="name" placeholder="e.g. Musa Abdullahi" required>
+
+        <label for="phone">Phone number <span style="color:var(--red)">*</span></label>
+        <input type="tel" name="phone" id="phone" placeholder="e.g. 08012345678" required>
+
+        <button type="submit" class="btn" id="submitBtn">Add Lead →</button>
+      </form>
+    </div>
+
+    <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
+  </div>
+
+  <script>
+    document.getElementById('prospectForm').addEventListener('submit', function() {
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Please wait...';
+    });
+  </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

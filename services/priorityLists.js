@@ -98,4 +98,21 @@ async function getAllListCounts(marketerId) {
   return result;
 }
 
-module.exports = { LISTS, listIds, listMeta, getListRows, getListCount, getAllListCounts };
+// The full roster, unlike the priority lists above: every prospect this
+// scope has ever worked, regardless of current stage — including ones who
+// have fully "graduated" past P6 (a repeat business, say) and so no longer
+// appear in any P1-P6 queue. That's deliberate for the queues (nothing to
+// action there), but a staff member still wants to see everyone they've
+// ever spoken to, converted or not.
+async function getAllProspects(marketerId) {
+  let sql = 'SELECT * FROM riders';
+  const params = [];
+  if (marketerId) {
+    sql += ' WHERE added_by_marketer_id = ?';
+    params.push(marketerId);
+  }
+  sql += ' ORDER BY created_at DESC';
+  return db.query(sql, params);
+}
+
+module.exports = { LISTS, listIds, listMeta, getListRows, getListCount, getAllListCounts, getAllProspects };
