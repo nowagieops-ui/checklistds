@@ -287,6 +287,25 @@ async function runSync() {
   return { matchResult, nameMatchResult, syncResult };
 }
 
+// Live, on-demand fetch for the prospect detail page — NOT synced into
+// MySQL, since this is inherently a daily time series and the detail page
+// is viewed rarely enough that a fresh Supabase read each time is cheap.
+// Sparse by construction: a day with zero activity never gets a row in
+// business_activity_pings, so it simply won't appear here — no fabricated
+// zero-days.
+async function getRecentUsage(platformBusinessId, days = 7) {
+  const supabase = getClient();
+  if (!supabase || !platformBusinessId) return [];
+  const { data, error } = await supabase
+    .from('business_activity_pings')
+    .select('day, open_count, active_seconds')
+    .eq('business_id', platformBusinessId)
+    .order('day', { ascending: false })
+    .limit(days);
+  if (error) { console.error('platformSync.getRecentUsage:', error.message); return []; }
+  return data || [];
+}
+
 function startInterval(intervalMs = 5 * 60 * 1000) {
   if (!getClient()) {
     console.log('platformSync: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — platform sync disabled');
@@ -298,4 +317,4 @@ function startInterval(intervalMs = 5 * 60 * 1000) {
   }, intervalMs);
 }
 
-module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval };
+module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage };

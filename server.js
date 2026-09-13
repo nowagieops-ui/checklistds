@@ -476,6 +476,20 @@ app.get('/my-performance', requireAuth, async (req, res) => {
   res.render('my-performance', { name: req.session.marketerName, period, scorecard });
 });
 
+// Live daily app-usage rows (opens/active minutes) for the prospect detail
+// screen — fetched fresh from Supabase each view, not synced into MySQL
+// (see platformSync.getRecentUsage). Sparse: a day with zero activity
+// simply doesn't appear, never shown as a fabricated 0.
+async function getUsageDays(rider) {
+  if (!rider.platform_business_id) return [];
+  const rows = await platformSync.getRecentUsage(rider.platform_business_id, 7);
+  return rows.map(r => ({
+    dateFormatted: formatDateShort(r.day),
+    opens: r.open_count || 0,
+    minutes: Math.round((r.active_seconds || 0) / 60)
+  }));
+}
+
 app.get('/riders/:id', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
   const marketer = await db.getMarketerById(req.session.marketerId);
@@ -494,10 +508,13 @@ app.get('/riders/:id', requireAuth, async (req, res) => {
     .filter(f => rider[f.key])
     .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
 
+  const usageDays = await getUsageDays(rider);
+
   res.render('rider-detail', {
     rider,
     stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
     timeline,
+    usageDays,
     followups,
     reasonCodes,
     today: today(),
@@ -527,10 +544,13 @@ app.get('/management/riders/:id', requireManagement, async (req, res) => {
     .filter(f => rider[f.key])
     .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
 
+  const usageDays = await getUsageDays(rider);
+
   res.render('rider-detail', {
     rider,
     stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
     timeline,
+    usageDays,
     followups,
     reasonCodes: [],
     today: today(),

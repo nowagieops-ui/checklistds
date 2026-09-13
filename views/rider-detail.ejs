@@ -56,6 +56,19 @@
       <% } %>
     </div>
 
+    <% if (usageDays.length > 0) { %>
+      <div class="card">
+        <div class="card-title" style="font-size:15px;margin-bottom:4px;">App Usage (Last 7 Days With Activity)</div>
+        <div class="card-sub" style="margin-bottom:10px;">How many times they opened the dashboard, and roughly how many minutes they were actually looking at it.</div>
+        <% usageDays.forEach(function (u) { %>
+          <div class="detail-row">
+            <span class="detail-label"><%= u.dateFormatted %></span>
+            <span class="detail-value"><%= u.opens %> open<%= u.opens === 1 ? '' : 's' %> · ~<%= u.minutes %> min active</span>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+
     <% if (timeline.length > 0) { %>
       <div class="card">
         <div class="card-title" style="font-size:15px;margin-bottom:10px;">Funnel Timeline</div>
