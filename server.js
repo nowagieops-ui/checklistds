@@ -358,14 +358,16 @@ app.get('/riders/:id/done', requireAuth, async (req, res) => {
 // stays specific to "Onboard New Rider" (device-flag checks, QC checklist,
 // the whole flow), which doesn't make sense for someone reached by phone.
 
-app.get('/prospects/new', requireAuth, (req, res) => {
-  res.render('prospect-new', { error: null });
+app.get('/prospects/new', requireAuth, async (req, res) => {
+  const reasonCodes = await db.getReasonCodes();
+  res.render('prospect-new', { error: null, reasonCodes });
 });
 
 app.post('/prospects', requireAuth, async (req, res) => {
-  const { name, phone } = req.body;
+  const { name, phone, reason_code, notes } = req.body;
   if (!name || !name.trim() || !phone || !phone.trim()) {
-    return res.render('prospect-new', { error: "Enter the lead's name and phone number." });
+    const reasonCodes = await db.getReasonCodes();
+    return res.render('prospect-new', { error: "Enter the lead's name and phone number.", reasonCodes });
   }
 
   const marketerId = req.session.marketerId;
@@ -383,18 +385,20 @@ app.post('/prospects', requireAuth, async (req, res) => {
 
   // Logging a new lead IS the day's first contact with them — telemarketer
   // called, field marketer visited. No separate "Called" tap needed right
-  // after adding someone.
+  // after adding someone. Why they haven't onboarded yet (if anything) goes
+  // on this same contact record, same reason-code system the follow-up form
+  // already uses — not a separate one-off notes field on the rider itself.
   await db.addFollowup({
     rider_id: rider.id,
     staff_id: marketerId,
     type: channel === 'telemarketer' ? 'call' : 'visit',
     stage_before: 'new',
     stage_after: 'new',
-    reason_code: null,
+    reason_code: reason_code || null,
     desired_action: null,
     action_completed: false,
     link_shared_confirmed: false,
-    notes: null,
+    notes: notes && notes.trim() ? notes.trim() : null,
     next_followup_date: null,
     created_at: nowLagos()
   });

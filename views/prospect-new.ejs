@@ -39,6 +39,17 @@
         <label for="phone">Phone number <span style="color:var(--red)">*</span></label>
         <input type="tel" name="phone" id="phone" placeholder="e.g. 08012345678" required>
 
+        <label for="reason_code">Reason they didn't onboard yet (if any)</label>
+        <select name="reason_code" id="reason_code">
+          <option value="">— None / still deciding —</option>
+          <% reasonCodes.forEach(function (rc) { %>
+            <option value="<%= rc.code %>"><%= rc.label %></option>
+          <% }) %>
+        </select>
+
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" rows="3" placeholder="Anything else worth recording about this conversation"></textarea>
+
         <button type="submit" class="btn" id="submitBtn">Add Lead →</button>
       </form>
     </div>
