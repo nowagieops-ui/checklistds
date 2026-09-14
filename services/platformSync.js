@@ -147,24 +147,37 @@ async function attributeUnlinkedPlatformSignups() {
   return { checked: (businesses || []).length, attributed };
 }
 
-// Activated = account live AND WhatsApp connected AND pricing configured —
-// the two setup steps DashSpid's own onboarding welcome email tells new
-// businesses they need, plus the account actually being active. Deliberately
-// NOT based on is_accepting_orders, which the prospect-detail screen tracks
-// as its own separate status (a business can be activated but paused).
-//
-// There's no discrete "activated at" event on the platform (no timestamp for
-// "WhatsApp connected" or "pricing configured"), so this stamps the moment
-// our sync first observes the condition being true — the best available
-// signal, not a fabricated one.
-async function isBusinessActivated(supabase, business) {
-  if (!business.is_active || !business.whatsapp_phone_number_id) return false;
+// Whether ANY pricing row exists for this business — the one setup fact
+// that's actually reliable (real, checked variance across real businesses;
+// unlike business_hours, which is auto-populated identically for everyone
+// regardless of whether they touched it, or whatsapp_phone_number_id, which
+// is null on every single real field/telemarketer-sourced business right
+// now — a confirmed platform-side tracking bug, not a real signal).
+async function hasPricingConfigured(supabase, businessId) {
   for (const table of ['pricing_config', 'pricing_rules', 'pricing_zones']) {
-    const { count, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq('business_id', business.id);
-    if (error) { console.error(`platformSync.isBusinessActivated (${table}):`, error.message); continue; }
+    const { count, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    if (error) { console.error(`platformSync.hasPricingConfigured (${table}):`, error.message); continue; }
     if (count > 0) return true;
   }
   return false;
+}
+
+// Activated = account live AND pricing configured. Originally also required
+// whatsapp_phone_number_id (the other onboarding welcome-email step), but
+// that's confirmed null on every real field/telemarketer-sourced business —
+// a platform-side WhatsApp-connection tracking bug — so requiring it made
+// "activated" permanently read ~0 for everyone regardless of real setup
+// state. Dropped until that's fixed upstream. Deliberately NOT based on
+// is_accepting_orders, which the prospect-detail screen tracks as its own
+// separate status (a business can be activated but paused).
+//
+// There's no discrete "activated at" event on the platform (no timestamp
+// for "pricing configured"), so this stamps the moment our sync first
+// observes the condition being true — the best available signal, not a
+// fabricated one.
+async function isBusinessActivated(supabase, business) {
+  if (!business.is_active) return false;
+  return hasPricingConfigured(supabase, business.id);
 }
 
 async function syncOutcomes() {
@@ -177,7 +190,7 @@ async function syncOutcomes() {
 
     const { data: business, error: businessError } = await supabase
       .from('businesses')
-      .select('id, is_active, is_accepting_orders, whatsapp_phone_number_id, slug, custom_domain, custom_domain_verified')
+      .select('id, is_active, is_accepting_orders, whatsapp_phone_number_id, slug, custom_domain, custom_domain_verified, bank_account_number')
       .eq('id', businessId)
       .maybeSingle();
     if (businessError) { console.error('platformSync.syncOutcomes business:', businessError.message); continue; }
@@ -302,6 +315,13 @@ async function syncOutcomes() {
     if (shareError && shareError.code !== 'PGRST205') console.error('platformSync.syncOutcomes link shares:', shareError.message);
 
     await db.updateRiderStorefrontInfo(prospect.id, { storefrontUrl, uniqueVisitorCount, linkShareCount: linkShareCount || 0 });
+
+    // Cross-checks two of the onboarding checklist's required claims
+    // (item_pricing, item_payout) against real platform data — see the
+    // migration for why WhatsApp and availability aren't checked here.
+    const pricingVerified = await hasPricingConfigured(supabase, businessId);
+    const payoutVerified = !!(business.bank_account_number && business.bank_account_number.trim());
+    await db.updateRiderChecklistVerification(prospect.id, { pricingVerified, payoutVerified });
   }
   return { checked: linked.length };
 }

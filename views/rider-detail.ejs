@@ -56,6 +56,50 @@
       <% } %>
     </div>
 
+    <% if (rider.completed && rider.platform_business_id) { %>
+      <div class="card">
+        <div class="card-title" style="font-size:15px;margin-bottom:4px;">Onboarding Checklist — Reality Check</div>
+        <div class="card-sub" style="margin-bottom:10px;">What the checklist claimed, checked against what's actually true on the platform.</div>
+        <div class="detail-row">
+          <span class="detail-label">Signed up on Dashspid</span>
+          <span class="badge badge-green">✓ Verified</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Set pricing</span>
+          <% if (rider.checklist_pricing_verified === 1) { %>
+            <span class="badge badge-green">✓ Verified</span>
+          <% } else if (rider.checklist_pricing_verified === 0) { %>
+            <span class="badge badge-red">✗ Not actually done</span>
+          <% } else { %>
+            <span class="badge badge-amber">Not checked yet</span>
+          <% } %>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Added payout details</span>
+          <% if (rider.checklist_payout_verified === 1) { %>
+            <span class="badge badge-green">✓ Verified</span>
+          <% } else if (rider.checklist_payout_verified === 0) { %>
+            <span class="badge badge-red">✗ Not actually done</span>
+          <% } else { %>
+            <span class="badge badge-amber">Not checked yet</span>
+          <% } %>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Shared link to a real customer</span>
+          <% if (rider.link_share_count > 0) { %>
+            <span class="badge badge-green">✓ Verified</span>
+          <% } else { %>
+            <span class="badge badge-red">✗ Not actually done</span>
+          <% } %>
+        </div>
+        <p style="margin-top:10px;font-size:12px;color:var(--gray);">
+          "Connected WhatsApp" and "Set availability" aren't checked here — WhatsApp connection isn't reliably
+          tracked on the platform yet, and business hours default to the same value for every business whether
+          they touched it or not, so neither can actually confirm anything.
+        </p>
+      </div>
+    <% } %>
+
     <% if (linkCandidates.length > 0) { %>
       <div class="card">
         <div class="card-title" style="font-size:15px;margin-bottom:4px;">Just signed up? Link them</div>

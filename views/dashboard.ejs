@@ -75,6 +75,24 @@
       <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ App Activity</div><div class="dash-title" style="font-size:24px;"><%= usageSummary.activeBusinesses %></div></div>
     </div>
 
+    <div class="section-title">Onboarding Checklist Accuracy (All-Time)</div>
+    <div class="card">
+      <div class="card-sub" style="margin-bottom:10px;">
+        Of everyone whose onboarding checklist is complete and linked to a real platform account, how many actually
+        did what they ticked (pricing set, payout added, link shared) — not just self-reported.
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Fully Verified</span>
+        <span class="detail-value"><%= checklistAccuracy.fully_verified %>/<%= checklistAccuracy.total_checklists %></span>
+      </div>
+      <% if (checklistAccuracy.total_checklists > 0 && checklistAccuracy.fully_verified < checklistAccuracy.total_checklists) { %>
+        <p style="margin-top:8px;font-size:12.5px;color:var(--red);">
+          <%= checklistAccuracy.total_checklists - checklistAccuracy.fully_verified %> checklist(s) have at least
+          one ticked item that isn't actually true yet — open the rider's detail page to see which one.
+        </p>
+      <% } %>
+    </div>
+
     <!-- GROWTH OS: PLATFORM SYNC -->
     <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;">

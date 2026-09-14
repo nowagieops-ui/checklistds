@@ -88,6 +88,21 @@ async function getCohortOverview(fromDate, toDate, marketerId) {
   return row;
 }
 
+// Of everyone whose onboarding checklist is complete AND is linked to a
+// platform business, how many actually did all three verifiable things
+// they ticked (pricing, payout, link shared) vs how many ticked at least
+// one box that isn't actually true. All-time by construction — the
+// checklist itself isn't a period-scoped event, it's a one-time submission.
+async function getChecklistAccuracy() {
+  const [row] = await db.query(
+    `SELECT
+      COUNT(*) AS total_checklists,
+      SUM(CASE WHEN checklist_pricing_verified = 1 AND checklist_payout_verified = 1 AND link_share_count > 0 THEN 1 ELSE 0 END) AS fully_verified
+     FROM riders WHERE completed = 1 AND platform_business_id IS NOT NULL`
+  );
+  return row;
+}
+
 // Channel rollup (field_marketer/telemarketer/pioneer/referral/ads/other) —
 // channel is purely an attribution dimension on riders, never part of the
 // funnel-stage definition itself (see plan).
@@ -146,4 +161,4 @@ async function getTodayCallSummary(staffId, todayDate) {
   return { total_calls: row.total_calls, moved_stage: row.moved_stage || 0 };
 }
 
-module.exports = { getCompanyOverview, getCohortOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary };
+module.exports = { getCompanyOverview, getCohortOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary, getChecklistAccuracy };

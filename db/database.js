@@ -310,6 +310,16 @@ const db = {
     );
   },
 
+  // Always overwritten with the latest known fact, unlike the funnel
+  // timestamps — a business could add payout details or set pricing later,
+  // and the checklist claim should be judged against current reality.
+  async updateRiderChecklistVerification(riderId, { pricingVerified, payoutVerified }) {
+    await pool.execute(
+      'UPDATE riders SET checklist_pricing_verified = ?, checklist_payout_verified = ? WHERE id = ?',
+      [pricingVerified ? 1 : 0, payoutVerified ? 1 : 0, parseInt(riderId)]
+    );
+  },
+
   // The only thing that ever sets link_shared_at — a staff member confirming
   // it in a follow-up, never inferred from a storefront visit. COALESCE'd so
   // it can only be set once, same guarantee as updateRiderFunnelOutcomes.

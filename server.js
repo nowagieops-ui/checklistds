@@ -893,6 +893,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     ? await performance.getCohortOverview()
     : await performance.getCohortOverview(overviewFromDate, overviewToDate);
   const usageSummary = await platformSync.getCompanyUsageSummary(overviewPeriod === 'all' ? undefined : overviewFromDate);
+  const checklistAccuracy = await performance.getChecklistAccuracy();
 
   const marketers = await db.getMarketers();
   const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
@@ -972,7 +973,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
     formatTime, formatDateShort,
-    companyOverview, cohortOverview, overviewPeriod, usageSummary
+    companyOverview, cohortOverview, overviewPeriod, usageSummary, checklistAccuracy
   });
 });
 
