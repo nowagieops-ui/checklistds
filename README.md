@@ -58,7 +58,7 @@ Fill in:
 - `CALLMEBOT_API_KEY` — get this by messaging CallMeBot (see below)
 - `MANAGEMENT_PIN` — set your own management dashboard PIN
 - `PORT` — Hostinger usually assigns this automatically
-- `ANTHROPIC_API_KEY` — optional, powers live AI feedback in the telemarketer training academy's roleplay practice (falls back to a canned message if left blank)
+- `GEMINI_API_KEY` — optional, powers live AI feedback in the telemarketer training academy's roleplay practice (falls back to a canned message if left blank). Get a free key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
 ### 5. Set up CallMeBot (free WhatsApp notifications)
 
@@ -110,7 +110,7 @@ Or use the management dashboard's "+ Add Staff" form, which lets you pick Field 
 
 New staff added with the **Telemarketer** role must complete an 8-module training academy (product knowledge, pricing, objection handling, an AI-graded live-call roleplay, and a final quiz-gated certificate) the first time they log in — they can't reach the normal app until they finish. Field marketers aren't affected.
 
-The roleplay module's AI feedback needs `ANTHROPIC_API_KEY` set (see above); without it, trainees still get a canned feedback message so practice still works.
+The roleplay module's AI feedback needs `GEMINI_API_KEY` set (see above); without it, trainees still get a canned feedback message so practice still works.
 
 ## Management Dashboard
 

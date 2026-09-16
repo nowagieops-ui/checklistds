@@ -4,27 +4,25 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenAI } = require('@google/genai');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
-// utils/whatsapp.js — never blocks the trainee's flow.
-const anthropicClient = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
+// utils/whatsapp.js — never blocks the trainee's flow. Gemini 2.5 Flash is
+// cheap/free-tier-eligible, which matters here since this fires on every
+// message a trainee sends during roleplay practice.
+const geminiClient = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 const FALLBACK_ROLEPLAY_FEEDBACK = 'Good attempt. Acknowledge the concern first, then pivot to the benefit. Always mention the free trial when someone hesitates on cost or complexity.';
 
 async function getRoleplayFeedback(scenario, traineeResponse) {
-  if (!anthropicClient) return FALLBACK_ROLEPLAY_FEEDBACK;
+  if (!geminiClient) return FALLBACK_ROLEPLAY_FEEDBACK;
   try {
-    const result = await anthropicClient.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 300,
-      output_config: { effort: 'low' },
-      messages: [{
-        role: 'user',
-        content: `You are a training evaluator for Dashspid, a Nigerian logistics SaaS. A telemarketer is practising objection handling.
+    const result = await geminiClient.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `You are a training evaluator for Dashspid, a Nigerian logistics SaaS. A telemarketer is practising objection handling.
 
 PROSPECT: ${scenario.prospect}
 OBJECTION: "${scenario.objection}"
@@ -41,10 +39,8 @@ KEY DASHSPID FACTS:
 - Shield welfare fund for riders
 
 Give feedback in 2-3 sentences max. One thing done well, one thing to improve, then a sample better response in quotes. Be brief and direct.`
-      }]
     });
-    const textBlock = result.content.find(b => b.type === 'text');
-    return textBlock ? textBlock.text : FALLBACK_ROLEPLAY_FEEDBACK;
+    return result.text || FALLBACK_ROLEPLAY_FEEDBACK;
   } catch (err) {
     console.error('Roleplay feedback error:', err.message);
     return FALLBACK_ROLEPLAY_FEEDBACK;
