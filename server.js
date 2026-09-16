@@ -4,9 +4,52 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
+const Anthropic = require('@anthropic-ai/sdk');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
+
+// Only used for the telemarketer training academy's AI roleplay feedback.
+// Falls back to a canned message if unconfigured, same convention as
+// utils/whatsapp.js — never blocks the trainee's flow.
+const anthropicClient = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
+const FALLBACK_ROLEPLAY_FEEDBACK = 'Good attempt. Acknowledge the concern first, then pivot to the benefit. Always mention the free trial when someone hesitates on cost or complexity.';
+
+async function getRoleplayFeedback(scenario, traineeResponse) {
+  if (!anthropicClient) return FALLBACK_ROLEPLAY_FEEDBACK;
+  try {
+    const result = await anthropicClient.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 300,
+      output_config: { effort: 'low' },
+      messages: [{
+        role: 'user',
+        content: `You are a training evaluator for Dashspid, a Nigerian logistics SaaS. A telemarketer is practising objection handling.
+
+PROSPECT: ${scenario.prospect}
+OBJECTION: "${scenario.objection}"
+TRAINEE SAID: "${traineeResponse}"
+
+KEY DASHSPID FACTS:
+- Plans: Free N0/30 orders, Rider N5999/250 orders (bot included), Growth N10799/750 orders, Pro N23999/unlimited
+- Transaction fee: 2.5% vs Bolt 20%
+- Free trial: 30 days Growth plan, no card
+- Dashspid runs ALONGSIDE Bolt, does not replace it
+- Instant payout to operator bank account
+- Payment via Paystack before rider moves
+- Setup 10 minutes
+- Shield welfare fund for riders
+
+Give feedback in 2-3 sentences max. One thing done well, one thing to improve, then a sample better response in quotes. Be brief and direct.`
+      }]
+    });
+    const textBlock = result.content.find(b => b.type === 'text');
+    return textBlock ? textBlock.text : FALLBACK_ROLEPLAY_FEEDBACK;
+  } catch (err) {
+    console.error('Roleplay feedback error:', err.message);
+    return FALLBACK_ROLEPLAY_FEEDBACK;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,8 +97,14 @@ function clientIp(req) {
 }
 
 function requireAuth(req, res, next) {
-  if (req.session.marketerId) return next();
-  res.redirect('/');
+  if (!req.session.marketerId) return res.redirect('/');
+  // Telemarketers must finish the training academy before reaching anything
+  // else — field marketers are unaffected (trainingCompleted is set true for
+  // them at login, see POST /login).
+  if (!req.session.trainingCompleted && !req.path.startsWith('/training')) {
+    return res.redirect('/training');
+  }
+  next();
 }
 function requireManagement(req, res, next) {
   if (req.session.isManagement) return next();
@@ -166,9 +215,18 @@ app.post('/login', async (req, res) => {
 
   req.session.marketerId = marketer.id;
   req.session.marketerName = marketer.name;
+  req.session.marketerRole = marketer.role;
 
-  if (wantsJson) return res.json({ ok: true, redirect: '/home' });
-  res.redirect('/home');
+  if (marketer.role === 'telemarketer') {
+    const progress = await db.getTrainingProgress(marketer.id);
+    req.session.trainingCompleted = !!(progress && progress.completed_at);
+  } else {
+    req.session.trainingCompleted = true; // gate only applies to telemarketers
+  }
+
+  const redirectTo = req.session.trainingCompleted ? '/home' : '/training';
+  if (wantsJson) return res.json({ ok: true, redirect: redirectTo });
+  res.redirect(redirectTo);
 });
 
 // Pure UTC date-string arithmetic — matches today()'s UTC convention and
@@ -324,6 +382,50 @@ app.get('/submitted', requireAuth, async (req, res) => {
   });
 });
 
+// ── TELEMARKETER TRAINING ACADEMY ────────────────────────────────────────────
+
+app.get('/training', requireAuth, async (req, res) => {
+  if (req.session.trainingCompleted) return res.redirect('/home');
+  const progress = await db.getTrainingProgress(req.session.marketerId);
+  res.render('training', {
+    name: req.session.marketerName,
+    initialCompleted: progress ? progress.completed_modules : {}
+  });
+});
+
+app.post('/training/progress', requireAuth, async (req, res) => {
+  const { completedModules } = req.body;
+  const existing = await db.getTrainingProgress(req.session.marketerId);
+  const roleplayLog = existing ? existing.roleplay_log : [];
+  await db.upsertTrainingProgress(req.session.marketerId, completedModules, roleplayLog, nowLagos());
+  res.json({ ok: true });
+});
+
+app.post('/training/roleplay-feedback', requireAuth, async (req, res) => {
+  const { scenario, response: traineeResponse } = req.body;
+  if (!scenario || !traineeResponse) return res.status(400).json({ ok: false, error: 'Missing scenario or response.' });
+
+  const feedback = await getRoleplayFeedback(scenario, traineeResponse);
+
+  const existing = await db.getTrainingProgress(req.session.marketerId);
+  const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
+  roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
+  await db.upsertTrainingProgress(
+    req.session.marketerId,
+    existing ? existing.completed_modules : {},
+    roleplayLog,
+    nowLagos()
+  );
+
+  res.json({ ok: true, feedback });
+});
+
+app.post('/training/complete', requireAuth, async (req, res) => {
+  await db.completeTraining(req.session.marketerId, nowLagos());
+  req.session.trainingCompleted = true;
+  res.json({ ok: true, redirect: '/home' });
+});
+
 // ── RIDER ONBOARDING ROUTES ──────────────────────────────────────────────────
 
 app.get('/riders/new', requireAuth, (req, res) => {
@@ -463,7 +565,7 @@ app.get('/management/staff/new', requireManagement, (req, res) => {
 });
 
 app.post('/management/staff', requireManagement, async (req, res) => {
-  const { name, pin } = req.body;
+  const { name, pin, role } = req.body;
 
   if (!name || !name.trim()) {
     return res.render('staff-new', { error: 'Enter the staff member\'s name.' });
@@ -472,7 +574,7 @@ app.post('/management/staff', requireManagement, async (req, res) => {
     return res.render('staff-new', { error: 'PIN must be exactly 4 digits.' });
   }
 
-  await db.addMarketer({ name: name.trim(), pin });
+  await db.addMarketer({ name: name.trim(), pin, role });
   res.redirect('/dashboard');
 });
 

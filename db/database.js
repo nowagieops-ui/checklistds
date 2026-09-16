@@ -37,10 +37,10 @@ const db = {
     return rows[0];
   },
 
-  async addMarketer({ name, pin }) {
+  async addMarketer({ name, pin, role }) {
     const [result] = await pool.execute(
-      'INSERT INTO marketers (name, pin, active) VALUES (?, ?, 1)',
-      [name, pin]
+      'INSERT INTO marketers (name, pin, role, active) VALUES (?, ?, ?, 1)',
+      [name, pin, role === 'telemarketer' ? 'telemarketer' : 'field_marketer']
     );
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [result.insertId]);
     return rows[0];
@@ -209,6 +209,34 @@ const db = {
       [fromDate, toDate]
     );
     return rows.map(normalizeRider);
+  },
+
+  async getTrainingProgress(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM training_progress WHERE marketer_id = ?',
+      [parseInt(marketerId)]
+    );
+    return rows[0] || null;
+  },
+
+  // now is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see nowLagos()
+  // in server.js) — not SQL NOW(). Upserts so repeated quiz-pass saves during
+  // one training run don't create duplicate rows (marketer_id is UNIQUE).
+  async upsertTrainingProgress(marketerId, completedModules, roleplayLog, now) {
+    await pool.execute(
+      `INSERT INTO training_progress (marketer_id, completed_modules, roleplay_log, started_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE completed_modules = VALUES(completed_modules), roleplay_log = VALUES(roleplay_log), updated_at = VALUES(updated_at)`,
+      [parseInt(marketerId), JSON.stringify(completedModules || {}), JSON.stringify(roleplayLog || []), now, now]
+    );
+    const [rows] = await pool.execute('SELECT * FROM training_progress WHERE marketer_id = ?', [parseInt(marketerId)]);
+    return rows[0];
+  },
+
+  async completeTraining(marketerId, completedAt) {
+    await pool.execute('UPDATE training_progress SET completed_at = ? WHERE marketer_id = ?', [completedAt, parseInt(marketerId)]);
+    const [rows] = await pool.execute('SELECT * FROM training_progress WHERE marketer_id = ?', [parseInt(marketerId)]);
+    return rows[0] || null;
   }
 };
 

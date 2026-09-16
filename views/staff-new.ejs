@@ -23,7 +23,7 @@
   <div class="container">
     <div class="card">
       <div class="card-title">Add Staff</div>
-      <div class="card-sub">Adds a new field marketer who can log into the app.</div>
+      <div class="card-sub">Adds a new field marketer or telemarketer who can log into the app.</div>
 
       <% if (error) { %>
         <div class="error"><%= error %></div>
@@ -35,6 +35,19 @@
 
         <label for="pin">4-digit PIN <span style="color:var(--red)">*</span></label>
         <input type="text" name="pin" id="pin" placeholder="e.g. 4821" inputmode="numeric" pattern="\d{4}" maxlength="4" required>
+
+        <label>Role <span style="color:var(--red)">*</span></label>
+        <div style="display:flex;gap:16px;margin-bottom:20px;">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--dark);">
+            <input type="radio" name="role" value="field_marketer" checked style="width:auto;margin:0;"> Field Marketer
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--dark);">
+            <input type="radio" name="role" value="telemarketer" style="width:auto;margin:0;"> Telemarketer
+          </label>
+        </div>
+        <div class="note-box" style="margin-bottom:20px;">
+          <div class="note-box-body">Telemarketers must complete the training academy the first time they log in, before they can reach anything else.</div>
+        </div>
 
         <button type="submit" class="btn" id="submitBtn">Add Staff →</button>
       </form>

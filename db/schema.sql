@@ -5,7 +5,21 @@ CREATE TABLE IF NOT EXISTS marketers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   pin VARCHAR(20) NOT NULL,
+  role ENUM('field_marketer', 'telemarketer') NOT NULL DEFAULT 'field_marketer',
   active TINYINT(1) NOT NULL DEFAULT 1
+);
+
+-- New telemarketers must complete the training academy (see /training in
+-- server.js) before reaching the normal app; field marketers skip this.
+CREATE TABLE IF NOT EXISTS training_progress (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  marketer_id INT NOT NULL UNIQUE,
+  completed_modules JSON,
+  roleplay_log JSON,
+  started_at DATETIME NOT NULL,
+  completed_at DATETIME,
+  updated_at DATETIME NOT NULL,
+  FOREIGN KEY (marketer_id) REFERENCES marketers(id)
 );
 
 CREATE TABLE IF NOT EXISTS marketer_devices (

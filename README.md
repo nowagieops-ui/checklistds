@@ -29,6 +29,8 @@ In hPanel > Databases, create a MySQL database and note the host, database name,
 
 Run `db/schema.sql` against it once (via phpMyAdmin's Import tab, or `mysql -u USER -p DBNAME < db/schema.sql` over SSH) to create the tables and seed the two starting marketers. If you've already changed their PINs in production, edit the `INSERT INTO marketers` values in that file first so you don't reset them.
 
+**Already deployed before the telemarketer training academy was added?** Also run `db/migrations/001_telemarketer_training.sql` once against your existing database — it adds the `role` column and `training_progress` table without touching existing data. Skip this if you're setting up fresh (schema.sql already includes it).
+
 ### 2. Upload files
 
 Upload the entire project folder to your Hostinger Node.js hosting directory (usually `public_html` or a subdomain folder for `checklist.dashspid.com`).
@@ -56,6 +58,7 @@ Fill in:
 - `CALLMEBOT_API_KEY` — get this by messaging CallMeBot (see below)
 - `MANAGEMENT_PIN` — set your own management dashboard PIN
 - `PORT` — Hostinger usually assigns this automatically
+- `ANTHROPIC_API_KEY` — optional, powers live AI feedback in the telemarketer training academy's roleplay practice (falls back to a canned message if left blank)
 
 ### 5. Set up CallMeBot (free WhatsApp notifications)
 
@@ -98,8 +101,16 @@ SELECT name, pin FROM marketers;
 ## Add more marketers
 
 ```sql
-INSERT INTO marketers (name, pin, active) VALUES ('New Marketer Name', '9999', 1);
+INSERT INTO marketers (name, pin, role, active) VALUES ('New Marketer Name', '9999', 'field_marketer', 1);
 ```
+
+Or use the management dashboard's "+ Add Staff" form, which lets you pick Field Marketer or Telemarketer.
+
+## Telemarketer Training Academy
+
+New staff added with the **Telemarketer** role must complete an 8-module training academy (product knowledge, pricing, objection handling, an AI-graded live-call roleplay, and a final quiz-gated certificate) the first time they log in — they can't reach the normal app until they finish. Field marketers aren't affected.
+
+The roleplay module's AI feedback needs `ANTHROPIC_API_KEY` set (see above); without it, trainees still get a canned feedback message so practice still works.
 
 ## Management Dashboard
 
@@ -119,7 +130,9 @@ dashspid-checklist/
 ├── .env.example            — Template
 ├── db/
 │   ├── database.js         — MySQL data access layer
-│   └── schema.sql          — Run once to create tables + seed marketers
+│   ├── schema.sql          — Run once to create tables + seed marketers (fresh installs)
+│   └── migrations/
+│       └── 001_telemarketer_training.sql — Run once against an already-deployed DB
 ├── utils/
 │   ├── whatsapp.js         — WhatsApp notification helper
 │   └── attendance.js       — Buddy-punching / GPS-spoofing flag checks
@@ -132,7 +145,9 @@ dashspid-checklist/
 │   ├── rider-new.ejs       — Rider onboarding: name/email/phone
 │   ├── rider-checklist.ejs — Rider onboarding checklist
 │   ├── rider-done.ejs      — Rider onboarding confirmation
+│   ├── training.ejs        — Telemarketer training academy (gated before first /home)
 │   ├── management-login.ejs
+│   ├── staff-new.ejs       — Management "+ Add Staff" form (role picker)
 │   └── dashboard.ejs       — Management view (date-range filterable)
 └── public/
     ├── style.css           — All styles
