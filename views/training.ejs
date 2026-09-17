@@ -17,6 +17,7 @@
       <div class="app-header-brand">Dashspid Ops</div>
       <div class="app-header-spacer"></div>
       <div class="tr-progress-label" id="progressLabel">0 / 8 complete</div>
+      <a href="/sign-out" class="tr-signout-link">Not you? Log out</a>
     </div>
   </div>
   <div class="tr-progress-bar-wrap"><div class="tr-progress-bar" id="progressBar" style="width:0%"></div></div>
@@ -39,7 +40,7 @@
       <div id="quizQuestions"></div>
       <div id="quizScore" style="display:none"></div>
       <div style="display:flex;gap:10px;padding-bottom:40px;">
-        <button class="btn btn-outline" id="quizRetryBtn" style="display:none;width:auto;" onclick="retryQuiz()">Try Again</button>
+        <button class="btn btn-outline" id="quizRetryBtn" style="display:none;width:auto;" onclick="backToModuleContent()">Review the material</button>
         <button class="btn" id="quizNextBtn" style="display:none;width:auto;" onclick="quizNext()">Continue</button>
         <button class="btn" id="quizSubmitBtn" style="width:auto;" onclick="submitQuiz()">Check My Answers</button>
       </div>
@@ -157,6 +158,9 @@
     showCert();
   }
 
+  const READ_TIME_SECONDS = 120;
+  let readTimerInterval = null;
+
   function showModule(idx) {
     const m = MODULES[idx];
     currentModuleIdx = idx;
@@ -164,14 +168,41 @@
     const screenId = 'module-' + m.id;
     if (!document.getElementById('screen-' + screenId)) buildModuleScreen(m, screenId);
     showScreen(screenId);
+    startReadTimer(screenId);
   }
 
   function buildModuleScreen(m, screenId) {
     const div = document.createElement('div');
     div.className = 'screen';
     div.id = 'screen-' + screenId;
-    div.innerHTML = `<div class="container tr-module-wrap"><div class="tr-module-header"><div class="tr-module-num">Module ${MODULES.indexOf(m) + 1} of ${MODULES.length} -- ${m.tag}</div><div class="tr-module-title">${m.title}</div></div>${renderContent(m.content)}<div style="display:flex;padding-bottom:40px;"><button class="btn" style="width:auto;" onclick="startQuiz(${MODULES.indexOf(m)})">Take the Quiz</button></div></div>`;
+    div.innerHTML = `<div class="container tr-module-wrap"><div class="tr-module-header"><div class="tr-module-num">Module ${MODULES.indexOf(m) + 1} of ${MODULES.length} -- ${m.tag}</div><div class="tr-module-title">${m.title}</div></div>${renderContent(m.content)}<div style="display:flex;padding-bottom:40px;"><button class="btn" id="quizBtn-${screenId}" style="width:auto;" disabled onclick="startQuiz(${MODULES.indexOf(m)})">Take the Quiz</button></div></div>`;
     document.getElementById('moduleScreens').appendChild(div);
+  }
+
+  // Forces at least READ_TIME_SECONDS on the module content before the quiz
+  // button unlocks, so trainees can't skip straight to guessing on the quiz.
+  function startReadTimer(screenId) {
+    if (readTimerInterval) clearInterval(readTimerInterval);
+    const btn = document.getElementById('quizBtn-' + screenId);
+    if (!btn) return;
+    let remaining = READ_TIME_SECONDS;
+    btn.disabled = true;
+    const label = () => {
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      btn.textContent = `Take the Quiz (unlocks in ${mins}:${String(secs).padStart(2, '0')})`;
+    };
+    label();
+    readTimerInterval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(readTimerInterval);
+        btn.disabled = false;
+        btn.textContent = 'Take the Quiz';
+      } else {
+        label();
+      }
+    }, 1000);
   }
 
   function renderContent(content) {
@@ -232,13 +263,11 @@
     else document.getElementById('quizRetryBtn').style.display = '';
   }
 
-  function retryQuiz() {
-    currentQuizData.answers = {};
-    currentQuizData.submitted = false;
-    document.getElementById('quizScore').style.display = 'none';
-    document.getElementById('quizRetryBtn').style.display = 'none';
-    document.getElementById('quizSubmitBtn').style.display = '';
-    renderQuizQuestions(currentQuizData.module.quiz);
+  // A failed quiz sends her back to re-read the module, not straight into
+  // another blind attempt — the read timer in startReadTimer() then makes
+  // her wait out READ_TIME_SECONDS again before the quiz button unlocks.
+  function backToModuleContent() {
+    showModule(currentQuizData.moduleIdx);
   }
 
   function quizNext() {

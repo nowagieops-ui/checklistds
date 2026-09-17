@@ -100,8 +100,9 @@ function requireAuth(req, res, next) {
   if (!req.session.marketerId) return res.redirect('/');
   // Telemarketers must finish the training academy before reaching anything
   // else — field marketers are unaffected (trainingCompleted is set true for
-  // them at login, see POST /login).
-  if (!req.session.trainingCompleted && !req.path.startsWith('/training')) {
+  // them at login, see POST /login). /sign-out stays reachable so a trainee
+  // isn't stuck with no way to log out mid-training.
+  if (!req.session.trainingCompleted && !req.path.startsWith('/training') && req.path !== '/sign-out') {
     return res.redirect('/training');
   }
   next();
