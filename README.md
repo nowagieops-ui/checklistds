@@ -29,7 +29,7 @@ In hPanel > Databases, create a MySQL database and note the host, database name,
 
 Run `db/schema.sql` against it once (via phpMyAdmin's Import tab, or `mysql -u USER -p DBNAME < db/schema.sql` over SSH) to create the tables and seed the two starting marketers. If you've already changed their PINs in production, edit the `INSERT INTO marketers` values in that file first so you don't reset them.
 
-**Already deployed before the telemarketer training academy was added?** Also run `db/migrations/001_telemarketer_training.sql` once against your existing database — it adds the `role` column and `training_progress` table without touching existing data. Skip this if you're setting up fresh (schema.sql already includes it).
+**Already deployed?** `db/schema.sql` is just the original baseline — run every file in `db/migrations/` in numeric order (002 through 007) against your existing database too. Each is additive and safe to run once; none touch existing data. (There's no `001` — it was folded into `002_growth_os.sql`.)
 
 ### 2. Upload files
 

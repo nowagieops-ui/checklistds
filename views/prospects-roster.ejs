@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>All My Prospects — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">All My Prospects</div>
+      <div class="card-sub" style="margin-bottom:0;">Everyone you've worked, converted or not — <%= summary.total %> total.</div>
+    </div>
+
+    <div class="card">
+      <div class="detail-row"><span class="detail-label">Total spoken to</span><span class="detail-value"><%= summary.total %></span></div>
+      <div class="detail-row"><span class="detail-label">Registered</span><span class="detail-value"><%= summary.registered %></span></div>
+      <div class="detail-row"><span class="detail-label">Activated</span><span class="detail-value"><%= summary.activated %></span></div>
+      <div class="detail-row"><span class="detail-label">Link Shared</span><span class="detail-value"><%= summary.linkShared %></span></div>
+      <div class="detail-row"><span class="detail-label">Customer Activity</span><span class="detail-value"><%= summary.customerActivity %></span></div>
+      <div class="detail-row"><span class="detail-label">Orders Placed</span><span class="detail-value"><%= summary.firstOrder %></span></div>
+      <div class="detail-row"><span class="detail-label">Orders Completed</span><span class="detail-value"><%= summary.completedOrder %></span></div>
+      <div class="detail-row"><span class="detail-label">Repeat Orders</span><span class="detail-value"><%= summary.repeatOrder %></span></div>
+    </div>
+
+    <% if (prospects.length === 0) { %>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">Nobody logged yet.</div>
+    <% } else { %>
+      <% prospects.forEach(function (p) { %>
+        <a href="/riders/<%= p.id %>" class="home-tile">
+          <div class="home-tile-body">
+            <div class="home-tile-title"><%= p.name %></div>
+            <div class="home-tile-sub"><%= p.phone %> · added <%= p.dateAdded %></div>
+          </div>
+          <span class="badge <%= p.platform_business_id ? 'badge-green' : 'badge-amber' %>" style="flex-shrink:0;"><%= p.stageLabel %></span>
+        </a>
+      <% }) %>
+    <% } %>
+
+    <a href="/home" class="logout-link">← Back to Home</a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

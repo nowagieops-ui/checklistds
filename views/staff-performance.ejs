@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <title>Staff Performance — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="mgr-header">
+    <div class="mgr-header-inner">
+      <div class="app-header-badge">D</div>
+      <div class="mgr-header-brand">Dashspid Ops</div>
+      <span class="badge badge-orange" style="background:rgba(255,92,0,0.2);color:#ffb37a;">Manager</span>
+      <div class="app-header-spacer"></div>
+      <a href="/management-logout" class="btn btn-outline" style="width:auto;padding:8px 16px;font-size:13px;margin:0;color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">Log out</a>
+    </div>
+  </div>
+
+  <div class="container wide">
+    <div class="dash-header" style="margin-top:1.5rem;">
+      <div>
+        <div class="dash-title">Staff Performance</div>
+        <div class="dash-date">Channel rollup, then drill into each staff member's own priority lists.</div>
+      </div>
+    </div>
+
+    <div class="section-title">By Channel</div>
+    <div class="table-scroll">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Channel</th>
+            <th>Prospects</th>
+            <th>Activations</th>
+            <th>First Orders</th>
+            <th>Completed Orders</th>
+            <th>Repeat Orders</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% channels.forEach(function (c) { %>
+            <tr>
+              <td><strong><%= c.channel %></strong></td>
+              <td><%= c.total_prospects %></td>
+              <td><%= c.activations %></td>
+              <td><%= c.first_orders %></td>
+              <td><%= c.completed_orders %></td>
+              <td><%= c.repeat_business_orders %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title">By Staff Member</div>
+    <div class="table-scroll">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Staff</th>
+            <th>Role</th>
+            <th>Prospects</th>
+            <th>P1</th>
+            <th>P2</th>
+            <th>P3</th>
+            <th>P4</th>
+            <th>P5</th>
+            <th>P6</th>
+            <th>Completed Orders</th>
+            <th>Repeat Orders</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% staff.forEach(function (s) { %>
+            <tr>
+              <td><strong><%= s.name %></strong></td>
+              <td><%= s.role === 'telemarketer' ? 'Telemarketer' : 'Field Marketer' %></td>
+              <td><%= s.total_prospects %></td>
+              <% s.priorityCounts.forEach(function (l) { %>
+                <td><%= l.count %></td>
+              <% }) %>
+              <td><%= s.completed_orders %></td>
+              <td><%= s.repeat_business_orders %></td>
+              <td><a href="/management/staff/<%= s.id %>/priority-lists" class="btn btn-outline" style="width:auto;padding:6px 14px;margin:0;font-size:12px;">View →</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <a href="/dashboard" class="logout-link">← Back to Dashboard</a>
+  </div>
+</body>
+</html>

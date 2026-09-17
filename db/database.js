@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -24,6 +25,14 @@ function normalizeRider(r) {
 }
 
 const db = {
+  // Generic escape hatch for callers with genuinely dynamic SQL (e.g.
+  // services/priorityLists.js, whose stage list/filters vary per list) —
+  // everything else in this module stays a named, purpose-specific method.
+  async query(sql, params) {
+    const [rows] = await pool.execute(sql, params);
+    return rows.map(r => ('completed' in r || 'device_flagged' in r) ? normalizeRider(r) : r);
+  },
+
   async getMarketers() {
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE active = 1');
     return rows;
@@ -37,10 +46,15 @@ const db = {
     return rows[0];
   },
 
+  async getMarketerById(id) {
+    const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [parseInt(id)]);
+    return rows[0];
+  },
+
   async addMarketer({ name, pin, role }) {
     const [result] = await pool.execute(
-      'INSERT INTO marketers (name, pin, role, active) VALUES (?, ?, ?, 1)',
-      [name, pin, role === 'telemarketer' ? 'telemarketer' : 'field_marketer']
+      'INSERT INTO marketers (name, pin, active, role) VALUES (?, ?, 1, ?)',
+      [name, pin, role || 'field_marketer']
     );
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [result.insertId]);
     return rows[0];
@@ -164,17 +178,18 @@ const db = {
 
   // createdAt is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see
   // nowLagos() in server.js) — not SQL NOW().
-  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name, device_id, user_agent, device_flagged, device_flag_reason }, createdAt) {
+  async addRider({ name, email, phone, added_by_marketer_id, added_by_marketer_name, device_id, user_agent, device_flagged, device_flag_reason, channel }, createdAt) {
     const [result] = await pool.execute(
       `INSERT INTO riders
-        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, device_id, user_agent, device_flagged, device_flag_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, device_id, user_agent, device_flagged, device_flag_reason, channel)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
       [
         name, email, phone, added_by_marketer_id, added_by_marketer_name, createdAt, JSON.stringify([]),
         device_id || null,
         user_agent || null,
         device_flagged ? 1 : 0,
-        device_flag_reason || null
+        device_flag_reason || null,
+        channel || 'field_marketer'
       ]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [result.insertId]);
@@ -187,12 +202,220 @@ const db = {
   },
 
   async completeRiderChecklist(riderId, checklistItems, notes, completedAt) {
+    // Generated once, here, rather than at rider creation — this is the
+    // attribution/join code staff relay to the business, and it shouldn't be
+    // handed out before onboarding is actually confirmed complete.
+    const staffOpsCode = await this._generateUniqueStaffOpsCode();
     await pool.execute(
-      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = ? WHERE id = ?',
-      [JSON.stringify(checklistItems || []), notes || null, completedAt, parseInt(riderId)]
+      'UPDATE riders SET checklist_items = ?, notes = ?, completed = 1, completed_at = ?, staff_ops_code = ? WHERE id = ?',
+      [JSON.stringify(checklistItems || []), notes || null, completedAt, staffOpsCode, parseInt(riderId)]
     );
     const [rows] = await pool.execute('SELECT * FROM riders WHERE id = ?', [parseInt(riderId)]);
     return rows[0] ? normalizeRider(rows[0]) : null;
+  },
+
+  // 7 chars from an unambiguous charset (no 0/O/1/I/L), mirroring the
+  // platform's own referral-code style — checked for collisions against
+  // live rows since this becomes a real join key against businesses.marketer_code.
+  async _generateUniqueStaffOpsCode() {
+    const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let code = '';
+      for (let i = 0; i < 7; i++) code += chars[crypto.randomInt(chars.length)];
+      const [rows] = await pool.execute('SELECT id FROM riders WHERE staff_ops_code = ? LIMIT 1', [code]);
+      if (rows.length === 0) return code;
+    }
+    throw new Error('Could not generate a unique staff_ops_code after 10 attempts');
+  },
+
+  // ── GROWTH OS: FUNNEL / ATTRIBUTION SYNC ────────────────────────────────────
+
+  // Prospects that have a join code but haven't been matched to a platform
+  // business yet — what platformSync.matchProspects() works through.
+  async getUnmatchedProspectsWithCode() {
+    const [rows] = await pool.execute(
+      'SELECT id, staff_ops_code FROM riders WHERE staff_ops_code IS NOT NULL AND platform_business_id IS NULL'
+    );
+    return rows;
+  },
+
+  // Sets the canonical platform reference once a code match is found.
+  // Never overwrites an existing platform_business_id — a code is
+  // single-use by construction (unmatched-only query above), but this
+  // guards against a re-run linking a prospect a second time.
+  async linkRiderToPlatformBusiness(riderId, platformBusinessId, registeredAt) {
+    await pool.execute(
+      'UPDATE riders SET platform_business_id = ?, registered_at = COALESCE(registered_at, ?) WHERE id = ? AND platform_business_id IS NULL',
+      [platformBusinessId, registeredAt, parseInt(riderId)]
+    );
+  },
+
+  // Every platform business.id already linked to some prospect — used to
+  // skip re-evaluating businesses the sync has already matched (whether via
+  // exact code or the name-based fallback below).
+  async getLinkedPlatformBusinessIds() {
+    const [rows] = await pool.execute('SELECT platform_business_id FROM riders WHERE platform_business_id IS NOT NULL');
+    return rows.map(r => r.platform_business_id);
+  },
+
+  // Best-effort pairing for the name-based fallback match: if this staff
+  // member already has a prospect they onboarded but haven't linked yet,
+  // prefer attaching the platform signup to that real record (keeps any
+  // onboarding-checklist data) over creating a fresh one.
+  async getOldestUnmatchedProspectForMarketer(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT id FROM riders WHERE added_by_marketer_id = ? AND platform_business_id IS NULL ORDER BY created_at ASC LIMIT 1',
+      [parseInt(marketerId)]
+    );
+    return rows[0] || null;
+  },
+
+  // Creates the funnel-tracking record directly from a platform signup that
+  // was never onboarded through the app's checklist flow — the reality for
+  // most signups right now, since riders just tell the platform a staff
+  // member's name rather than relaying a generated code.
+  async createLinkedProspectFromPlatform({ name, email, phone, marketerId, marketerName, channel, platformBusinessId, registeredAt }) {
+    const [result] = await pool.execute(
+      `INSERT INTO riders
+        (name, email, phone, added_by_marketer_id, added_by_marketer_name, created_at, checklist_items, completed, channel, platform_business_id, registered_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+      [name || 'Unnamed business', email || '', phone || '', marketerId, marketerName, registeredAt, JSON.stringify([]), channel, platformBusinessId, registeredAt]
+    );
+    return result.insertId;
+  },
+
+  // Prospects already linked to a platform business — what
+  // platformSync.syncOutcomes() re-checks against live Supabase data on
+  // every run. Deliberately not filtered by funnel_stage: repeat-order and
+  // repeat-customer fields can still change long after "completed_order".
+  async getLinkedProspects() {
+    const [rows] = await pool.execute(
+      `SELECT id, platform_business_id, is_accepting_orders, activated_at, link_shared_at,
+              first_activity_at, first_order_at, completed_order_at, repeat_business_order_at,
+              first_repeat_customer_at, repeat_customer_count
+       FROM riders WHERE platform_business_id IS NOT NULL`
+    );
+    return rows;
+  },
+
+  // Applies whichever funnel timestamps/fields are newly known. Every
+  // timestamp field uses COALESCE so a sync run can never regress or
+  // overwrite a stage that already fired — only fill in what was NULL.
+  // Live facts, not one-time milestones — always overwritten with the
+  // latest known value, unlike the COALESCE'd funnel timestamps.
+  async updateRiderStorefrontInfo(riderId, { storefrontUrl, uniqueVisitorCount, linkShareCount }) {
+    await pool.execute(
+      'UPDATE riders SET storefront_url = ?, unique_visitor_count = ?, link_share_count = ? WHERE id = ?',
+      [storefrontUrl || null, uniqueVisitorCount || 0, linkShareCount || 0, parseInt(riderId)]
+    );
+  },
+
+  // Always overwritten with the latest known fact, unlike the funnel
+  // timestamps — a business could add payout details or set pricing later,
+  // and the checklist claim should be judged against current reality.
+  async updateRiderChecklistVerification(riderId, { pricingVerified, payoutVerified }) {
+    await pool.execute(
+      'UPDATE riders SET checklist_pricing_verified = ?, checklist_payout_verified = ? WHERE id = ?',
+      [pricingVerified ? 1 : 0, payoutVerified ? 1 : 0, parseInt(riderId)]
+    );
+  },
+
+  // The only thing that ever sets link_shared_at — a staff member confirming
+  // it in a follow-up, never inferred from a storefront visit. COALESCE'd so
+  // it can only be set once, same guarantee as updateRiderFunnelOutcomes.
+  async confirmLinkShared(riderId, when) {
+    await pool.execute(
+      'UPDATE riders SET link_shared_at = COALESCE(link_shared_at, ?) WHERE id = ?',
+      [when, parseInt(riderId)]
+    );
+  },
+
+  async getReasonCodes() {
+    const [rows] = await pool.execute('SELECT code, label FROM reason_codes WHERE active = 1 ORDER BY label ASC');
+    return rows;
+  },
+
+  async getFollowupsForRider(riderId) {
+    const [rows] = await pool.execute(
+      `SELECT f.*, m.name AS staff_name FROM followups f
+       JOIN marketers m ON m.id = f.staff_id
+       WHERE f.rider_id = ? ORDER BY f.created_at DESC`,
+      [parseInt(riderId)]
+    );
+    return rows;
+  },
+
+  // Every rider_id this staff member has already logged ANY followup
+  // against today — used to grey out the quick-call button (it should only
+  // ever add one contact per prospect per day) and to know which rows don't
+  // need it shown at all.
+  async getContactedTodayRiderIds(staffId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT DISTINCT rider_id FROM followups WHERE staff_id = ? AND DATE(created_at) = ?',
+      [staffId, todayDate]
+    );
+    return rows.map(r => r.rider_id);
+  },
+
+  async hasContactedToday(staffId, riderId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT id FROM followups WHERE staff_id = ? AND rider_id = ? AND DATE(created_at) = ? LIMIT 1',
+      [staffId, parseInt(riderId), todayDate]
+    );
+    return rows.length > 0;
+  },
+
+  async addFollowup(data) {
+    await pool.execute(
+      `INSERT INTO followups
+        (rider_id, staff_id, type, stage_before, stage_after, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.rider_id, data.staff_id, data.type, data.stage_before, data.stage_after,
+        data.reason_code || null, data.desired_action || null, data.action_completed ? 1 : 0,
+        data.link_shared_confirmed ? 1 : 0, data.notes || null, data.next_followup_date || null, data.created_at
+      ]
+    );
+  },
+
+  async getExperiments() {
+    const [rows] = await pool.execute('SELECT * FROM experiments ORDER BY start_date DESC, id DESC');
+    return rows;
+  },
+
+  async addExperiment(data) {
+    await pool.execute(
+      `INSERT INTO experiments (problem, hypothesis, change_description, start_date, target_metric, created_by_staff_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [data.problem, data.hypothesis, data.change_description, data.start_date, data.target_metric, data.created_by_staff_id || null, data.created_at]
+    );
+  },
+
+  async updateExperimentResult(id, { result, decision, end_date }) {
+    await pool.execute(
+      'UPDATE experiments SET result = ?, decision = ?, end_date = COALESCE(?, end_date) WHERE id = ?',
+      [result || null, decision || null, end_date || null, parseInt(id)]
+    );
+  },
+
+  async updateRiderFunnelOutcomes(riderId, fields) {
+    const settable = ['is_accepting_orders', 'activated_at', 'first_activity_at', 'first_order_at',
+      'completed_order_at', 'repeat_business_order_at', 'first_repeat_customer_at', 'repeat_customer_count'];
+    const sets = [];
+    const values = [];
+    for (const key of settable) {
+      if (!(key in fields)) continue;
+      if (key === 'is_accepting_orders' || key === 'repeat_customer_count') {
+        sets.push(`${key} = ?`);
+        values.push(fields[key]);
+      } else {
+        sets.push(`${key} = COALESCE(${key}, ?)`);
+        values.push(fields[key]);
+      }
+    }
+    if (sets.length === 0) return;
+    values.push(parseInt(riderId));
+    await pool.execute(`UPDATE riders SET ${sets.join(', ')} WHERE id = ?`, values);
   },
 
   async getRidersAddedByOnDate(marketerId, date) {

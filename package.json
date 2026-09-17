@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
+    "@supabase/supabase-js": "^2.45.4",
     "axios": "^1.6.7",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.1",

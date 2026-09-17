@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title><%= heading %> — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title"><%= heading %></div>
+      <div class="card-sub" style="margin-bottom:0;">Who to work today, and why — ordered oldest-first within each list.</div>
+    </div>
+
+    <div class="card" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+      <div>
+        <div style="font-size:22px;font-weight:800;color:var(--dark);"><%= callSummary.total_calls %></div>
+        <div style="font-size:12px;color:var(--gray);">Calls/visits logged today</div>
+      </div>
+      <div>
+        <div style="font-size:22px;font-weight:800;color:<%= callSummary.moved_stage > 0 ? 'var(--green)' : 'var(--dark)' %>;"><%= callSummary.moved_stage %></div>
+        <div style="font-size:12px;color:var(--gray);">Actually moved a stage</div>
+      </div>
+      <% if (callSummary.total_calls > 0 && callSummary.moved_stage === 0) { %>
+        <div style="font-size:12px;color:var(--red);flex-basis:100%;">Nothing has moved forward today yet — worth checking why.</div>
+      <% } %>
+    </div>
+
+    <div class="priority-tabs">
+      <% counts.forEach(function (l) { %>
+        <a href="<%= baseUrl %>?list=<%= l.id %>" class="priority-tab <%= l.id === activeList ? 'priority-tab-active' : '' %>">
+          <span class="priority-tab-id"><%= l.id %></span>
+          <span class="priority-tab-count"><%= l.count %></span>
+        </a>
+      <% }) %>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title" style="font-size:16px;"><%= activeMeta.label %></div>
+      <div class="card-sub" style="margin-bottom:0;">Goal: <%= activeMeta.objective %></div>
+    </div>
+
+    <% if (rows.length === 0) { %>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
+        Nothing in <%= activeList %> right now.
+      </div>
+    <% } else { %>
+      <% rows.forEach(function (r) { %>
+        <div class="home-tile" style="padding:0.9rem 1.1rem;">
+          <a href="<%= riderBaseUrl %>/<%= r.id %>" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;text-decoration:none;color:inherit;">
+            <div class="home-tile-body">
+              <div class="home-tile-title"><%= r.name %></div>
+              <div class="home-tile-sub">
+                <%= r.phone %>
+                <% if (r.daysInStage !== null) { %>
+                  · <%= r.daysInStage %> day<%= r.daysInStage === 1 ? '' : 's' %> in this stage
+                <% } %>
+              </div>
+            </div>
+            <div class="home-tile-arrow">→</div>
+          </a>
+          <% if (!viewerIsManagement) { %>
+            <% if (r.contactedToday) { %>
+              <span class="badge badge-green" style="flex-shrink:0;white-space:nowrap;" title="Already logged today — one contact per prospect per day">✓ Contacted today</span>
+            <% } else { %>
+              <form method="POST" action="/riders/<%= r.id %>/quick-call?redirect=<%= encodeURIComponent(baseUrl + '?list=' + activeList) %>" style="margin:0;flex-shrink:0;">
+                <button type="submit" class="btn btn-outline" style="width:auto;padding:8px 12px;margin:0;font-size:12px;white-space:nowrap;" title="Log that you called or visited them today, with no other details">☎ Called</button>
+              </form>
+            <% } %>
+          <% } %>
+        </div>
+      <% }) %>
+    <% } %>
+
+    <% if (!viewerIsManagement) { %>
+      <a href="/my-performance" class="logout-link">My Performance →</a>
+    <% } %>
+    <a href="<%= backHref %>" class="logout-link"><%= backLabel %></a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

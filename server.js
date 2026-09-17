@@ -8,6 +8,10 @@ const { GoogleGenAI } = require('@google/genai');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
 const { evaluateAttendance } = require('./utils/attendance');
+const { lagosParts, today, nowLagos, daysSince, addDaysUTC, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
+const platformSync = require('./services/platformSync');
+const priorityLists = require('./services/priorityLists');
+const performance = require('./services/performance');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
@@ -106,46 +110,6 @@ function requireManagement(req, res, next) {
   if (req.session.isManagement) return next();
   res.redirect('/management-login');
 }
-// Everything time-related is pinned to Africa/Lagos explicitly, never left
-// to the server's own timezone. The app runs on shared hosting whose local
-// time isn't guaranteed, and a mismatch between how a timestamp gets
-// written (e.g. MySQL's NOW(), or a JS Date's default local formatting)
-// and how "today" gets computed on read can make a same-day record vanish
-// from date-range queries entirely — that's what was happening.
-function lagosParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Lagos', hour12: false,
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
-  }).formatToParts(date);
-  const get = t => parts.find(p => p.type === t).value;
-  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
-}
-function today() {
-  const p = lagosParts();
-  return `${p.year}-${p.month}-${p.day}`;
-}
-// Lagos wall-clock datetime as 'YYYY-MM-DD HH:MM:SS', for writing to
-// DATETIME columns instead of relying on MySQL's NOW().
-function nowLagos() {
-  const p = lagosParts();
-  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
-}
-function formatDate() {
-  return new Date().toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-function formatDateShort(dateStr) {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'short', day: 'numeric', month: 'short' });
-}
-function formatDateLong(dateStr) {
-  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-// datetimeStr is already a 'YYYY-MM-DD HH:MM:SS' Lagos wall-clock string
-// (see nowLagos()), so this is a plain substring — no further timezone
-// conversion needed or wanted.
-function formatTime(datetimeStr) {
-  return datetimeStr.slice(11, 16);
-}
-
 // Turns a raw User-Agent string into a short "device · browser" label for
 // the dashboard (e.g. "iPhone · Safari") instead of the full unreadable UA
 // string. Best-effort pattern matching, not a full UA parser.
@@ -225,13 +189,6 @@ app.post('/login', async (req, res) => {
   res.redirect(redirectTo);
 });
 
-// Pure UTC date-string arithmetic — matches today()'s UTC convention and
-// avoids local-vs-UTC date parsing mismatches shifting a date by a day.
-function addDaysUTC(dateStr, days) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().split('T')[0];
-}
-
 // A day counts green only once BOTH a login and a logout event exist for it
 // AND the login happened before the cutoff — a late-but-complete day shows
 // amber instead, not green. Today is never marked missed — it's still
@@ -271,6 +228,11 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr, cutoff) {
 }
 
 app.get('/home', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const role = marketer ? marketer.role : 'field_marketer';
+  const priorityCounts = await priorityLists.getAllListCounts(scopeMarketerId(marketer));
+  const openProspects = priorityCounts.reduce((sum, l) => sum + l.count, 0);
+
   const submittedToday = !!(await db.getSubmissionByMarketerToday(req.session.marketerId, today()));
 
   const toDate = today();
@@ -287,7 +249,7 @@ app.get('/home', requireAuth, async (req, res) => {
   const missedCheckin = !submittedToday && isPastCheckinDeadline();
   const canCheckout = submittedToday && isAfterCheckoutTime();
 
-  res.render('home', { name: req.session.marketerName, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
+  res.render('home', { name: req.session.marketerName, role, openProspects, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
 });
 
 // Plain sign-out for "wrong person is logged in on this device" — ends the
@@ -444,6 +406,12 @@ app.post('/riders', requireAuth, async (req, res) => {
   const deviceFlagReason = deviceFlagged ? `This device was last used to check in as ${owner.name}` : null;
   await db.registerDevice(marketerId, req.deviceId);
 
+  // Channel attribution follows the staff member's own role — a telemarketer
+  // onboarding a prospect over the phone counts as the telemarketer channel,
+  // not field, for the growth-OS priority lists and dashboard rollups.
+  const marketer = await db.getMarketerById(marketerId);
+  const channel = marketer && marketer.role === 'telemarketer' ? 'telemarketer' : 'field_marketer';
+
   const rider = await db.addRider({
     name: name.trim(),
     email: email.trim(),
@@ -453,7 +421,8 @@ app.post('/riders', requireAuth, async (req, res) => {
     device_id: req.deviceId,
     user_agent: req.get('User-Agent') || '',
     device_flagged: deviceFlagged,
-    device_flag_reason: deviceFlagReason
+    device_flag_reason: deviceFlagReason,
+    channel
   }, nowLagos());
 
   res.redirect(`/riders/${rider.id}/checklist`);
@@ -479,6 +448,384 @@ app.get('/riders/:id/done', requireAuth, async (req, res) => {
   const rider = await db.getRider(req.params.id);
   if (!rider || rider.added_by_marketer_id !== req.session.marketerId) return res.redirect('/home');
   res.render('rider-done', { rider, time: rider.completed_at ? formatTime(rider.completed_at) : null });
+});
+
+// ── QUICK-ADD LEAD (no checklist) ────────────────────────────────────────────
+// For a telemarketer (or a field marketer) to log a brand-new warm prospect
+// they're about to work, without the in-person onboarding checklist — that
+// stays specific to "Onboard New Rider" (device-flag checks, QC checklist,
+// the whole flow), which doesn't make sense for someone reached by phone.
+
+app.get('/prospects/new', requireAuth, async (req, res) => {
+  const reasonCodes = await db.getReasonCodes();
+  res.render('prospect-new', { error: null, reasonCodes });
+});
+
+app.post('/prospects', requireAuth, async (req, res) => {
+  const { name, phone, reason_code, notes } = req.body;
+  if (!name || !name.trim() || !phone || !phone.trim()) {
+    const reasonCodes = await db.getReasonCodes();
+    return res.render('prospect-new', { error: "Enter the lead's name and phone number.", reasonCodes });
+  }
+
+  const marketerId = req.session.marketerId;
+  const marketer = await db.getMarketerById(marketerId);
+  const channel = marketer && marketer.role === 'telemarketer' ? 'telemarketer' : 'field_marketer';
+
+  const rider = await db.addRider({
+    name: name.trim(),
+    email: '',
+    phone: phone.trim(),
+    added_by_marketer_id: marketerId,
+    added_by_marketer_name: req.session.marketerName,
+    channel
+  }, nowLagos());
+
+  // Logging a new lead IS the day's first contact with them — telemarketer
+  // called, field marketer visited. No separate "Called" tap needed right
+  // after adding someone. Why they haven't onboarded yet (if anything) goes
+  // on this same contact record, same reason-code system the follow-up form
+  // already uses — not a separate one-off notes field on the rider itself.
+  await db.addFollowup({
+    rider_id: rider.id,
+    staff_id: marketerId,
+    type: channel === 'telemarketer' ? 'call' : 'visit',
+    stage_before: 'new',
+    stage_after: 'new',
+    reason_code: reason_code || null,
+    desired_action: null,
+    action_completed: false,
+    link_shared_confirmed: false,
+    notes: notes && notes.trim() ? notes.trim() : null,
+    next_followup_date: null,
+    created_at: nowLagos()
+  });
+
+  res.redirect(`/riders/${rider.id}`);
+});
+
+// ── CORE PRIORITY LISTS (P1-P6) ──────────────────────────────────────────────
+// Shared by field marketer and telemarketer alike — same underlying queries
+// (services/priorityLists.js). The view adapts its own copy/labels by role.
+//
+// Scope differs by role, and deliberately so: a field marketer works the
+// specific people they sourced face-to-face, but the telemarketer's job is
+// working the whole company-wide funnel by phone regardless of which
+// channel originally registered someone — ownership of who onboarded a
+// prospect doesn't change whose job it is to call them forward. This only
+// stays correct with exactly one telemarketer; with more than one, "sees
+// everyone" needs a real assignment mechanism instead.
+function scopeMarketerId(marketer) {
+  return marketer && marketer.role === 'telemarketer' ? null : (marketer ? marketer.id : null);
+}
+
+// A prospect can be acted on by whoever sourced them, OR by the
+// telemarketer (who can act on anyone, per the scope rule above).
+function canAccessRider(rider, marketer) {
+  if (!rider || !marketer) return false;
+  return rider.added_by_marketer_id === marketer.id || marketer.role === 'telemarketer';
+}
+
+// Only a same-origin path is ever accepted for a query-string redirect
+// target — rejects absolute URLs and protocol-relative ones (e.g.
+// "//evil.com", which starts with "/" but is an open redirect).
+function isSafeLocalRedirect(value) {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+}
+
+app.get('/priority-lists', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const role = marketer ? marketer.role : 'field_marketer';
+  const scopeId = scopeMarketerId(marketer);
+
+  const counts = await priorityLists.getAllListCounts(scopeId);
+  const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
+  const meta = priorityLists.LISTS[activeList];
+
+  const contactedTodayIds = new Set(await db.getContactedTodayRiderIds(req.session.marketerId, today()));
+  const rawRows = await priorityLists.getListRows(activeList, scopeId);
+  const rows = rawRows.map(r => ({
+    ...r,
+    daysInStage: daysSince(r[meta.orderByColumn] || r.created_at),
+    contactedToday: contactedTodayIds.has(r.id)
+  }));
+
+  const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
+
+  res.render('priority-lists', {
+    heading: role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists',
+    baseUrl: '/priority-lists',
+    riderBaseUrl: '/riders',
+    backHref: '/home',
+    backLabel: '← Back to Home',
+    viewerIsManagement: false,
+    callSummary,
+    counts,
+    activeList,
+    activeMeta: priorityLists.listMeta(activeList),
+    rows
+  });
+});
+
+// Management's read-only drill-down into one staff member's own priority
+// lists — same queries, same template, just a different base URL/back link
+// and no self-service "My Performance" shortcut.
+app.get('/management/staff/:id/priority-lists', requireManagement, async (req, res) => {
+  const staff = await db.getMarketerById(req.params.id);
+  if (!staff) return res.redirect('/management/staff-performance');
+
+  const scopeId = scopeMarketerId(staff);
+  const counts = await priorityLists.getAllListCounts(scopeId);
+  const activeList = priorityLists.LISTS[req.query.list] ? req.query.list : 'P1';
+  const meta = priorityLists.LISTS[activeList];
+
+  const rawRows = await priorityLists.getListRows(activeList, scopeId);
+  const rows = rawRows.map(r => ({ ...r, daysInStage: daysSince(r[meta.orderByColumn] || r.created_at) }));
+  const callSummary = await performance.getTodayCallSummary(staff.id, today());
+
+  res.render('priority-lists', {
+    heading: `${staff.name}'s Priority Lists`,
+    baseUrl: `/management/staff/${staff.id}/priority-lists`,
+    riderBaseUrl: '/management/riders',
+    backHref: '/management/staff-performance',
+    backLabel: '← Back to Staff Performance',
+    viewerIsManagement: true,
+    callSummary,
+    counts,
+    activeList,
+    activeMeta: priorityLists.listMeta(activeList),
+    rows
+  });
+});
+
+const FUNNEL_STAGE_LABELS = {
+  new: 'New',
+  registered: 'Registered',
+  activated: 'Activated',
+  link_shared: 'Link Shared',
+  customer_activity: 'Customer Activity',
+  first_order: 'First Order',
+  completed_order: 'Completed Order'
+};
+
+// Every stage timestamp worth showing on the prospect detail screen, in
+// funnel order — only the ones actually set get rendered.
+const FUNNEL_TIMELINE_FIELDS = [
+  { key: 'registered_at', label: 'Registered' },
+  { key: 'activated_at', label: 'Activated' },
+  { key: 'link_shared_at', label: 'Link Shared' },
+  { key: 'first_activity_at', label: 'First Customer Activity' },
+  { key: 'first_order_at', label: 'First Order' },
+  { key: 'completed_order_at', label: 'Completed Order' },
+  { key: 'repeat_business_order_at', label: 'Repeat Order (Business)' },
+  { key: 'first_repeat_customer_at', label: 'First Repeat Customer' }
+];
+
+app.get('/my-performance', requireAuth, async (req, res) => {
+  const period = ['today', 'week', 'month'].includes(req.query.period) ? req.query.period : 'week';
+  const toDate = today();
+  const fromDate = period === 'today' ? toDate : period === 'week' ? addDaysUTC(toDate, -6) : addDaysUTC(toDate, -29);
+
+  const scorecard = await performance.getStaffScorecard(req.session.marketerId, fromDate, toDate);
+  res.render('my-performance', { name: req.session.marketerName, period, scorecard });
+});
+
+// Live daily app-usage rows (opens/active minutes) for the prospect detail
+// screen — fetched fresh from Supabase each view, not synced into MySQL
+// (see platformSync.getRecentUsage). Sparse: a day with zero activity
+// simply doesn't appear, never shown as a fabricated 0.
+async function getUsageDays(rider) {
+  if (!rider.platform_business_id) return [];
+  const rows = await platformSync.getRecentUsage(rider.platform_business_id, 7);
+  return rows.map(r => ({
+    dateFormatted: formatDateShort(r.day),
+    opens: r.open_count || 0,
+    minutes: Math.round((r.active_seconds || 0) / 60)
+  }));
+}
+
+// Full roster — "everyone I've ever worked," not just who currently needs
+// action. Scoped the same way as the priority lists (own leads for a field
+// marketer, everyone for the telemarketer — see scopeMarketerId above).
+app.get('/prospects', requireAuth, async (req, res) => {
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  const rows = await priorityLists.getAllProspects(scopeMarketerId(marketer));
+
+  const prospects = rows.map(r => ({
+    ...r,
+    stageLabel: FUNNEL_STAGE_LABELS[r.funnel_stage] || r.funnel_stage,
+    dateAdded: formatDateShort(r.created_at.slice(0, 10))
+  }));
+
+  const summary = {
+    total: rows.length,
+    registered: rows.filter(r => r.registered_at).length,
+    activated: rows.filter(r => r.activated_at).length,
+    linkShared: rows.filter(r => r.link_shared_at).length,
+    customerActivity: rows.filter(r => r.first_activity_at).length,
+    firstOrder: rows.filter(r => r.first_order_at).length,
+    completedOrder: rows.filter(r => r.completed_order_at).length,
+    repeatOrder: rows.filter(r => r.repeat_business_order_at).length
+  };
+
+  res.render('prospects-roster', { prospects, summary });
+});
+
+app.get('/riders/:id', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  const followups = (await db.getFollowupsForRider(rider.id)).map(f => ({
+    ...f,
+    stageBeforeLabel: FUNNEL_STAGE_LABELS[f.stage_before] || f.stage_before,
+    stageAfterLabel: FUNNEL_STAGE_LABELS[f.stage_after] || f.stage_after,
+    dateFormatted: formatDateShort(f.created_at.slice(0, 10)),
+    timeFormatted: formatTime(f.created_at)
+  }));
+  const reasonCodes = await db.getReasonCodes();
+
+  const timeline = FUNNEL_TIMELINE_FIELDS
+    .filter(f => rider[f.key])
+    .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
+
+  const usageDays = await getUsageDays(rider);
+  const linkCandidates = (!rider.platform_business_id)
+    ? await platformSync.getUnmatchedCandidatesForStaff(marketer.name)
+    : [];
+
+  res.render('rider-detail', {
+    rider,
+    stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
+    timeline,
+    usageDays,
+    linkCandidates,
+    followups,
+    reasonCodes,
+    today: today(),
+    viewerIsManagement: false,
+    backHref: '/priority-lists',
+    backLabel: '← Back to Priority Lists'
+  });
+});
+
+// Manual override for the ambiguous case: staff confirms a specific
+// "new"-stage prospect is the same person as a specific recent platform
+// signup, rather than waiting on (or second-guessing) the automatic
+// oldest-unmatched-prospect heuristic in platformSync.js.
+app.post('/riders/:id/link-business', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  if (req.body.platform_business_id && !rider.platform_business_id) {
+    await db.linkRiderToPlatformBusiness(rider.id, req.body.platform_business_id, nowLagos());
+  }
+  res.redirect(`/riders/${rider.id}`);
+});
+
+// Management's read-only view of any prospect — same funnel timeline and
+// follow-up history as the staff-facing screen, but no follow-up form (a
+// follow-up should be attributed to whoever actually did it, not whoever's
+// viewing it) and shows who sourced the prospect.
+app.get('/management/riders/:id', requireManagement, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  if (!rider) return res.redirect('/management/staff-performance');
+
+  const followups = (await db.getFollowupsForRider(rider.id)).map(f => ({
+    ...f,
+    stageBeforeLabel: FUNNEL_STAGE_LABELS[f.stage_before] || f.stage_before,
+    stageAfterLabel: FUNNEL_STAGE_LABELS[f.stage_after] || f.stage_after,
+    dateFormatted: formatDateShort(f.created_at.slice(0, 10)),
+    timeFormatted: formatTime(f.created_at)
+  }));
+
+  const timeline = FUNNEL_TIMELINE_FIELDS
+    .filter(f => rider[f.key])
+    .map(f => ({ label: f.label, dateFormatted: formatDateShort(rider[f.key].slice(0, 10)), timeFormatted: formatTime(rider[f.key]) }));
+
+  const usageDays = await getUsageDays(rider);
+
+  res.render('rider-detail', {
+    rider,
+    stageLabel: FUNNEL_STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage,
+    timeline,
+    usageDays,
+    linkCandidates: [],
+    followups,
+    reasonCodes: [],
+    today: today(),
+    viewerIsManagement: true,
+    backHref: `/management/staff/${rider.added_by_marketer_id}/priority-lists`,
+    backLabel: '← Back to Priority Lists'
+  });
+});
+
+app.post('/riders/:id/followups', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  const { type, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date } = req.body;
+  const stageBefore = rider.funnel_stage;
+
+  if (link_shared_confirmed) {
+    await db.confirmLinkShared(rider.id, nowLagos());
+  }
+
+  const updatedRider = await db.getRider(rider.id);
+
+  await db.addFollowup({
+    rider_id: rider.id,
+    staff_id: req.session.marketerId,
+    type: type === 'visit' ? 'visit' : 'call',
+    stage_before: stageBefore,
+    stage_after: updatedRider.funnel_stage,
+    reason_code: reason_code || null,
+    desired_action: desired_action || null,
+    action_completed: !!action_completed,
+    link_shared_confirmed: !!link_shared_confirmed,
+    notes: notes || null,
+    next_followup_date: next_followup_date || null,
+    created_at: nowLagos()
+  });
+
+  res.redirect(`/riders/${rider.id}`);
+});
+
+// One-tap "I called/visited this person today" — a bare-bones followups row
+// with no stage change, for when there's genuinely nothing more to record
+// than the contact itself. Deliberately the same table as the full
+// follow-up form (not a separate counter), so "200 calls logged, 3 moved a
+// stage" stays computable from one source of truth rather than two.
+app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
+  const rider = await db.getRider(req.params.id);
+  const marketer = await db.getMarketerById(req.session.marketerId);
+  if (!canAccessRider(rider, marketer)) return res.redirect('/priority-lists');
+
+  // Caps at one contact per prospect per day — the whole point of a
+  // one-tap button is "I touched this today," not a raw click counter. A
+  // second tap the same day is a no-op, not a second logged contact.
+  const alreadyContacted = await db.hasContactedToday(req.session.marketerId, rider.id, today());
+  if (!alreadyContacted) {
+    await db.addFollowup({
+      rider_id: rider.id,
+      staff_id: req.session.marketerId,
+      type: 'call',
+      stage_before: rider.funnel_stage,
+      stage_after: rider.funnel_stage,
+      reason_code: null,
+      desired_action: null,
+      action_completed: false,
+      link_shared_confirmed: false,
+      notes: null,
+      next_followup_date: null,
+      created_at: nowLagos()
+    });
+  }
+
+  const redirectTo = isSafeLocalRedirect(req.query.redirect) ? req.query.redirect : '/priority-lists';
+  res.redirect(redirectTo);
 });
 
 app.get('/logout', requireAuth, async (req, res) => {
@@ -557,17 +904,20 @@ app.post('/management-login', (req, res) => {
 });
 
 app.get('/management/staff/new', requireManagement, (req, res) => {
-  res.render('staff-new', { error: null });
+  res.render('staff-new', { error: null, role: null });
 });
 
 app.post('/management/staff', requireManagement, async (req, res) => {
   const { name, pin, role } = req.body;
 
   if (!name || !name.trim()) {
-    return res.render('staff-new', { error: 'Enter the staff member\'s name.' });
+    return res.render('staff-new', { error: 'Enter the staff member\'s name.', role });
   }
   if (!/^\d{4}$/.test(pin || '')) {
-    return res.render('staff-new', { error: 'PIN must be exactly 4 digits.' });
+    return res.render('staff-new', { error: 'PIN must be exactly 4 digits.', role });
+  }
+  if (!['field_marketer', 'telemarketer'].includes(role)) {
+    return res.render('staff-new', { error: 'Choose a role.', role });
   }
 
   await db.addMarketer({ name: name.trim(), pin, role });
@@ -603,7 +953,50 @@ function isValidDateParam(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+app.get('/management/staff-performance', requireManagement, async (req, res) => {
+  const channels = await performance.getChannelBreakdown();
+  const staff = await performance.getStaffBreakdown();
+  res.render('staff-performance', { channels, staff });
+});
+
+app.get('/management/experiments', requireManagement, async (req, res) => {
+  const experiments = (await db.getExperiments()).map(e => ({
+    ...e,
+    startFormatted: formatDateShort(e.start_date),
+    endFormatted: e.end_date ? formatDateShort(e.end_date) : null
+  }));
+  res.render('experiments', { experiments, error: null });
+});
+
+app.post('/management/experiments', requireManagement, async (req, res) => {
+  const { problem, hypothesis, change_description, start_date, target_metric } = req.body;
+  if (!problem || !hypothesis || !change_description || !start_date || !target_metric) {
+    const experiments = await db.getExperiments();
+    return res.render('experiments', { experiments, error: 'Fill in problem, hypothesis, change, start date, and target metric.' });
+  }
+  await db.addExperiment({ ...req.body, created_by_staff_id: null, created_at: nowLagos() });
+  res.redirect('/management/experiments');
+});
+
+app.post('/management/experiments/:id/result', requireManagement, async (req, res) => {
+  const { result, decision, end_date } = req.body;
+  await db.updateExperimentResult(req.params.id, { result, decision: decision || null, end_date: end_date || null });
+  res.redirect('/management/experiments');
+});
+
 app.get('/dashboard', requireManagement, async (req, res) => {
+  const overviewPeriod = ['all', 'today', 'week'].includes(req.query.overviewPeriod) ? req.query.overviewPeriod : 'all';
+  const overviewToDate = today();
+  const overviewFromDate = overviewPeriod === 'today' ? overviewToDate : addDaysUTC(overviewToDate, -6);
+  const companyOverview = overviewPeriod === 'all'
+    ? await performance.getCompanyOverview()
+    : await performance.getCompanyOverview(overviewFromDate, overviewToDate);
+  const cohortOverview = overviewPeriod === 'all'
+    ? await performance.getCohortOverview()
+    : await performance.getCohortOverview(overviewFromDate, overviewToDate);
+  const usageSummary = await platformSync.getCompanyUsageSummary(overviewPeriod === 'all' ? undefined : overviewFromDate);
+  const checklistAccuracy = await performance.getChecklistAccuracy();
+
   const marketers = await db.getMarketers();
   const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
   const statusSubs = await db.getSubmissionsToday(statusDate);
@@ -681,8 +1074,22 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     from, to,
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
-    formatTime, formatDateShort
+    formatTime, formatDateShort,
+    companyOverview, cohortOverview, overviewPeriod, usageSummary, checklistAccuracy
   });
+});
+
+// Manual trigger for platformSync — lets management (and, during Phase 1
+// build-out, us) confirm a match/outcome without waiting for the 5-minute
+// interval. Returns counts only, no sensitive data.
+app.post('/management/sync-platform', requireManagement, async (req, res) => {
+  try {
+    const result = await platformSync.runSync();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Manual platform sync failed:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/management-logout', (req, res) => {
@@ -695,3 +1102,5 @@ app.listen(PORT, () => {
   console.log(`   Marketer login: http://localhost:${PORT}`);
   console.log(`   Management:     http://localhost:${PORT}/management-login`);
 });
+
+platformSync.startInterval();
