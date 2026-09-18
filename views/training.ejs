@@ -16,7 +16,7 @@
       <div class="app-header-badge">D</div>
       <div class="app-header-brand">Dashspid Ops</div>
       <div class="app-header-spacer"></div>
-      <div class="tr-progress-label" id="progressLabel">0 / 8 complete</div>
+      <div class="tr-progress-label" id="progressLabel">Loading...</div>
       <a href="/sign-out" class="tr-signout-link">Not you? Log out</a>
     </div>
   </div>
@@ -24,8 +24,9 @@
 
   <div class="screen active" id="screen-welcome">
     <div class="container tr-welcome">
+      <div class="tr-week-badge">Week <%= weekData.weekNumber %> of 12</div>
       <h1>Welcome, <%= name %></h1>
-      <p>Before your first call, go through these 8 modules. You cannot move forward without passing each quiz at 80%. By the time you finish, everything here will be at the back of your head without thinking.</p>
+      <p><%= weekData.intro %></p>
       <div class="tr-module-grid" id="moduleGrid"></div>
       <button class="btn" onclick="startTraining()">Start Training</button>
     </div>
@@ -48,7 +49,7 @@
 
   <div class="screen" id="screen-roleplay">
     <div class="container tr-roleplay-wrap">
-      <div class="tr-quiz-title">Module 7 — Live Call Practice</div>
+      <div class="tr-quiz-title" id="rpTitle">Live Call Practice</div>
       <div class="tr-quiz-sub" style="margin-bottom:16px;">You are on a call. Handle each objection as you would in real life. You'll get feedback after each exchange.</div>
       <div class="tr-scenario-box">
         <div class="tr-scenario-label">The prospect says</div>
@@ -72,29 +73,23 @@
     <div class="container tr-cert-wrap">
       <div class="tr-cert">
         <div class="tr-cert-logo">DASHSPID</div>
-        <div class="tr-cert-presents">This certifies that</div>
+        <div class="tr-cert-week" id="certWeekLabel"></div>
+        <div class="tr-cert-presents">Awarded to</div>
         <div class="tr-cert-name"><%= name %></div>
-        <div class="tr-cert-desc">has completed the Dashspid Telemarketing Training Academy and demonstrated knowledge of the platform, pricing, Rider Hub, Dashspid Shield, call flow, objection handling, and closing techniques.</div>
+        <div class="tr-cert-desc"><%= weekData.certificateDescription %></div>
         <div class="tr-cert-date" id="certDate"></div>
       </div>
-      <div class="tr-cheatsheet">
-        <h3>Numbers to know always</h3>
-        <div class="tr-cs-grid">
-          <div class="tr-cs-item"><div class="tr-cs-label">Free plan</div><div class="tr-cs-value">N0 / 30 orders</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Rider plan</div><div class="tr-cs-value">N5,999 / 250 orders</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Growth plan</div><div class="tr-cs-value">N10,799 / 750 orders</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Pro plan</div><div class="tr-cs-value">N23,999 / unlimited</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Transaction fee</div><div class="tr-cs-value">2.5% vs Bolt 20%</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Free trial</div><div class="tr-cs-value">30 days Growth, no card</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Gold tier</div><div class="tr-cs-value">6 months paid plan</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Platinum tier</div><div class="tr-cs-value">12 months paid plan</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Shield max death</div><div class="tr-cs-value">N1,000,000</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Shield minimum</div><div class="tr-cs-value">3 months before claim</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Setup time</div><div class="tr-cs-value">10 minutes</div></div>
-          <div class="tr-cs-item"><div class="tr-cs-label">Payout speed</div><div class="tr-cs-value">Instant to bank account</div></div>
+      <% if (weekData.cheatsheet && weekData.cheatsheet.length) { %>
+        <div class="tr-cheatsheet">
+          <h3>Numbers to know always</h3>
+          <div class="tr-cs-grid">
+            <% weekData.cheatsheet.forEach(function(item) { %>
+              <div class="tr-cs-item"><div class="tr-cs-label"><%= item.label %></div><div class="tr-cs-value"><%= item.value %></div></div>
+            <% }) %>
+          </div>
         </div>
-      </div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:20px;">You are ready. Make the calls.</p>
+      <% } %>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:20px;" id="certNextMsg"></p>
       <button class="btn" id="continueBtn" onclick="finishTrainingAndContinue()">Continue to your dashboard</button>
     </div>
   </div>
@@ -108,10 +103,10 @@
 
   <script>
   const TRAINEE_NAME = <%- JSON.stringify(name) %>;
-
-  const MODULES=[{id:'intro',title:'What is Dashspid?',tag:'Foundation',content:[{header:'The one-line answer',body:'Dashspid is a software platform built for Nigerian delivery and logistics operators. It replaces the manual, WhatsApp-based way of running a delivery business with a complete system: branded ordering website, instant pricing, WhatsApp bot, payment collection, and an operations dashboard.'},{header:'The problem every operator has right now',body:'',bullets:['Customers message on WhatsApp and negotiate price every single time','Orders get lost in chat threads and are never followed up','Cash collection is a nightmare -- customers who disappear or claim no change','No professional appearance -- just a phone number, no brand, no receipts','No visibility -- operators cannot see revenue, busy routes, or rider performance']},{header:'What Dashspid gives them instead',body:'A complete system. Set up once -- business name, logo, pricing. From that moment, customers get a professional website to order from, prices are calculated automatically, payments confirmed before the rider moves, and every order lands in one dashboard.'},{callout:'Built for Nigeria. Not adapted from abroad. Designed for how delivery actually works in Lagos.'}],quiz:[{q:'What is the most accurate description of Dashspid?',options:['A ride-hailing app like Bolt or Uber','A platform for Nigerian delivery operators to manage orders, pricing, and payments','A social network for dispatch riders','A banking app'],answer:1,exp:'Dashspid is operator-facing -- it gives delivery businesses the tools to run professionally. It is not a ride-hailing app.'},{q:'The biggest daily pain for most operators you will call is:',options:['Not having enough customers','Quoting prices manually over WhatsApp for every single order','Bikes breaking down','Paying too much tax'],answer:1,exp:'Manual price quoting is the number one time sink and pain point. Dashspid eliminates it.'},{q:'Dashspid is a direct competitor to Bolt and Uber.',options:['True -- we are competing for the same riders','False -- Dashspid gives operators their own platform, Bolt sends them random orders','True -- both take a commission','False -- Dashspid is only for logistics companies'],answer:1,exp:'Dashspid is not Bolt. Bolt sends operators random customers and takes 20%. Dashspid gives operators their own platform to serve their existing customers at 2.5%.'},{q:'How long does setup take?',options:['1-2 days','A week','About 10 minutes','Requires a developer'],answer:2,exp:'10 minutes from signup to a live ordering page. No technical knowledge required.'},{q:'What is the transaction fee Dashspid charges?',options:['5%','20%','2.5%','0% on all plans'],answer:2,exp:'2.5% on every platform-processed payment. Bolt takes 20%. That difference is the most powerful number in your pitch.'}]},{id:'targets',title:'Who Are You Calling?',tag:'Know your prospect',content:[{header:'Two types of prospect -- very different pitches',body:'Every call is to one of two types. Know which one you have before you open your mouth. The pain is different. What moves them is different.'},{header:'Target 1 -- Solo Dispatch Riders',body:'Individual riders running their own operation from one WhatsApp number. They have their own customers -- regulars, Instagram vendors, pharmacies. They may also be on Bolt on the side.',bullets:['Pain: customers who say they will transfer and then disappear after delivery','Pain: quoting prices manually for every single order','Pain: no professional appearance -- just a phone number','What moves them: operating like a real business without paying 20% to Bolt']},{header:'Target 2 -- Logistics Companies',body:'Small to medium businesses with 3 to 20 riders. Business clients, delivery contracts, managing everything manually -- WhatsApp groups, phone calls, spreadsheets.',bullets:['Pain: no visibility -- cannot track rider performance','Pain: business clients want professionalism and paper trails they cannot deliver','Pain: want to scale but chaos holds them back','What moves them: a real operations system -- dashboard, tracking, team management']},{callout:'Ask before you pitch: Do you run your own operation or do you work for someone? That one question tells you which pitch to use.'}],quiz:[{q:'A solo rider\'s biggest pain is usually:',options:['Not having fuel money','Quoting prices manually and chasing payment after every single delivery','LASTMA stopping them','Not having a phone'],answer:1,exp:'The daily grind of quoting prices manually and chasing payment -- including customers who say they will transfer after delivery and then ghost -- is the number one pain for SOLO RIDERS specifically. Logistics companies have different pains around visibility and operations.'},{q:'A logistics company owner\'s biggest pain is usually:',options:['No WhatsApp account','No visibility into rider performance and inability to look professional to business clients','Too many orders','Not knowing what Bolt is'],answer:1,exp:'Logistics company owners are running blind -- no dashboards, no tracking, no professional system for business clients.'},{q:'What is the first question you should ask to determine which pitch to use?',options:['"How many orders a day?"','"Are you on Bolt?"','"Do you run your own operation or do you work for someone?"','"Have you heard of Dashspid?"'],answer:2,exp:'This immediately tells you solo operator vs logistics company -- which completely changes your pitch.'},{q:'A rider tells you they are on Bolt already. What do you say?',options:['Tell them to leave Bolt','Tell them Dashspid replaces Bolt','Dashspid runs alongside Bolt -- when customers order through Dashspid they keep 100%, no 20% going anywhere','We only work with people not on other platforms'],answer:2,exp:'Dashspid is not a replacement for Bolt. It runs alongside it. When a customer orders through Dashspid, the operator keeps everything.'},{q:'What moves a solo rider most when you pitch?',options:['The analytics dashboard','Operating like a real business and not paying 20% to Bolt','The coupon system','The bulk CSV import'],answer:1,exp:'Solo riders care about owning their customers, keeping their earnings, and looking professional. 2.5% vs 20% is the most powerful thing you can say.'}]},{id:'platform',title:'The Platform',tag:'Product knowledge',content:[{header:'Branded ordering website',body:'Every business gets their own website -- yourbusiness.dashspid.com. Customers visit, type pickup and drop-off, get an instant price. No WhatsApp back and forth. Custom domains available on Pro.'},{header:'Instant automatic pricing',body:'Operator sets rates once. System calculates every order price automatically using real map data. No manual quoting. Every rider quotes the same price for the same job.'},{header:'WhatsApp bot 24/7',body:'The bot handles the full customer conversation: pickup, drop-off, price, payment, confirmation. Works while the operator sleeps. Available from Rider plan.'},{header:'Online payment before the rider moves',body:'Customers pay through Paystack before delivery starts. Money lands in the operator account immediately. No cash, no bank transfer after delivery, no chasing, no ghosting. Payment is confirmed before the rider moves.'},{header:'Operations dashboard',body:'All orders in one place: pending, in transit, delivered. Revenue analytics. Rider performance. Missed orders. CSV export for business clients.'},{header:'Live tracking link',body:'Every order gets a tracking link automatically. Customer checks it themselves. No more where-is-my-order calls.'},{header:'Daily WhatsApp revenue report',body:'Every evening -- today orders, revenue, pending. Automatic. No logging into the app. The report comes to the operator.'},{header:'Other features',body:'',bullets:['Rider management -- add riders, assign orders, track status','Coupon and discount codes','Customer records and order history (Growth+)','Bulk order import via CSV','Support ticket system','Custom domain (Pro only)','Referral programme']},{callout:'On a phone call, never list all features. Pick the one or two most relevant to this specific operator pain and go deep on those.'}],quiz:[{q:'From which plan does the automated WhatsApp bot become available?',options:['Free (Starter)','Rider plan','Growth plan','Pro plan only'],answer:1,exp:'The full automated WhatsApp bot is included from the Rider plan (N5,999 per month) and above.'},{q:'When does the operator receive payment from a Dashspid order?',options:['48 hours after delivery','End of the week','Immediately when the customer pays -- before the rider moves','End of the month'],answer:2,exp:'Instant payout. When a customer pays, money lands in the operator account immediately. No settlement delay.'},{q:'What does the daily WhatsApp report contain?',options:['A list of new features','Today orders, revenue, and pending deliveries -- sent automatically each evening','Instructions on how to use the app','Rider contact numbers'],answer:1,exp:'The daily WhatsApp report is automatic -- orders, revenue, and pending. It arrives without the operator doing anything.'},{q:'Custom domain support is available on which plan?',options:['Growth','Free (Starter)','Rider','Pro'],answer:3,exp:'Custom domain support is a Pro plan exclusive feature.'},{q:'On a call, how many features should you pitch deeply?',options:['As many as possible','5 to 6 features','1 to 2 -- go deep on the most relevant ones','All 15 features'],answer:2,exp:'One feature explained well beats five features listed quickly. Pick what is most relevant to this person\'s pain.'}]},{id:'pricing',title:'Pricing -- Cold',tag:'Know every number',content:[{header:'The four plans -- know these without thinking',body:''},{type:'table',headers:['Plan','Monthly','Quarterly','Orders per month','Riders'],rows:[['Free (Starter)','N0','N0','30','0 -- no bot'],['Rider','N5,999','N14,997','250','1 -- bot included'],['Growth','N10,799','N26,997','750','Up to 5 -- bot included'],['Pro','N23,999','N59,997','Unlimited','Unlimited -- multi-agent']]},{header:'The most important number',body:'2.5% -- the transaction fee on every order. Compare to Bolt 20%. On N500,000 monthly revenue, Dashspid takes N12,500. Bolt takes N100,000. That is N87,500 every month staying in the operator pocket.'},{header:'The free trial -- use this every time',body:'Every new signup gets 30 days on the Growth plan completely free. N10,799 value. No card required. No commitment. This is the strongest thing you can say when someone hesitates.'},{callout:'You get the full Growth plan -- WhatsApp bot, 750 orders, analytics -- completely free for 30 days. No card. If you do not like it, you never pay a naira. But you will like it.'}],quiz:[{q:'What is the monthly price of the Rider plan?',options:['N4,999','N5,999','N8,999','N10,799'],answer:1,exp:'N5,999 per month. Quarterly is N14,997.'},{q:'What is the monthly price of the Growth plan?',options:['N8,999','N9,999','N10,799','N12,999'],answer:2,exp:'N10,799 per month. Quarterly is N26,997.'},{q:'What is the monthly price of the Pro plan?',options:['N19,999','N21,999','N23,999','N25,999'],answer:2,exp:'N23,999 per month. Quarterly is N59,997.'},{q:'What is the transaction fee on all Dashspid-processed payments?',options:['5%','3%','2.5%','1%'],answer:2,exp:'2.5% on every platform-processed payment. Bolt takes 20%. That difference is everything.'},{q:'The free trial gives a new user how many days of which plan?',options:['14 days of Rider plan','30 days of Growth plan','7 days of Pro plan','60 days of Starter plan'],answer:1,exp:'30 days of the Growth plan (N10,799 value), no card required.'},{q:'How many orders per month does the Growth plan allow?',options:['250','500','750','Unlimited'],answer:2,exp:'750 orders per month on Growth. Rider gets 250. Pro is unlimited.'},{q:'On N500,000 GMV in a month -- Dashspid takes vs Bolt?',options:['Dashspid N25,000 / Bolt N50,000','Dashspid N12,500 / Bolt N100,000','Dashspid N5,000 / Bolt N100,000','Dashspid N12,500 / Bolt N75,000'],answer:1,exp:'Dashspid: 2.5% of N500,000 = N12,500. Bolt: 20% of N500,000 = N100,000. That is N87,500 extra per month in the operator pocket.'},{q:'How many riders can a Growth plan account have?',options:['1 rider','3 riders','5 riders','Unlimited'],answer:2,exp:'Up to 5 riders on Growth. Rider plan allows 1. Pro is unlimited.'}]},{id:'hub',title:'Rider Hub and Shield',tag:'The rider pitch',content:[{header:'What is the Rider Hub?',body:'A completely separate experience inside Dashspid built for riders rather than operators. While the operator dashboard is about managing a business, the Rider Hub is about belonging to a community, being recognised for your work, and being supported when things go wrong.'},{header:'Dashspid Shield -- the most powerful pitch for riders',body:'Bolt does not care if you have an accident. Dashspid does. A portion of every subscription goes into a welfare fund.',bullets:['3 to 5 months paid -- N50,000 injury support / N200,000 death benefit','6 to 8 months paid -- N100,000 injury / N400,000 death benefit','9 to 11 months paid -- N150,000 injury / N600,000 death benefit','12 to 17 months paid -- N200,000 injury / N800,000 death benefit','18+ months paid -- N250,000 injury / N1,000,000 death benefit']},{callout:'Minimum 3 months on a paid plan before the first claim. Road accidents only. Police report or hospital document required.'},{header:'Membership tier -- based on paid plan time, not orders',body:'',bullets:['Bronze: 0 to 3 months on a paid plan','Silver: 3 to 6 months on a paid plan','Gold: 6 to 12 months -- accident support and family support activate','Platinum: 12+ months -- bike insurance unlocks']},{header:'Other Hub features to mention to riders',body:'',bullets:['Breakdown SOS -- one tap alerts nearby riders with your location if you are stuck','Membership card -- digital card with name, tier, rating, member ID','Community feed -- route tips, fuel prices, open orders, questions','Passing board -- pass orders you cannot take to the network, others claim them','Recognition -- Rider of the Week from real data, weekly leaderboard','Events -- official meetups, safety training, annual Rider Awards','Know your rights -- LASTMA, seizure, permits -- all plain English in the app']}],quiz:[{q:'What is the death benefit for a rider on a paid plan for 18+ months?',options:['N200,000','N500,000','N800,000','N1,000,000'],answer:3,exp:'N1,000,000 death benefit for 18+ months of paid membership. This is the maximum Shield payout.'},{q:'What determines a rider tier on Dashspid?',options:['How many orders completed','How long the business has been on a paid plan','Their star rating','How many riders referred'],answer:1,exp:'Tier is based entirely on time on a paid plan. Not orders. Not activity. Paid tenure.'},{q:'When does accident support and family support activate?',options:['Bronze (day 1)','Silver (3 months)','Gold (6 months on a paid plan)','Platinum (12 months)'],answer:2,exp:'Accident support and family support activate at Gold tier -- 6 months on a paid plan.'},{q:'Minimum duration before a rider can make their first Shield claim?',options:['1 month','2 months','3 months','6 months'],answer:2,exp:'Minimum 3 months on a paid plan before making a first claim.'},{q:'What is the Breakdown SOS feature?',options:['A way to cancel an order','One tap alerts nearby riders in the network with the stuck rider location','A phone line to call Dashspid support','A way to claim insurance immediately'],answer:1,exp:'Breakdown SOS broadcasts to nearby riders in the network with the stranded rider location. One tap and help is on the way.'},{q:'Rider of the Week is selected by:',options:['Community votes','A random draw','Automatically by Dashspid from real data -- orders, rating, community activity','The highest-paying operator'],answer:2,exp:'Rider of the Week is auto-generated from real platform data. Not a vote.'}]},{id:'callflow',title:'The Call Flow',tag:'Step by step',content:[{header:'Step 1 -- Open with their pain, not your product',body:'FOR RIDERS: Quick one -- how do you handle it when a customer says they will transfer you after delivery, and then stops picking your calls? Because that is the number one thing riders deal with right now. FOR LOGISTICS: Quick question -- how do you know which of your riders is performing and which one is holding your business back? NEVER start with your name, the company name, or a product feature.'},{header:'Step 2 -- Get confirmation',body:'Does that sound familiar? Is that something you deal with? Let them talk. The more they describe their own problem, the easier the rest of the call is. Do not skip this.'},{header:'Step 3 -- Introduce Dashspid briefly',body:'Dashspid is a platform built for Nigerian delivery operators. It gives you your own branded ordering website, handles payments automatically before the rider moves, and shows you your whole operation in one dashboard. Then pivot immediately to the one feature most relevant to their pain.'},{header:'Step 4 -- Land one feature deeply',body:'Do not list features. Pick the most relevant one and explain it so clearly they can picture it. One feature explained well beats five features listed quickly.'},{header:'Step 5 -- Mention the Shield for riders',body:'Bolt does not care if you have an accident. Dashspid does. Every rider on a paid plan is part of our Shield welfare fund. Say it clearly and let it land.'},{header:'Step 6 -- Handle objections',body:'Know the objections cold. Every objection is a question in disguise. Answer it, then re-engage.'},{header:'Step 7 -- Close',body:'Let me send you the link right now on WhatsApp and we sign up together while we are on the call. 10 minutes. No card. First month Growth plan completely free. Get the WhatsApp number. Send the link before you hang up. Follow up in exactly 48 hours.'},{callout:'End every call with ONE of three things: a signup, their WhatsApp number, or a specific callback time. Never just say goodbye.'}],quiz:[{q:'How should you open a call with a solo rider?',options:['Introduce yourself and list Dashspid features','Ask if they have heard of Dashspid','Open with their pain -- How do you handle customers who say they will transfer after delivery and then ghost?','Ask how many orders they do per day'],answer:2,exp:'Always open with their pain, not your product. The rider should think you understand their world before you mention Dashspid.'},{q:'How many features should you pitch deeply on a single call?',options:['As many as possible','5 to 6 to cover all bases','1 to 2 maximum -- the most relevant ones','All 15 features'],answer:2,exp:'One feature explained well beats five features listed quickly. Pick what is most relevant to this specific person.'},{q:'A prospect says I am busy, I cannot talk now. What do you say?',options:['No problem, I will call back sometime','Completely understand. When is a better time to call today? I will be quick.','I will just email you.','This will only take 2 seconds.'],answer:1,exp:'Always get a specific callback time. Never accept I am busy and hang up without getting a time.'},{q:'What is the goal of Step 2?',options:['To tell them how much Dashspid costs','To make them describe their own pain -- the more they talk about it, the easier the pitch becomes','To list the features','To close the sale immediately'],answer:1,exp:'When a prospect describes their own problem, they are selling themselves on the need for a solution.'},{q:'What are the three acceptable ways to end a call?',options:['Promise to send information by email','A completed signup, their WhatsApp number, or a specific callback time','Just say goodbye and try again next week','Ask them to visit the website on their own'],answer:1,exp:'Every call must end with one of these three things. Never leave a call with nothing.'}]},{id:'roleplay',title:'Live Call Practice',tag:'AI roleplay',isRoleplay:true},{id:'close',title:'The Close and Follow-Up',tag:'Finish strong',content:[{header:'Primary close -- aim for signup on the call',body:'Look -- the easiest thing to do right now is let me send you the link on WhatsApp and we sign up together while we are on the call. It takes 10 minutes. Business name, your pricing, your page is live. No card. First month Growth plan is completely free -- N10,799 value. Can we do it now?'},{header:'If they will not sign up on the call',body:'No problem. Let me send you the link right now -- I will WhatsApp it before we hang up. Sign up today -- it is free, no card. I will call you back in exactly 2 days. What is your WhatsApp number?'},{header:'WhatsApp message to send immediately',body:'Hey [name], it is [your name] from Dashspid. Here is your link: dashspid.com. Sign up -- first month completely free, no card. If you are not happy after 30 days, you pay nothing. I will call you in 2 days. Any questions just reply here.'},{header:'Follow-up -- non-negotiable',body:'',bullets:['Send the dashspid.com signup link via WhatsApp BEFORE you hang up -- not after','Follow up in exactly 48 hours -- not 3 days, not next week','Log every contact: name, number, area, outcome, follow-up date','High-value logistics company that showed strong interest -- call, not WhatsApp']},{callout:'Warm leads go cold fast. The follow-up is as important as the call. Most conversions happen on the second or third touch.'}],quiz:[{q:'What is the best outcome of a call?',options:['Getting their email address','A completed signup or their WhatsApp number with a link sent immediately','Promising to follow up in a week','Sending them a PDF about Dashspid'],answer:1,exp:'The ideal is a signup during the call. If they cannot do it right then -- especially solo riders on the road -- the next best outcome is their WhatsApp number with the dashspid.com signup link sent before you hang up. Email and PDFs are weak endings. Always leave with something actionable.'},{q:'When should you send the prospect the Dashspid signup link (dashspid.com) via WhatsApp?',options:['After the call once you finish your notes','Before you hang up -- send it while they are still on the call','The following day during follow-up','Only if they specifically request the link'],answer:1,exp:'Send them the dashspid.com signup link on WhatsApp before you hang up. Not after the call -- before. If you wait, they move on and the link never gets opened.'},{q:'How long after the initial call should you follow up?',options:['1 week','3 days','Exactly 48 hours','Whenever you have time'],answer:2,exp:'Exactly 48 hours. Not 3 days. Not next week. 48 hours keeps the conversation warm.'},{q:'A logistics company with 8 riders showed strong interest but did not sign up. How do you follow up?',options:['Send a WhatsApp like everyone else','Call them personally -- these are high-value prospects worth a real conversation','Email them a PDF','Wait for them to reach out'],answer:1,exp:'High-value logistics companies deserve a personal phone call follow-up. These are Growth or Pro plan prospects worth N10,799 to N23,999 per month.'}]}];
-
-  const SCENARIOS=[{prospect:'Dispatch rider, Lagos',objection:'I already use WhatsApp and it works fine for me.'},{prospect:'Logistics company owner, Ikeja',objection:'I do not trust online payment. My customers prefer cash on delivery.'},{prospect:'Solo rider, Lekki',objection:'I am already on Bolt and InDrive. I do not need anything else.'},{prospect:'Dispatch rider, Surulere',objection:'It sounds too complicated. I am not tech savvy.'},{prospect:'Logistics company owner, Ajah',objection:'How much does it cost? I cannot afford software right now.'}];
+  const WEEK_DATA = <%- JSON.stringify(weekData) %>;
+  const WEEK_MODE = <%- JSON.stringify(weekMode) %>; // 'gate' (Week 1, hard-blocks /home) or 'weekly' (2-12, ongoing)
+  const MODULES = WEEK_DATA.modules;
+  const SCENARIOS = WEEK_DATA.scenarios;
 
   let completed = <%- JSON.stringify(initialCompleted || {}) %>;
   let currentModuleIdx = 0;
@@ -122,7 +117,7 @@
     fetch('/training/progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completedModules: completed })
+      body: JSON.stringify({ completedModules: completed, week: WEEK_DATA.weekNumber })
     }).catch(() => {});
   }
 
@@ -204,12 +199,28 @@
     }, 1000);
   }
 
+  // Every content block is one of: {type:'table',headers,rows},
+  // {callout}, {example:{label,text}}, {script:{label,text,response}},
+  // {header,steps:[{num,title,body}]}, or {header,body,bullets} — normalized
+  // server-side in services/trainingWeeks.js regardless of which raw field
+  // names that particular week's source data used.
   function renderContent(content) {
     return content.map(block => {
       if (block.type === 'table') {
         return `<div class="card tr-card"><div class="table-scroll"><table class="history-table"><tr>${block.headers.map(h => `<th>${h}</th>`).join('')}</tr>${block.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table></div></div>`;
       }
       if (block.callout) return `<div class="card tr-card"><div class="tr-callout">${block.callout}</div></div>`;
+      if (block.example) return `<div class="card tr-card"><div class="tr-example"><div class="tr-example-label">${block.example.label}</div><div class="tr-example-text">${block.example.text}</div></div></div>`;
+      if (block.script) {
+        let html = `<div class="card tr-card"><div class="tr-script"><div class="tr-script-label">${block.script.label}</div><div class="tr-script-text">${block.script.text}</div>`;
+        if (block.script.response) html += `<div class="tr-script-response">${block.script.response}</div>`;
+        html += '</div></div>';
+        return html;
+      }
+      if (block.steps) {
+        const stepsHtml = block.steps.map(s => `<div class="tr-step"><div class="tr-step-num">${s.num}</div><div class="tr-step-body"><strong>${s.title}</strong><p>${s.body}</p></div></div>`).join('');
+        return `<div class="card tr-card">${block.header ? `<div class="tr-card-header">${block.header}</div>` : ''}<div class="tr-card-body"><div class="tr-steps">${stepsHtml}</div></div></div>`;
+      }
       let html = `<div class="card tr-card">${block.header ? `<div class="tr-card-header">${block.header}</div>` : ''}<div class="tr-card-body">`;
       if (block.body) html += `<p>${block.body}</p>`;
       if (block.bullets) html += `<ul class="tr-bullets">${block.bullets.map(b => `<li>${b}</li>`).join('')}</ul>`;
@@ -302,6 +313,8 @@
   }
 
   function showRoleplay() {
+    const m = MODULES[currentModuleIdx];
+    document.getElementById('rpTitle').textContent = m.title || 'Live Call Practice';
     showScreen('roleplay');
     currentScenarioIdx = 0;
     loadScenario();
@@ -340,7 +353,7 @@
       const res = await fetch('/training/roleplay-feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: s, response: text })
+        body: JSON.stringify({ scenario: s, response: text, week: WEEK_DATA.weekNumber })
       });
       const data = await res.json();
       if (data.ok && data.feedback) feedbackText = data.feedback;
@@ -360,16 +373,29 @@
   }
 
   function finishRoleplay() {
-    completed['roleplay'] = true;
+    const m = MODULES[currentModuleIdx];
+    completed[m.id] = true;
     saveProgress();
     updateProgress();
-    const nextIdx = MODULES.findIndex(m => m.id === 'roleplay') + 1;
+    const nextIdx = currentModuleIdx + 1;
     if (nextIdx >= MODULES.length) { showCert(); return; }
     showModule(nextIdx);
   }
 
   function showCert() {
     document.getElementById('certDate').textContent = 'Completed: ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const wn = WEEK_DATA.weekNumber;
+    document.getElementById('certWeekLabel').textContent = wn === 12
+      ? 'Advanced Programme Complete — Weeks 2-12'
+      : 'Week ' + wn + ' Complete — ' + WEEK_DATA.title;
+    const nextMsg = document.getElementById('certNextMsg');
+    if (WEEK_MODE === 'gate') {
+      nextMsg.textContent = 'You are ready. Make the calls.';
+    } else if (wn >= 12) {
+      nextMsg.textContent = 'You have completed the full 12-week programme. Keep making calls.';
+    } else {
+      nextMsg.textContent = 'Week ' + (wn + 1) + ' unlocks next Monday.';
+    }
     showScreen('cert');
   }
 
@@ -378,7 +404,11 @@
     btn.disabled = true;
     btn.textContent = 'Please wait...';
     document.getElementById('loaderOverlay').classList.add('active');
-    fetch('/training/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    fetch('/training/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: WEEK_DATA.weekNumber })
+    })
       .then(r => r.json())
       .then(data => { window.location.href = data.redirect || '/home'; })
       .catch(() => { window.location.href = '/home'; });

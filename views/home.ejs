@@ -61,6 +61,28 @@
       <div class="home-tile-arrow">→</div>
     </a>
 
+    <% if (weeklyTraining && weeklyTraining.done) { %>
+      <a href="/weekly-training" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Training Programme Complete</div>
+          <div class="home-tile-sub">All 12 weeks finished — view your certificate</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } else if (weeklyTraining && weeklyTraining.available) { %>
+      <a href="/weekly-training" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Week <%= weeklyTraining.weekNumber %> Training: <%= weeklyTraining.title %></div>
+          <div class="home-tile-sub">Available now — tap to start this week's lessons</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } else if (weeklyTraining) { %>
+      <div class="card">
+        <div class="card-sub">Week <%= weeklyTraining.weekNumber %> training (<%= weeklyTraining.title %>) unlocks <%= weeklyTraining.unlockDateFormatted %>.</div>
+      </div>
+    <% } %>
+
     <% if (role !== 'telemarketer') { %>
       <a href="/riders/new" class="home-tile">
         <div class="home-tile-body">

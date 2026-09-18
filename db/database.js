@@ -460,6 +460,53 @@ const db = {
     await pool.execute('UPDATE training_progress SET completed_at = ? WHERE marketer_id = ?', [completedAt, parseInt(marketerId)]);
     const [rows] = await pool.execute('SELECT * FROM training_progress WHERE marketer_id = ?', [parseInt(marketerId)]);
     return rows[0] || null;
+  },
+
+  // ── WEEKLY TRAINING PROGRAM (weeks 2-12, ongoing alongside normal work) ──
+
+  async getWeekProgress(marketerId, weekNumber) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0] || null;
+  },
+
+  // All weeks (2-12) this marketer has any record for — used to find the
+  // highest completed week when computing which week unlocks next.
+  async getAllWeekProgress(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM training_weeks_progress WHERE marketer_id = ? ORDER BY week_number ASC',
+      [parseInt(marketerId)]
+    );
+    return rows;
+  },
+
+  // now is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string — not SQL NOW().
+  async upsertWeekProgress(marketerId, weekNumber, completedModules, roleplayLog, now) {
+    await pool.execute(
+      `INSERT INTO training_weeks_progress (marketer_id, week_number, completed_modules, roleplay_log, started_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE completed_modules = VALUES(completed_modules), roleplay_log = VALUES(roleplay_log), updated_at = VALUES(updated_at)`,
+      [parseInt(marketerId), weekNumber, JSON.stringify(completedModules || {}), JSON.stringify(roleplayLog || []), now, now]
+    );
+    const [rows] = await pool.execute(
+      'SELECT * FROM training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0];
+  },
+
+  async completeWeekProgress(marketerId, weekNumber, completedAt) {
+    await pool.execute(
+      'UPDATE training_weeks_progress SET completed_at = ? WHERE marketer_id = ? AND week_number = ?',
+      [completedAt, parseInt(marketerId), weekNumber]
+    );
+    const [rows] = await pool.execute(
+      'SELECT * FROM training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0] || null;
   }
 };
 

@@ -12,6 +12,7 @@ const { lagosParts, today, nowLagos, daysSince, addDaysUTC, formatDate, formatDa
 const platformSync = require('./services/platformSync');
 const priorityLists = require('./services/priorityLists');
 const performance = require('./services/performance');
+const trainingWeeks = require('./services/trainingWeeks');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
@@ -250,7 +251,27 @@ app.get('/home', requireAuth, async (req, res) => {
   const missedCheckin = !submittedToday && isPastCheckinDeadline();
   const canCheckout = submittedToday && isAfterCheckoutTime();
 
-  res.render('home', { name: req.session.marketerName, role, openProspects, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar });
+  // Ongoing weekly training program (weeks 2-12) — field marketers never see
+  // this, and it's just a status line, not a gate, so a failure here should
+  // never break the home screen.
+  let weeklyTraining = null;
+  if (role === 'telemarketer') {
+    try {
+      const state = await getWeeklyTrainingState(req.session.marketerId);
+      if (state.done) {
+        weeklyTraining = { done: true };
+      } else {
+        const weekTitle = trainingWeeks.loadWeek(state.nextWeek).title;
+        weeklyTraining = state.isUnlocked
+          ? { available: true, weekNumber: state.nextWeek, title: weekTitle }
+          : { available: false, weekNumber: state.nextWeek, title: weekTitle, unlockDateFormatted: formatDateShort(state.unlockDate) };
+      }
+    } catch (err) {
+      console.error('Weekly training status error:', err.message);
+    }
+  }
+
+  res.render('home', { name: req.session.marketerName, role, openProspects, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar, weeklyTraining });
 });
 
 // Plain sign-out for "wrong person is logged in on this device" — ends the
@@ -341,47 +362,130 @@ app.get('/submitted', requireAuth, async (req, res) => {
   });
 });
 
-// ── TELEMARKETER TRAINING ACADEMY ────────────────────────────────────────────
+// ── TELEMARKETER TRAINING ACADEMY (WEEK 1 GATE + WEEKLY PROGRAM) ─────────────
 
 app.get('/training', requireAuth, async (req, res) => {
   if (req.session.trainingCompleted) return res.redirect('/home');
   const progress = await db.getTrainingProgress(req.session.marketerId);
   res.render('training', {
     name: req.session.marketerName,
+    weekData: trainingWeeks.loadWeek(1),
+    weekMode: 'gate',
     initialCompleted: progress ? progress.completed_modules : {}
   });
 });
 
+// Figures out which week (2-12) a telemarketer should be working on right
+// now: the week after their last completed one, but only once BOTH that
+// prior week is done AND the next Monday has arrived — never both at once,
+// and never skipping ahead just because time passed on an unfinished week.
+async function getWeeklyTrainingState(marketerId) {
+  const week1Progress = await db.getTrainingProgress(marketerId);
+  const week1CompletedAt = week1Progress ? week1Progress.completed_at : null;
+  if (!week1CompletedAt) return { locked: true, nextWeek: 2, unlockDate: null, isUnlocked: false };
+
+  const weekRows = await db.getAllWeekProgress(marketerId);
+  const byWeek = {};
+  weekRows.forEach(r => { byWeek[r.week_number] = r; });
+
+  let lastCompletedWeek = 1;
+  let lastCompletedDate = week1CompletedAt.slice(0, 10);
+  for (let w = 2; w <= trainingWeeks.TOTAL_WEEKS; w++) {
+    const row = byWeek[w];
+    if (row && row.completed_at) {
+      lastCompletedWeek = w;
+      lastCompletedDate = row.completed_at.slice(0, 10);
+    } else {
+      break;
+    }
+  }
+
+  const nextWeek = lastCompletedWeek + 1;
+  if (nextWeek > trainingWeeks.TOTAL_WEEKS) return { done: true, lastCompletedWeek };
+
+  const unlockDate = trainingWeeks.ceilToMonday(lastCompletedDate);
+  const nextWeekRow = byWeek[nextWeek] || null;
+
+  return {
+    done: false,
+    nextWeek,
+    unlockDate,
+    isUnlocked: today() >= unlockDate,
+    initialCompleted: nextWeekRow ? nextWeekRow.completed_modules : {}
+  };
+}
+
+app.get('/weekly-training', requireAuth, async (req, res) => {
+  if (req.session.marketerRole !== 'telemarketer') return res.redirect('/home');
+
+  const state = await getWeeklyTrainingState(req.session.marketerId);
+
+  if (state.done) {
+    return res.render('weekly-training-locked', { name: req.session.marketerName, done: true });
+  }
+  if (!state.isUnlocked) {
+    const nextWeekData = trainingWeeks.loadWeek(state.nextWeek);
+    return res.render('weekly-training-locked', {
+      name: req.session.marketerName,
+      done: false,
+      nextWeekNumber: state.nextWeek,
+      nextWeekTitle: nextWeekData.title,
+      unlockDateFormatted: formatDateLong(state.unlockDate)
+    });
+  }
+
+  res.render('training', {
+    name: req.session.marketerName,
+    weekData: trainingWeeks.loadWeek(state.nextWeek),
+    weekMode: 'weekly',
+    initialCompleted: state.initialCompleted || {}
+  });
+});
+
 app.post('/training/progress', requireAuth, async (req, res) => {
-  const { completedModules } = req.body;
-  const existing = await db.getTrainingProgress(req.session.marketerId);
-  const roleplayLog = existing ? existing.roleplay_log : [];
-  await db.upsertTrainingProgress(req.session.marketerId, completedModules, roleplayLog, nowLagos());
+  const { completedModules, week } = req.body;
+  const weekNumber = week || 1;
+  if (weekNumber === 1) {
+    const existing = await db.getTrainingProgress(req.session.marketerId);
+    await db.upsertTrainingProgress(req.session.marketerId, completedModules, existing ? existing.roleplay_log : [], nowLagos());
+  } else {
+    const existing = await db.getWeekProgress(req.session.marketerId, weekNumber);
+    await db.upsertWeekProgress(req.session.marketerId, weekNumber, completedModules, existing ? existing.roleplay_log : [], nowLagos());
+  }
   res.json({ ok: true });
 });
 
 app.post('/training/roleplay-feedback', requireAuth, async (req, res) => {
-  const { scenario, response: traineeResponse } = req.body;
+  const { scenario, response: traineeResponse, week } = req.body;
   if (!scenario || !traineeResponse) return res.status(400).json({ ok: false, error: 'Missing scenario or response.' });
+  const weekNumber = week || 1;
 
   const feedback = await getRoleplayFeedback(scenario, traineeResponse);
 
-  const existing = await db.getTrainingProgress(req.session.marketerId);
-  const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
-  roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
-  await db.upsertTrainingProgress(
-    req.session.marketerId,
-    existing ? existing.completed_modules : {},
-    roleplayLog,
-    nowLagos()
-  );
+  if (weekNumber === 1) {
+    const existing = await db.getTrainingProgress(req.session.marketerId);
+    const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
+    roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
+    await db.upsertTrainingProgress(req.session.marketerId, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
+  } else {
+    const existing = await db.getWeekProgress(req.session.marketerId, weekNumber);
+    const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
+    roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
+    await db.upsertWeekProgress(req.session.marketerId, weekNumber, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
+  }
 
   res.json({ ok: true, feedback });
 });
 
 app.post('/training/complete', requireAuth, async (req, res) => {
-  await db.completeTraining(req.session.marketerId, nowLagos());
-  req.session.trainingCompleted = true;
+  const { week } = req.body;
+  const weekNumber = week || 1;
+  if (weekNumber === 1) {
+    await db.completeTraining(req.session.marketerId, nowLagos());
+    req.session.trainingCompleted = true;
+    return res.json({ ok: true, redirect: '/home' });
+  }
+  await db.completeWeekProgress(req.session.marketerId, weekNumber, nowLagos());
   res.json({ ok: true, redirect: '/home' });
 });
 

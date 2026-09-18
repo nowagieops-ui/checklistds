@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <title>Training — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <% if (done) { %>
+      <div class="card">
+        <div class="card-title">Programme complete</div>
+        <div class="card-sub">You've finished all 12 weeks of the training programme. Nothing more unlocks — just keep making calls.</div>
+      </div>
+    <% } else { %>
+      <div class="card">
+        <div class="card-title">Week <%= nextWeekNumber %>: <%= nextWeekTitle %></div>
+        <div class="card-sub">This unlocks <%= unlockDateFormatted %>. Come back then to continue the programme.</div>
+      </div>
+    <% } %>
+
+    <a href="/home" class="logout-link">← Back to home</a>
+  </div>
+
+</body>
+</html>

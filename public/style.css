@@ -713,6 +713,19 @@ textarea { resize: vertical; min-height: 90px; }
 .training-page .tr-cs-item { background: var(--light); border-radius: 8px; padding: 10px 12px; }
 .training-page .tr-cs-label { font-size: 10px; font-weight: 700; color: var(--gray); letter-spacing: .4px; text-transform: uppercase; margin-bottom: 3px; }
 .training-page .tr-cs-value { font-size: 13px; font-weight: 700; color: var(--dark); }
+.training-page .tr-example { background: var(--light); border-radius: 10px; padding: 13px 15px; border: 1px solid var(--border); }
+.training-page .tr-example-label { font-size: 10px; font-weight: 800; color: var(--orange); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 6px; }
+.training-page .tr-example-text { font-size: 14px; color: var(--dark); line-height: 1.6; }
+.training-page .tr-script { background: var(--dark); border-radius: 12px; padding: 15px 17px; }
+.training-page .tr-script-label { font-size: 10px; font-weight: 800; color: var(--orange-light); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 6px; }
+.training-page .tr-script-text { font-size: 14px; color: #fff; line-height: 1.65; font-weight: 500; white-space: pre-line; }
+.training-page .tr-script-response { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12); white-space: pre-line; }
+.training-page .tr-steps { display: flex; flex-direction: column; gap: 10px; }
+.training-page .tr-step { display: flex; gap: 12px; align-items: flex-start; }
+.training-page .tr-step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--orange); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+.training-page .tr-step-body strong { font-size: 14px; font-weight: 700; color: var(--dark); display: block; margin-bottom: 3px; }
+.training-page .tr-step-body p { font-size: 13px; color: #555; line-height: 1.55; margin: 0; }
+.training-page .tr-week-badge { display: inline-block; background: var(--orange); color: #fff; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 20px; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 16px; }
 
 @media (max-width: 520px) {
   .training-page .tr-module-grid { grid-template-columns: 1fr; }
