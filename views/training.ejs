@@ -40,7 +40,6 @@
       <div id="quizQuestions"></div>
       <div id="quizScore" style="display:none"></div>
       <div style="display:flex;gap:10px;padding-bottom:40px;">
-        <button class="btn btn-outline" id="quizRetryBtn" style="display:none;width:auto;" onclick="backToModuleContent()">Review the material</button>
         <button class="btn" id="quizNextBtn" style="display:none;width:auto;" onclick="quizNext()">Continue</button>
         <button class="btn" id="quizSubmitBtn" style="width:auto;" onclick="submitQuiz()">Check My Answers</button>
       </div>
@@ -225,7 +224,6 @@
     document.getElementById('quizTitle').textContent = m.title + ' -- Quiz';
     document.getElementById('quizSub').textContent = m.quiz.length + ' questions. You need 80% to continue.';
     document.getElementById('quizScore').style.display = 'none';
-    document.getElementById('quizRetryBtn').style.display = 'none';
     document.getElementById('quizNextBtn').style.display = 'none';
     document.getElementById('quizSubmitBtn').style.display = '';
     renderQuizQuestions(m.quiz);
@@ -247,20 +245,34 @@
     const m = currentQuizData.module;
     let correct = 0;
     m.quiz.forEach((q, qi) => {
-      const selected = currentQuizData.answers[qi];
-      document.querySelectorAll(`[id^="opt-${qi}-"]`).forEach(el => el.classList.remove('selected'));
-      if (selected === q.answer) { document.getElementById(`opt-${qi}-${selected}`).classList.add('correct'); correct++; }
-      else { if (selected !== undefined) document.getElementById(`opt-${qi}-${selected}`).classList.add('wrong'); document.getElementById(`opt-${qi}-${q.answer}`).classList.add('correct'); }
-      document.getElementById(`exp-${qi}`).style.display = 'block';
+      if (currentQuizData.answers[qi] === q.answer) correct++;
     });
     currentQuizData.submitted = true;
     const pct = Math.round(correct / m.quiz.length * 100);
     const pass = pct >= 80;
-    document.getElementById('quizScore').innerHTML = `<div class="card tr-score-card"><div class="tr-score-big">${pct}%</div><div class="tr-score-label">${correct} of ${m.quiz.length} correct</div><div class="tr-score-msg ${pass ? 'pass' : 'fail'}">${pass ? 'Passed -- well done.' : 'Not quite. Review the answers above and try again.'}</div></div>`;
-    document.getElementById('quizScore').style.display = 'block';
     document.getElementById('quizSubmitBtn').style.display = 'none';
-    if (pass) document.getElementById('quizNextBtn').style.display = '';
-    else document.getElementById('quizRetryBtn').style.display = '';
+
+    if (pass) {
+      // Only reveal correct/wrong and explanations once she's actually
+      // passed — otherwise a fail becomes a way to learn the answer key
+      // instead of the material.
+      m.quiz.forEach((q, qi) => {
+        const selected = currentQuizData.answers[qi];
+        document.querySelectorAll(`[id^="opt-${qi}-"]`).forEach(el => el.classList.remove('selected'));
+        if (selected === q.answer) document.getElementById(`opt-${qi}-${selected}`).classList.add('correct');
+        document.getElementById(`exp-${qi}`).style.display = 'block';
+      });
+      document.getElementById('quizScore').innerHTML = `<div class="card tr-score-card"><div class="tr-score-big">${pct}%</div><div class="tr-score-label">${correct} of ${m.quiz.length} correct</div><div class="tr-score-msg pass">Passed -- well done.</div></div>`;
+      document.getElementById('quizScore').style.display = 'block';
+      document.getElementById('quizNextBtn').style.display = '';
+    } else {
+      // No answer reveal on a fail — just the score, then straight back to
+      // the module content to actually re-read it (read timer re-locks the
+      // quiz button for READ_TIME_SECONDS again from there).
+      document.getElementById('quizScore').innerHTML = `<div class="card tr-score-card"><div class="tr-score-big">${pct}%</div><div class="tr-score-label">${correct} of ${m.quiz.length} correct</div><div class="tr-score-msg fail">Not quite -- you need 80%. Taking you back to the material...</div></div>`;
+      document.getElementById('quizScore').style.display = 'block';
+      setTimeout(backToModuleContent, 2500);
+    }
   }
 
   // A failed quiz sends her back to re-read the module, not straight into
