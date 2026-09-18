@@ -266,12 +266,22 @@
       document.getElementById('quizScore').style.display = 'block';
       document.getElementById('quizNextBtn').style.display = '';
     } else {
-      // No answer reveal on a fail — just the score, then straight back to
-      // the module content to actually re-read it (read timer re-locks the
-      // quiz button for READ_TIME_SECONDS again from there).
-      document.getElementById('quizScore').innerHTML = `<div class="card tr-score-card"><div class="tr-score-big">${pct}%</div><div class="tr-score-label">${correct} of ${m.quiz.length} correct</div><div class="tr-score-msg fail">Not quite -- you need 80%. Taking you back to the material...</div></div>`;
+      // Mark which of HER OWN picks were wrong (so she knows what to focus
+      // on) without ever revealing what the correct answer actually was —
+      // that stays hidden until she passes, so a fail can't be used to
+      // learn the answer key instead of the material. No explanations
+      // either. Then straight back to the module content (read timer
+      // re-locks the quiz button for READ_TIME_SECONDS again from there).
+      m.quiz.forEach((q, qi) => {
+        const selected = currentQuizData.answers[qi];
+        document.querySelectorAll(`[id^="opt-${qi}-"]`).forEach(el => el.classList.remove('selected'));
+        if (selected !== undefined) {
+          document.getElementById(`opt-${qi}-${selected}`).classList.add(selected === q.answer ? 'correct' : 'wrong');
+        }
+      });
+      document.getElementById('quizScore').innerHTML = `<div class="card tr-score-card"><div class="tr-score-big">${pct}%</div><div class="tr-score-label">${correct} of ${m.quiz.length} correct</div><div class="tr-score-msg fail">Not quite -- you need 80%. The ones marked in red are what to focus on. Taking you back to the material...</div></div>`;
       document.getElementById('quizScore').style.display = 'block';
-      setTimeout(backToModuleContent, 2500);
+      setTimeout(backToModuleContent, 4000);
     }
   }
 
