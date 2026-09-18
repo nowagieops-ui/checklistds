@@ -97,7 +97,7 @@ function clientIp(req) {
   return (req.get('CF-Connecting-IP') || req.ip || '').replace('::ffff:', '');
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   if (!req.session.marketerId) return res.redirect('/');
   // Telemarketers must finish the training academy before reaching anything
   // else — field marketers are unaffected (trainingCompleted is set true for
@@ -106,6 +106,28 @@ function requireAuth(req, res, next) {
   if (!req.session.trainingCompleted && !req.path.startsWith('/training') && req.path !== '/sign-out') {
     return res.redirect('/training');
   }
+
+  // Same hard block for whichever week (2-12) is currently unlocked — a
+  // telemarketer can't reach anything else until she finishes it, exactly
+  // like Week 1. Re-checked once per calendar day (cached on the session)
+  // rather than on every request, since this can only change by a new
+  // Monday arriving, not by anything she does mid-day.
+  if (req.session.trainingCompleted && req.session.marketerRole === 'telemarketer'
+      && !req.path.startsWith('/weekly-training') && !req.path.startsWith('/training') && req.path !== '/sign-out') {
+    const checkDate = today();
+    if (req.session.weeklyGateCheckedDate !== checkDate) {
+      req.session.weeklyGateCheckedDate = checkDate;
+      try {
+        const state = await getWeeklyTrainingState(req.session.marketerId);
+        req.session.weeklyGateBlocked = !state.done && !!state.isUnlocked;
+      } catch (err) {
+        console.error('Weekly training gate check failed:', err.message);
+        req.session.weeklyGateBlocked = false; // fail open — never lock her out of real work over an error here
+      }
+    }
+    if (req.session.weeklyGateBlocked) return res.redirect('/weekly-training');
+  }
+
   next();
 }
 function requireManagement(req, res, next) {
@@ -486,6 +508,7 @@ app.post('/training/complete', requireAuth, async (req, res) => {
     return res.json({ ok: true, redirect: '/home' });
   }
   await db.completeWeekProgress(req.session.marketerId, weekNumber, nowLagos());
+  req.session.weeklyGateBlocked = false; // she just cleared it — don't wait for tomorrow's re-check to let her back in
   res.json({ ok: true, redirect: '/home' });
 });
 
