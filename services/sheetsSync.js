@@ -39,8 +39,8 @@ const TABS = [
   { id: 'P6', title: 'P6 New - Register' },
   { id: 'P1', title: 'P1 Registered - Activate' },
   { id: 'P2', title: 'P2 Activated - Share Link' },
-  { id: 'P3', title: 'P3 Link Shared - Get Customers' },
-  { id: 'P4', title: 'P4 Has Customers - First Order' },
+  { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit' },
+  { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order' },
   { id: 'P5', title: 'P5 Ordered - Repeat Order' },
   { id: 'DONE', title: 'Graduated' }
 ];
@@ -55,10 +55,19 @@ const FUNNEL_STAGES = [
   { id: 'P6', label: 'P6 Register' },
   { id: 'P1', label: 'P1 Activate' },
   { id: 'P2', label: 'P2 Share link' },
-  { id: 'P3', label: 'P3 Get customers' },
-  { id: 'P4', label: 'P4 First order' },
+  { id: 'P3', label: 'P3 Get customers to visit' },
+  { id: 'P4', label: 'P4 Get customers to order' },
   { id: 'P5', label: 'P5 Repeat order' }
 ];
+
+// Tabs renamed in a later version: new title -> the title it used to have. The
+// existing tab is renamed in place (never recreated) so its rows and
+// formatting are kept — otherwise the sync would create a fresh empty tab and
+// leave the old one behind, holding leads that are no longer updated.
+const RENAMED_TABS = {
+  'P3 Link Shared - Get Customers to Visit': 'P3 Link Shared - Get Customers',
+  'P4 Has Visitors - Get Customers to Order': 'P4 Has Customers - First Order'
+};
 
 const OUTCOMES = ['No answer', 'Busy - call back', 'Switched off', 'Wrong number', 'Reached', 'Interested', 'Not interested'];
 
@@ -392,6 +401,16 @@ async function ensureTabs(cfg, reasonCodes) {
   const meta = await sheetsRequest(cfg, 'get', '', { params: { fields: 'sheets.properties(sheetId,title)' } });
   const sheetIds = {};
   (meta.sheets || []).forEach(s => { sheetIds[s.properties.title] = s.properties.sheetId; });
+
+  const renames = TABS
+    .filter(t => RENAMED_TABS[t.title] && !(t.title in sheetIds) && (RENAMED_TABS[t.title] in sheetIds))
+    .map(t => ({ from: RENAMED_TABS[t.title], to: t.title }));
+  if (renames.length) {
+    await sheetsRequest(cfg, 'post', ':batchUpdate', {
+      data: { requests: renames.map(r => ({ updateSheetProperties: { properties: { sheetId: sheetIds[r.from], title: r.to }, fields: 'title' } })) }
+    });
+    renames.forEach(r => { sheetIds[r.to] = sheetIds[r.from]; delete sheetIds[r.from]; });
+  }
 
   const wanted = TABS.map(t => ({ title: t.title, kind: 'stage' })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
   const missing = wanted.filter(t => !(t.title in sheetIds));

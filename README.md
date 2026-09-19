@@ -123,8 +123,8 @@ Lets leads be bulk-pasted and calls logged in a Google Sheet instead of (or as w
 | P6 New - Register | Haven't registered yet — paste new leads here |
 | P1 Registered - Activate | Registered, not activated |
 | P2 Activated - Share Link | Activated, link not shared |
-| P3 Link Shared - Get Customers | Link shared, no customer activity |
-| P4 Has Customers - First Order | Customer activity, no first order |
+| P3 Link Shared - Get Customers to Visit | Link shared, no customer has visited yet — get customers to visit |
+| P4 Has Visitors - Get Customers to Order | Customers are visiting, no first order yet — get customers to place an order |
 | P5 Ordered - Repeat Order | Ordered, no repeat yet |
 | Graduated | Repeat customers — nothing left to chase |
 
