@@ -45,6 +45,21 @@ const TABS = [
   { id: 'DONE', title: 'Graduated' }
 ];
 
+// A read-only overview of every lead against every stage. Nobody types in it,
+// so the app can freely re-sort and rewrite it — unlike the stage tabs, where
+// rows must never move under someone who is typing.
+const FUNNEL_TITLE = 'Funnel Overview';
+const FUNNEL_COLS = 10; // A-J: Lead, Phone, Source, Current stage, then six stage columns
+const FUNNEL_HEADER_ROWS = 4; // header + Here / Done / Not-there-yet counts
+const FUNNEL_STAGES = [
+  { id: 'P6', label: 'P6 Register' },
+  { id: 'P1', label: 'P1 Activate' },
+  { id: 'P2', label: 'P2 Share link' },
+  { id: 'P3', label: 'P3 Get customers' },
+  { id: 'P4', label: 'P4 First order' },
+  { id: 'P5', label: 'P5 Repeat order' }
+];
+
 const OUTCOMES = ['No answer', 'Busy - call back', 'Switched off', 'Wrong number', 'Reached', 'Interested', 'Not interested'];
 
 const SOURCE_LABELS = {
@@ -69,6 +84,39 @@ function targetTabId(r) {
     case 'completed_order': return r.repeat_business_order_at ? 'DONE' : 'P5';
     default: return 'P6';
   }
+}
+
+// Index of the stage a lead is currently at; a graduated lead is past all six.
+function funnelStageIndex(rider) {
+  const id = targetTabId(rider);
+  return id === 'DONE' ? FUNNEL_STAGES.length : FUNNEL_STAGES.findIndex(s => s.id === id);
+}
+
+// Every lead x every stage: "Done" (already past it), "Here" (this is the
+// stage they're at — the one to call about), "Not yet" (hasn't reached it).
+// Sorted furthest-behind first, so the leads with the most left to do are at
+// the top. The counts rows give the "20 here, 46 done, 22 not yet" picture.
+function buildFunnelGrid(riders) {
+  const n = FUNNEL_STAGES.length;
+  const placed = riders
+    .map(r => ({ r, idx: funnelStageIndex(r) }))
+    .sort((a, b) => a.idx - b.idx || String(a.r.created_at).localeCompare(String(b.r.created_at)) || a.r.id - b.r.id);
+  const counts = pred => FUNNEL_STAGES.map((_, j) => String(placed.filter(x => pred(x.idx, j)).length));
+  const summaryRow = (label, cs) => [label, '', '', '', ...cs];
+  const grid = [
+    ['Lead', 'Phone', 'Source', 'Current stage', ...FUNNEL_STAGES.map(s => s.label)],
+    summaryRow('Here - to call now', counts((i, j) => i === j)),
+    summaryRow('Done - already past', counts((i, j) => i > j)),
+    summaryRow('Not there yet', counts((i, j) => i < j))
+  ];
+  placed.forEach(({ r, idx }) => {
+    grid.push([
+      cellText(r.name), cellText(r.phone), SOURCE_LABELS[r.channel] || r.channel || '',
+      idx >= n ? 'Graduated' : FUNNEL_STAGES[idx].label,
+      ...FUNNEL_STAGES.map((_, j) => (j < idx ? '✓ Done' : j === idx ? '● Here' : '– Not yet'))
+    ]);
+  });
+  return grid;
 }
 
 // The key gets mangled in many ways when pasted into an env-var panel:
@@ -313,14 +361,40 @@ function formatRequests(sheetId, reasonLabels) {
   ];
 }
 
-// Makes sure every stage tab exists (creating and formatting missing ones)
-// and returns a title -> sheetId map.
+function funnelFormatRequests(sheetId) {
+  const stageCols = { sheetId, startRowIndex: FUNNEL_HEADER_ROWS, startColumnIndex: 4, endColumnIndex: FUNNEL_COLS };
+  const rule = (text, bg, fg, bold) => ({
+    addConditionalFormatRule: {
+      index: 0,
+      rule: {
+        ranges: [stageCols],
+        booleanRule: {
+          condition: { type: 'TEXT_CONTAINS', values: [{ userEnteredValue: text }] },
+          format: { backgroundColor: bg, textFormat: Object.assign({ foregroundColor: fg }, bold ? { bold: true } : {}) }
+        }
+      }
+    }
+  });
+  return [
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: FUNNEL_HEADER_ROWS } }, fields: 'gridProperties.frozenRowCount' } },
+    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: FUNNEL_HEADER_ROWS, startColumnIndex: 0, endColumnIndex: FUNNEL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
+    { repeatCell: { range: { sheetId, startRowIndex: FUNNEL_HEADER_ROWS, startColumnIndex: 1, endColumnIndex: 2 }, cell: { userEnteredFormat: { numberFormat: { type: 'TEXT' } } }, fields: 'userEnteredFormat.numberFormat' } },
+    // Done = green, Here = black (the ones to call), Not yet = gray.
+    rule('Done', { red: 0.83, green: 0.93, blue: 0.83 }, { red: 0.1, green: 0.4, blue: 0.1 }, false),
+    rule('Here', { red: 0.1, green: 0.1, blue: 0.1 }, { red: 1, green: 1, blue: 1 }, true),
+    rule('Not yet', { red: 0.9, green: 0.9, blue: 0.9 }, { red: 0.55, green: 0.55, blue: 0.55 }, false)
+  ];
+}
+
+// Makes sure every stage tab and the overview tab exist (creating and
+// formatting missing ones) and returns a title -> sheetId map.
 async function ensureTabs(cfg, reasonCodes) {
   const meta = await sheetsRequest(cfg, 'get', '', { params: { fields: 'sheets.properties(sheetId,title)' } });
   const sheetIds = {};
   (meta.sheets || []).forEach(s => { sheetIds[s.properties.title] = s.properties.sheetId; });
 
-  const missing = TABS.filter(t => !(t.title in sheetIds));
+  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage' })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
+  const missing = wanted.filter(t => !(t.title in sheetIds));
   if (missing.length) {
     const res = await sheetsRequest(cfg, 'post', ':batchUpdate', {
       data: { requests: missing.map(t => ({ addSheet: { properties: { title: t.title } } })) }
@@ -329,7 +403,9 @@ async function ensureTabs(cfg, reasonCodes) {
     // Cosmetic only — a formatting failure must never stop the sync itself.
     try {
       const reasonLabels = reasonCodes.map(r => r.label);
-      const requests = missing.flatMap(t => formatRequests(sheetIds[t.title], reasonLabels));
+      const requests = missing.flatMap(t => (t.kind === 'funnel'
+        ? funnelFormatRequests(sheetIds[t.title])
+        : formatRequests(sheetIds[t.title], reasonLabels)));
       await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     } catch (err) {
       console.error('sheetsSync: tab formatting failed:', err.message);
@@ -419,7 +495,10 @@ async function runSync() {
     const sheetIds = await ensureTabs(cfg, reasonCodes);
 
     // Read every stage tab in one request.
-    const read = await sheetsRequest(cfg, 'get', batchGetPath(TABS.map(t => tabRange(t.title, 'A1:O'))));
+    const read = await sheetsRequest(cfg, 'get', batchGetPath([
+      ...TABS.map(t => tabRange(t.title, 'A1:O')),
+      tabRange(FUNNEL_TITLE, 'A1:J') // last, so the stage tabs keep their indexes
+    ]));
     const tabProblems = [];
     const headerWrites = [];
     const tabData = {}; // tab id -> data rows (header excluded); row n is at index n-2
@@ -646,6 +725,19 @@ async function runSync() {
         writes.push({ range: tabRange(tabTitle(tabId), `K${from}:O${to}`), values });
       });
     });
+
+    // The overview tab is rewritten only when its content actually changed
+    // (a lead advancing a stage, a new lead) — extra old rows are blanked.
+    const funnelGrid = buildFunnelGrid(ridersAfter);
+    const funnelCurrent = ((read.valueRanges[TABS.length] && read.valueRanges[TABS.length].values) || [])
+      .map(r => Array.from({ length: FUNNEL_COLS }, (_, k) => cellText(r[k])));
+    const funnelOut = funnelGrid.concat(
+      Array.from({ length: Math.max(0, funnelCurrent.length - funnelGrid.length) }, () => new Array(FUNNEL_COLS).fill(''))
+    );
+    const sameFunnel = funnelOut.length === funnelCurrent.length &&
+      funnelOut.every((row, i) => row.every((v, k) => v === funnelCurrent[i][k]));
+    if (!sameFunnel) writes.push({ range: tabRange(FUNNEL_TITLE, `A1:J${funnelOut.length}`), values: funnelOut });
+
     if (writes.length) {
       await sheetsRequest(cfg, 'post', '/values:batchUpdate', { data: { valueInputOption: 'RAW', data: writes } });
     }
@@ -687,7 +779,7 @@ async function runSync() {
     ];
     stats.deleted = await deleteRows(cfg, sheetIds, toRemove);
 
-    return { ok: true, rows: results.length, tabProblems, ...stats };
+    return { ok: true, rows: results.length, funnelLeads: funnelGrid.length - FUNNEL_HEADER_ROWS, tabProblems, ...stats };
   } finally {
     running = false;
   }

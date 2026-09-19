@@ -128,6 +128,8 @@ Lets leads be bulk-pasted and calls logged in a Google Sheet instead of (or as w
 | P5 Ordered - Repeat Order | Ordered, no repeat yet |
 | Graduated | Repeat customers — nothing left to chase |
 
+A read-only **Funnel Overview** tab (last) shows every lead against every stage: **green ✓ Done** (already past that stage), **black ● Here** (the stage they're at — the ones to call), **gray – Not yet**. Rows are sorted furthest-behind first, and three summary rows at the top give the counts per stage ("Here / Done / Not there yet"), matching the dashboard funnel. Nobody types in it — the app rewrites it whenever something changes — so leads are never duplicated across the work tabs and can't be called twice from two places.
+
 All leads appear, whichever channel sourced them (see the **Source** column). The tabs are created and formatted (frozen header, dropdowns, plain-text phone column, filter) automatically on the first sync.
 
 **One-time setup**
