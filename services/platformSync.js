@@ -187,7 +187,7 @@ async function isBusinessActivated(supabase, business) {
 // works — not a sale, so it never counts toward first/completed/repeat order.
 // The customer_id filter alone wasn't enough: those walkthrough orders are
 // placed through the storefront and do have a customer.
-const TEST_ORDER_WINDOW_MS = 10 * 60 * 1000;
+const TEST_ORDER_WINDOW_MS = 20 * 60 * 1000;
 
 function realOrders(orders, businessCreatedAt) {
   if (!businessCreatedAt) return orders; // can't tell when they registered — don't guess
