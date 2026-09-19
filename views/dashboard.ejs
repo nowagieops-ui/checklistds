@@ -444,6 +444,9 @@
       result.textContent = '';
       try {
         var res = await fetch('/management/sync-sheet', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+        if (res.redirected || (res.headers.get('content-type') || '').indexOf('json') === -1) {
+          throw new Error('Your management session expired (the app restarts on every deploy) — reload this page and log in again, then retry.');
+        }
         var data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || 'Sync failed');
         result.textContent = 'Read ' + data.rows + ' row(s) · created ' + data.created + ' lead(s) · linked ' + data.linked +
