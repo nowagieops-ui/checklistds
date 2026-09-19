@@ -342,7 +342,18 @@ async function ensureTabs(cfg, reasonCodes) {
 
 let running = false;
 
-async function logCall(rider, fields, reasonCodes, now) {
+// Who a call typed into the sheet counts for. The sheet has no logins, so it
+// can't know who typed — but it's the telemarketer's tool, so calls are
+// credited to SHEETS_DEFAULT_STAFF_ID, not to whoever originally sourced the
+// lead ("Assigned To" is the lead's owner; a call Ruth makes on a lead a field
+// marketer sourced is Ruth's call). Falls back to the lead's owner only when
+// no working staff member is configured.
+function callerId(rider, cfg, staffList) {
+  const configured = cfg.defaultStaffId && staffList.some(s => s.id === cfg.defaultStaffId);
+  return configured ? cfg.defaultStaffId : rider.added_by_marketer_id;
+}
+
+async function logCall(rider, staffId, fields, reasonCodes, now) {
   const before = await db.getRider(rider.id);
   if (fields.linkShared) await db.confirmLinkShared(rider.id, now);
   const after = await db.getRider(rider.id);
@@ -350,7 +361,7 @@ async function logCall(rider, fields, reasonCodes, now) {
   const noteText = (reason.extraNote + fields.feedback).trim();
   await db.addSheetFollowup({
     rider_id: rider.id,
-    staff_id: after.added_by_marketer_id,
+    staff_id: staffId,
     stage_before: before.funnel_stage,
     stage_after: after.funnel_stage,
     reason_code: reason.code,
@@ -566,7 +577,7 @@ async function runSync() {
           let callHashToStore = mapping.call_hash;
           if (callHash !== mapping.call_hash) {
             if (callBlockUsed) {
-              await logCall(rider, callFields, reasonCodes, now);
+              await logCall(rider, callerId(rider, cfg, staffList), callFields, reasonCodes, now);
               stats.callsLogged++;
             }
             callHashToStore = callHash;
