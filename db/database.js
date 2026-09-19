@@ -543,14 +543,11 @@ const db = {
     );
   },
 
-  // Every lead the sheet covers: telemarketer-channel prospects, plus anything
-  // that was already on the sheet.
+  // Every lead, whatever channel sourced it — the telemarketer works the whole
+  // company-wide funnel, so the sheet's stage tabs cover all of it. Oldest
+  // first, so first-time appends land in the same order the app's queues use.
   async getRidersForSheet() {
-    const [rows] = await pool.execute(
-      `SELECT r.* FROM riders r
-       LEFT JOIN sheet_sync_rows s ON s.rider_id = r.id
-       WHERE r.channel = 'telemarketer' OR s.rider_id IS NOT NULL`
-    );
+    const [rows] = await pool.execute('SELECT * FROM riders ORDER BY created_at ASC, id ASC');
     return rows;
   },
 

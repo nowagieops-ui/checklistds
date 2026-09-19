@@ -116,13 +116,27 @@ The roleplay module's AI feedback needs `GEMINI_API_KEY` set (see above); withou
 
 Lets leads be bulk-pasted and calls logged in a Google Sheet instead of (or as well as) the app. Every ~3 minutes the app reads the sheet and applies it; the dashboard's "Google Sheet sync → Sync now" button forces it immediately.
 
+**One tab per stage.** The sheet mirrors the app's priority lists, so a telemarketer opens a tab, calls everyone on it, and logs the outcome in the row. When a lead advances on the platform, the sync moves their row to the next stage's tab — the leads still on **P6** are exactly the ones who haven't registered yet, and that tab shrinks as they do.
+
+| Tab | Who's on it |
+|---|---|
+| P6 New - Register | Haven't registered yet — paste new leads here |
+| P1 Registered - Activate | Registered, not activated |
+| P2 Activated - Share Link | Activated, link not shared |
+| P3 Link Shared - Get Customers | Link shared, no customer activity |
+| P4 Has Customers - First Order | Customer activity, no first order |
+| P5 Ordered - Repeat Order | Ordered, no repeat yet |
+| Graduated | Repeat customers — nothing left to chase |
+
+All leads appear, whichever channel sourced them (see the **Source** column). The tabs are created and formatted (frozen header, dropdowns, plain-text phone column, filter) automatically on the first sync.
+
 **One-time setup**
 
-1. Run `db/migrations/009_google_sheet_sync.sql`.
+1. Run `db/migrations/009_google_sheet_sync.sql`, then `010_reset_sheet_sync_for_stage_tabs.sql`.
 2. In [Google Cloud Console](https://console.cloud.google.com/): create a project → enable the **Google Sheets API** → *IAM & Admin → Service Accounts* → create one → *Keys → Add key → JSON* and download it.
-3. Create a Google Sheet (any name; the tab must be called `Leads`, or set `GOOGLE_SHEETS_TAB`). In the sheet's *Settings*, set **Locale to Nigeria**, and format column C (Phone) as **Plain text**. Share the sheet with the service account's `client_email` as **Editor**.
-4. Set the env vars (from the downloaded JSON): `GOOGLE_SHEETS_SPREADSHEET_ID` (the long id in the sheet's URL), `GOOGLE_SERVICE_ACCOUNT_EMAIL` (`client_email`), `GOOGLE_PRIVATE_KEY` (`private_key`, with its `\n` sequences left as-is), and `SHEETS_DEFAULT_STAFF_ID` (a `marketers.id`, used when "Assigned To" is blank).
-5. Restart. The first sync writes the header row if the tab is empty.
+3. Create a Google Sheet and share it with the service account's `client_email` as **Editor**. (Any pre-existing tab is left alone — the sync only uses the seven tabs above.)
+4. Set the env vars (from the downloaded JSON): `GOOGLE_SHEETS_SPREADSHEET_ID` (the long id in the sheet's URL), `GOOGLE_SERVICE_ACCOUNT_EMAIL` (`client_email`), `GOOGLE_PRIVATE_KEY` (`private_key`), and `SHEETS_DEFAULT_STAFF_ID` (a `marketers.id`, used when "Assigned To" is blank).
+5. Restart. The first sync creates the tabs and places every lead on the right one.
 
 **How it behaves.** Columns A–J are input, K–O are written by the app — never both sides for the same cell, so there are no edit conflicts.
 
@@ -130,10 +144,10 @@ Lets leads be bulk-pasted and calls logged in a Google Sheet instead of (or as w
 |---|---|
 | A App ID | Leave blank for new rows — the app fills it in |
 | B–E Name, Phone, Area / Notes, Assigned To | Lead details. Only a phone is required; a blank name becomes `Lead 0803…`. A phone already in the system links to that lead instead of duplicating it |
-| F–J Call Outcome, Reason, Feedback, Next Follow-up, Link Shared? | Each change to this block logs one call for the assigned staff member (visible on their pages and the manager dashboard). Reason accepts a reason code or its label; Link Shared? accepts Yes |
-| K–O Stage, Calls Logged, Last Called, Last Feedback, Sync Status | Written by the app; calls logged in the app show up here on the next sync. A row that can't be applied says why in Sync Status |
+| F–J Call Outcome, Reason, Feedback, Next Follow-up, Link Shared? | Each change to this block logs one call for the assigned staff member (visible on their pages and the manager dashboard). Dropdowns are suggestions — typing something else is fine |
+| K–O Source, Calls Logged, Last Called, Last Feedback, Sync Status | Written by the app. A row that can't be applied says why in Sync Status |
 
-Leads created in the app (telemarketer channel) are appended to the sheet automatically. Deleting a sheet row does not delete the lead. Don't sort or filter-and-edit the sheet at the exact moment a sync runs.
+Leads created in the app are added to the sheet automatically. Deleting a sheet row does not delete the lead, and it won't be re-added. A row is moved by adding it to the new tab and then removing the old one, so a moved lead's call-log cells start blank on its new tab (its history stays on the lead, and shows in Last Feedback). Don't sort the sheet at the exact moment a sync runs.
 
 ## Management Dashboard
 

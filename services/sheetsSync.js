@@ -1,5 +1,11 @@
-// Two-way sync between one Google Sheet tab and the app's lead data, so leads
-// can be bulk-pasted and calls logged in the sheet as easily as in the app.
+// Two-way sync between a Google Sheet and the app's lead data, so leads can be
+// bulk-pasted and calls logged in the sheet as easily as in the app.
+//
+// The sheet has one tab per priority list (the same P6/P1-P5 queues as the
+// app), so a telemarketer opens a tab, calls everyone on it, and logs the
+// outcome in the row. When a lead advances on the platform their row moves to
+// the next stage's tab on the next sync — "the 22 not yet registered" is just
+// the P6 tab, shrinking as they register.
 //
 // Design rule that keeps this conflict-free: no cell is ever written from
 // both sides.
@@ -8,14 +14,12 @@
 //   details update the lead, and each change to the call-log block becomes a
 //   logged contact (followups row), so it shows up in the staff member's own
 //   pages and the manager dashboard exactly like a call logged in the app.
-//   Columns K-O are OUTPUT (owned by the app): stage, calls logged, last
-//   called, last feedback, sync status. They refresh from the database every
-//   run, so a call logged in the app appears in the sheet within one cycle.
-//
-// A lead created in the app also gets appended to the sheet automatically.
+//   Columns K-O are OUTPUT (owned by the app): source, calls logged, last
+//   called, last feedback, sync status.
 //
 // What she changed since the last run is detected by hashing each row's input
-// values and comparing to the hashes stored in sheet_sync_rows.
+// values against the hashes stored in sheet_sync_rows. A lead is identified by
+// its App ID (column A), never by which tab or row it sits in.
 const crypto = require('crypto');
 const axios = require('axios');
 const db = require('../db/database');
@@ -24,15 +28,48 @@ const { nowLagos } = require('../utils/time');
 const HEADERS = [
   'App ID', 'Name', 'Phone', 'Area / Notes', 'Assigned To',
   'Call Outcome', 'Reason', 'Feedback', 'Next Follow-up', 'Link Shared?',
-  'Stage', 'Calls Logged', 'Last Called', 'Last Feedback', 'Sync Status'
+  'Source', 'Calls Logged', 'Last Called', 'Last Feedback', 'Sync Status'
 ];
 const INPUT_COLS = 10; // A-J
 const TOTAL_COLS = HEADERS.length; // A-O
 
-const STAGE_LABELS = {
-  new: 'New', registered: 'Registered', activated: 'Activated', link_shared: 'Link shared',
-  customer_activity: 'Customer activity', first_order: 'First order', completed_order: 'Completed order'
+// Titled by who's in it and what the call is trying to achieve. The id ties a
+// tab to the app's priority lists (services/priorityLists.js).
+const TABS = [
+  { id: 'P6', title: 'P6 New - Register' },
+  { id: 'P1', title: 'P1 Registered - Activate' },
+  { id: 'P2', title: 'P2 Activated - Share Link' },
+  { id: 'P3', title: 'P3 Link Shared - Get Customers' },
+  { id: 'P4', title: 'P4 Has Customers - First Order' },
+  { id: 'P5', title: 'P5 Ordered - Repeat Order' },
+  { id: 'DONE', title: 'Graduated' }
+];
+
+const OUTCOMES = ['No answer', 'Busy - call back', 'Switched off', 'Wrong number', 'Reached', 'Interested', 'Not interested'];
+
+const SOURCE_LABELS = {
+  field_marketer: 'Field', telemarketer: 'Telemarketer', pioneer: 'Pioneer',
+  referral: 'Referral', ads: 'Ads', other: 'Other'
 };
+
+function tabTitle(id) {
+  return TABS.find(t => t.id === id).title;
+}
+
+// Same membership rules as the app's priority lists, computed from the
+// rider's current funnel stage.
+function targetTabId(r) {
+  switch (r.funnel_stage) {
+    case 'new': return 'P6';
+    case 'registered': return 'P1';
+    case 'activated': return 'P2';
+    case 'link_shared': return 'P3';
+    case 'customer_activity': return 'P4';
+    case 'first_order':
+    case 'completed_order': return r.repeat_business_order_at ? 'DONE' : 'P5';
+    default: return 'P6';
+  }
+}
 
 // The key gets mangled in many ways when pasted into an env-var panel:
 // literal "\n" sequences, real newlines turned into spaces, wrapping quotes,
@@ -67,7 +104,6 @@ function getConfig() {
     email,
     privateKey,
     configError,
-    tab: process.env.GOOGLE_SHEETS_TAB || 'Leads',
     defaultStaffId: process.env.SHEETS_DEFAULT_STAFF_ID ? parseInt(process.env.SHEETS_DEFAULT_STAFF_ID, 10) : null
   };
 }
@@ -103,6 +139,8 @@ async function getAccessToken(cfg) {
   return cachedToken.token;
 }
 
+// path is appended straight to /spreadsheets/{id}, so it may be '' (the
+// spreadsheet itself), ':batchUpdate', '/values:batchGet?...', etc.
 async function sheetsRequest(cfg, method, path, { params, data } = {}) {
   const token = await getAccessToken(cfg);
   try {
@@ -112,7 +150,7 @@ async function sheetsRequest(cfg, method, path, { params, data } = {}) {
       params,
       data,
       headers: { Authorization: `Bearer ${token}` },
-      timeout: 30000
+      timeout: 60000
     });
     return res.data;
   } catch (err) {
@@ -121,8 +159,12 @@ async function sheetsRequest(cfg, method, path, { params, data } = {}) {
   }
 }
 
-function tabRange(cfg, a1) {
-  return `'${cfg.tab.replace(/'/g, "''")}'!${a1}`;
+function tabRange(title, a1) {
+  return `'${title.replace(/'/g, "''")}'!${a1}`;
+}
+
+function batchGetPath(ranges) {
+  return '/values:batchGet?valueRenderOption=FORMATTED_VALUE&' + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');
 }
 
 // ── SMALL HELPERS ────────────────────────────────────────────────────────────
@@ -130,6 +172,8 @@ function tabRange(cfg, a1) {
 function hashOf(values) {
   return crypto.createHash('sha1').update(JSON.stringify(values)).digest('hex');
 }
+
+const EMPTY_CALL_HASH = hashOf(['', '', '', '', '']);
 
 function cellText(v) {
   return v === undefined || v === null ? '' : String(v).trim();
@@ -139,9 +183,9 @@ function phoneTail(raw) {
   return String(raw || '').replace(/\D/g, '').slice(-10);
 }
 
-// Google Sheets drops a pasted phone's leading zero (08012345678 becomes the
-// number 8012345678) — put it back so leads are stored the way the rest of
-// the app expects, and convert +234 forms.
+// A phone pasted into a non-text cell loses its leading zero (08012345678
+// becomes the number 8012345678) — put it back so leads are stored the way
+// the rest of the app expects, and convert +234 forms.
 function formatPhone(raw) {
   const digits = String(raw || '').replace(/\D/g, '');
   if (digits.length === 13 && digits.startsWith('234')) return '0' + digits.slice(3);
@@ -154,8 +198,7 @@ function isValidPhone(raw) {
 }
 
 // Accepts 2026-09-25, 25/09/2026, 25-09-2026, "25 Sep 2026" etc. For a slash
-// date where both parts could be a month, day-first wins (Nigeria) — set the
-// spreadsheet's locale to Nigeria so what she sees matches.
+// date where both parts could be a month, day-first wins (Nigeria).
 function parseDate(str) {
   const s = cellText(str);
   if (!s) return null;
@@ -219,7 +262,7 @@ function groupContiguous(numbers) {
 function outputCells(rider, summary, status) {
   const s = summary || { calls: 0, lastAt: null, lastNotes: null };
   return [
-    STAGE_LABELS[rider.funnel_stage] || rider.funnel_stage || '',
+    SOURCE_LABELS[rider.channel] || rider.channel || '',
     String(s.calls),
     s.lastAt ? String(s.lastAt).slice(0, 10) : '',
     s.lastNotes ? String(s.lastNotes).trim().slice(0, 200).trim() : '',
@@ -227,25 +270,77 @@ function outputCells(rider, summary, status) {
   ];
 }
 
+function sheetRow(rider, summary) {
+  return [
+    rider.id, rider.name, rider.phone, rider.notes || '', rider.added_by_marketer_name || '',
+    '', '', '', '', '',
+    ...outputCells(rider, summary, 'Synced')
+  ];
+}
+
+// Built from the same trimmed text a read-back of the sheet produces, so a
+// stray trailing space in a note doesn't look like she edited the row.
+function leadHashOf(rider) {
+  return hashOf([cellText(rider.name), cellText(rider.phone), cellText(rider.notes), cellText(rider.added_by_marketer_name)]);
+}
+
+// ── TAB SETUP ────────────────────────────────────────────────────────────────
+
+function formatRequests(sheetId, reasonLabels) {
+  const listRule = (col, values) => ({
+    setDataValidation: {
+      range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+      rule: {
+        condition: { type: 'ONE_OF_LIST', values: values.map(v => ({ userEnteredValue: v })) },
+        showCustomUi: true,
+        strict: false
+      }
+    }
+  });
+  return [
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
+    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
+    // Output columns shaded so it's clear they're written by the app.
+    { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: INPUT_COLS, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { backgroundColor: { red: 0.96, green: 0.96, blue: 0.96 } } }, fields: 'userEnteredFormat.backgroundColor' } },
+    // Plain-text phone column keeps the leading zero; ISO dates keep the
+    // follow-up column unambiguous whatever the spreadsheet's locale.
+    { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 3 }, cell: { userEnteredFormat: { numberFormat: { type: 'TEXT' } } }, fields: 'userEnteredFormat.numberFormat' } },
+    { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: 8, endColumnIndex: 9 }, cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'yyyy-mm-dd' } } }, fields: 'userEnteredFormat.numberFormat' } },
+    listRule(5, OUTCOMES),
+    listRule(6, reasonLabels),
+    listRule(9, ['Yes', 'No']),
+    { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: TOTAL_COLS } } } }
+  ];
+}
+
+// Makes sure every stage tab exists (creating and formatting missing ones)
+// and returns a title -> sheetId map.
+async function ensureTabs(cfg, reasonCodes) {
+  const meta = await sheetsRequest(cfg, 'get', '', { params: { fields: 'sheets.properties(sheetId,title)' } });
+  const sheetIds = {};
+  (meta.sheets || []).forEach(s => { sheetIds[s.properties.title] = s.properties.sheetId; });
+
+  const missing = TABS.filter(t => !(t.title in sheetIds));
+  if (missing.length) {
+    const res = await sheetsRequest(cfg, 'post', ':batchUpdate', {
+      data: { requests: missing.map(t => ({ addSheet: { properties: { title: t.title } } })) }
+    });
+    res.replies.forEach((rep, i) => { sheetIds[missing[i].title] = rep.addSheet.properties.sheetId; });
+    // Cosmetic only — a formatting failure must never stop the sync itself.
+    try {
+      const reasonLabels = reasonCodes.map(r => r.label);
+      const requests = missing.flatMap(t => formatRequests(sheetIds[t.title], reasonLabels));
+      await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
+    } catch (err) {
+      console.error('sheetsSync: tab formatting failed:', err.message);
+    }
+  }
+  return sheetIds;
+}
+
 // ── SYNC ─────────────────────────────────────────────────────────────────────
 
 let running = false;
-
-async function ensureHeaders(cfg, rows) {
-  const first = rows[0] || [];
-  const isEmpty = first.every(c => !cellText(c));
-  if (isEmpty) {
-    await sheetsRequest(cfg, 'put', `/values/${encodeURIComponent(tabRange(cfg, 'A1:O1'))}`, {
-      params: { valueInputOption: 'RAW' },
-      data: { values: [HEADERS] }
-    });
-    return;
-  }
-  const mismatch = HEADERS.slice(0, INPUT_COLS).some((h, i) => cellText(first[i]).toLowerCase() !== h.toLowerCase());
-  if (mismatch) {
-    throw new Error(`Row 1 of the "${cfg.tab}" tab doesn't match the expected headers (${HEADERS.slice(0, INPUT_COLS).join(', ')}). Fix the header row or use a fresh tab.`);
-  }
-}
 
 async function logCall(rider, fields, reasonCodes, now) {
   const before = await db.getRider(rider.id);
@@ -267,6 +362,32 @@ async function logCall(rider, fields, reasonCodes, now) {
   });
 }
 
+// Deletes rows that have been moved (or were stale duplicates), but only
+// after re-reading column A to confirm each row still holds the same App ID —
+// if she sorted or inserted rows since the sync read the tab, the row numbers
+// are no longer trustworthy and that deletion is skipped (the next run
+// notices the leftover and retries).
+async function deleteRows(cfg, sheetIds, candidates) {
+  const byTab = {};
+  candidates.forEach(c => { (byTab[c.tabId] = byTab[c.tabId] || []).push(c); });
+  const tabIds = Object.keys(byTab);
+  if (!tabIds.length) return 0;
+
+  const current = await sheetsRequest(cfg, 'get', batchGetPath(tabIds.map(id => tabRange(tabTitle(id), 'A1:A'))));
+  const requests = [];
+  tabIds.forEach((id, i) => {
+    const col = (current.valueRanges[i] && current.valueRanges[i].values) || [];
+    byTab[id]
+      .filter(c => col[c.rowNumber - 1] && String(col[c.rowNumber - 1][0]).trim() === String(c.riderId))
+      .sort((a, b) => b.rowNumber - a.rowNumber) // bottom-up so earlier deletions don't shift later ones
+      .forEach(c => requests.push({
+        deleteDimension: { range: { sheetId: sheetIds[tabTitle(id)], dimension: 'ROWS', startIndex: c.rowNumber - 1, endIndex: c.rowNumber } }
+      }));
+  });
+  if (requests.length) await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
+  return requests.length;
+}
+
 async function runSync() {
   const cfg = getConfig();
   if (!cfg) return { skipped: 'Google Sheet sync is not configured' };
@@ -283,15 +404,36 @@ async function runSync() {
       throw err;
     }
 
-    const read = await sheetsRequest(cfg, 'get', `/values/${encodeURIComponent(tabRange(cfg, 'A1:O'))}`, {
-      params: { valueRenderOption: 'FORMATTED_VALUE' }
+    const reasonCodes = await db.getReasonCodes();
+    const sheetIds = await ensureTabs(cfg, reasonCodes);
+
+    // Read every stage tab in one request.
+    const read = await sheetsRequest(cfg, 'get', batchGetPath(TABS.map(t => tabRange(t.title, 'A1:O'))));
+    const tabProblems = [];
+    const headerWrites = [];
+    const tabData = {}; // tab id -> data rows (header excluded); row n is at index n-2
+    TABS.forEach((t, i) => {
+      const values = (read.valueRanges[i] && read.valueRanges[i].values) || [];
+      const grid = values.map(r => Array.from({ length: TOTAL_COLS }, (_, k) => cellText(r[k])));
+      const first = grid[0] || new Array(TOTAL_COLS).fill('');
+      if (first.every(c => !c)) {
+        headerWrites.push({ range: tabRange(t.title, 'A1:O1'), values: [HEADERS] });
+      } else {
+        if (HEADERS.slice(0, INPUT_COLS).some((h, k) => first[k].toLowerCase() !== h.toLowerCase())) {
+          tabProblems.push(`"${t.title}": row 1 doesn't match the expected headers, so this tab was skipped`);
+          return;
+        }
+        if (HEADERS.slice(INPUT_COLS).some((h, k) => first[INPUT_COLS + k].toLowerCase() !== h.toLowerCase())) {
+          headerWrites.push({ range: tabRange(t.title, 'K1:O1'), values: [HEADERS.slice(INPUT_COLS)] });
+        }
+      }
+      tabData[t.id] = grid.slice(1);
     });
-    const grid = (read.values || []).map(r => Array.from({ length: TOTAL_COLS }, (_, i) => cellText(r[i])));
-    await ensureHeaders(cfg, grid);
-    const dataRows = grid.slice(1);
+    if (headerWrites.length) {
+      await sheetsRequest(cfg, 'post', '/values:batchUpdate', { data: { valueInputOption: 'RAW', data: headerWrites } });
+    }
 
     const staffList = await db.getMarketers();
-    const reasonCodes = await db.getReasonCodes();
     const ridersBefore = await db.getRidersForSheet();
     const ridersById = {};
     ridersBefore.forEach(r => { ridersById[r.id] = r; });
@@ -301,107 +443,146 @@ async function runSync() {
       if (tail && !phoneToRider[tail]) phoneToRider[tail] = r.id;
     });
 
-    const stats = { created: 0, linked: 0, updated: 0, callsLogged: 0, appended: 0, errors: 0 };
+    // Where each lead currently sits. A lead can end up on two tabs if a
+    // previous run moved it but couldn't delete the old row; the row on the
+    // tab it belongs on is the real one and the other is a stale leftover.
+    const occurrences = {};
+    Object.keys(tabData).forEach(tabId => {
+      tabData[tabId].forEach((cells, i) => {
+        if (/^\d+$/.test(cells[0])) {
+          const id = parseInt(cells[0], 10);
+          (occurrences[id] = occurrences[id] || []).push({ tabId, rowNumber: i + 2 });
+        }
+      });
+    });
+    const canonical = {};
+    Object.keys(occurrences).forEach(k => {
+      const id = Number(k);
+      const target = ridersById[id] ? targetTabId(ridersById[id]) : null;
+      canonical[id] = occurrences[k].find(o => o.tabId === target) || occurrences[k][0];
+    });
+
+    const stats = { created: 0, linked: 0, updated: 0, callsLogged: 0, appended: 0, moved: 0, deleted: 0, errors: 0 };
     const now = nowLagos();
-    const seenIds = new Set();
-    const rowInfo = []; // per data row: { riderId, status }
+    const results = [];
 
-    for (let i = 0; i < dataRows.length; i++) {
-      const cells = dataRows[i];
-      const [appIdRaw, name, phone, area, assigned, outcome, reason, feedback, nextFollowup, linkSharedRaw] = cells;
-      const info = { riderId: null, status: '', newId: false };
-      rowInfo.push(info);
+    for (const tabId of Object.keys(tabData)) {
+      for (let i = 0; i < tabData[tabId].length; i++) {
+        const cells = tabData[tabId][i];
+        const rowNumber = i + 2;
+        const [appIdRaw, name, phone, area, assigned, outcome, reason, feedback, nextFollowup, linkSharedRaw] = cells;
+        const info = { tabId, rowNumber, riderId: null, status: '', newId: false, stale: false, redundant: false };
+        results.push({ cells, info });
 
-      if (cells.slice(0, INPUT_COLS).every(c => !c)) continue; // blank row
+        if (cells.slice(0, INPUT_COLS).every(c => !c)) continue; // blank row
 
-      const leadHash = hashOf([name, phone, area, assigned]);
-      const callFields = { outcome, reason, feedback, nextFollowup, linkShared: isYes(linkSharedRaw) };
-      const callBlockUsed = !!(outcome || reason || feedback || nextFollowup || callFields.linkShared);
-      const callHash = hashOf([outcome, reason, feedback, nextFollowup, linkSharedRaw]);
-
-      try {
-        let rider;
-        let mapping;
-        let statusText = 'Synced';
-
-        if (!appIdRaw) {
-          // New row: link to an existing lead with the same number, else create.
-          if (!isValidPhone(phone)) { info.status = 'Needs a valid phone number'; stats.errors++; continue; }
-          const tail = phoneTail(phone);
-          const existingId = phoneToRider[tail];
-          if (existingId) {
-            rider = ridersById[existingId] || await db.getRider(existingId);
-            statusText = 'Linked to existing lead';
-            stats.linked++;
-          } else {
-            const resolved = resolveStaff(assigned, staffList, cfg.defaultStaffId);
-            if (resolved.error) { info.status = resolved.error; stats.errors++; continue; }
-            const phoneStored = formatPhone(phone);
-            const created = await db.addRider({
-              name: name || `Lead ${phoneStored}`,
-              email: '',
-              phone: phoneStored,
-              added_by_marketer_id: resolved.staff.id,
-              added_by_marketer_name: resolved.staff.name,
-              channel: 'telemarketer'
-            }, now);
-            if (area) {
-              await db.updateRiderLeadFields(created.id, {
-                name: created.name, phone: created.phone, notes: area,
-                marketerId: resolved.staff.id, marketerName: resolved.staff.name
-              });
-            }
-            rider = await db.getRider(created.id);
-            phoneToRider[tail] = rider.id;
-            statusText = `Created · ${resolved.staff.name}`;
-            stats.created++;
-          }
-          info.newId = true;
-          mapping = { lead_hash: leadHash, call_hash: hashOf(['', '', '', '', '']) };
-        } else {
+        if (appIdRaw) {
+          if (!/^\d+$/.test(appIdRaw)) { info.status = 'App ID must be a number'; stats.errors++; continue; }
           const id = parseInt(appIdRaw, 10);
-          if (!Number.isInteger(id)) { info.status = 'App ID must be a number'; stats.errors++; continue; }
-          if (seenIds.has(id)) { info.status = 'Duplicate App ID — clear it to add as a new lead'; stats.errors++; continue; }
-          rider = ridersById[id] || await db.getRider(id);
-          if (!rider) { info.status = 'Lead not found — clear the App ID to add it as new'; stats.errors++; continue; }
-          mapping = syncRows[id] || { lead_hash: '', call_hash: '' };
+          const canon = canonical[id];
+          if (canon && !(canon.tabId === tabId && canon.rowNumber === rowNumber)) {
+            if (canon.tabId !== tabId) { info.stale = true; info.staleId = id; }
+            else { info.status = 'Duplicate App ID — clear it to add as a new lead'; stats.errors++; }
+            continue;
+          }
+        }
 
-          if (leadHash !== mapping.lead_hash) {
+        const leadHash = hashOf([name, phone, area, assigned]);
+        const callFields = { outcome, reason, feedback, nextFollowup, linkShared: isYes(linkSharedRaw) };
+        const callBlockUsed = !!(outcome || reason || feedback || nextFollowup || callFields.linkShared);
+        const callHash = hashOf([outcome, reason, feedback, nextFollowup, linkSharedRaw]);
+
+        try {
+          let rider;
+          let mapping;
+          let statusText = 'Synced';
+
+          if (!appIdRaw) {
+            // New row: link to an existing lead with the same number, else create.
             if (!isValidPhone(phone)) { info.status = 'Needs a valid phone number'; stats.errors++; continue; }
-            let staff = { id: rider.added_by_marketer_id, name: rider.added_by_marketer_name };
-            if (assigned) {
-              const resolved = resolveStaff(assigned, staffList, null);
+            const tail = phoneTail(phone);
+            const existingId = phoneToRider[tail];
+            if (existingId) {
+              rider = ridersById[existingId] || await db.getRider(existingId);
+              if (occurrences[existingId]) {
+                // Already has its own row somewhere — apply any call she typed
+                // here to that lead, then this duplicate row is deleted.
+                info.redundant = true;
+                statusText = 'Already on the sheet — row removed';
+              } else {
+                statusText = 'Linked to existing lead';
+              }
+              stats.linked++;
+            } else {
+              const resolved = resolveStaff(assigned, staffList, cfg.defaultStaffId);
               if (resolved.error) { info.status = resolved.error; stats.errors++; continue; }
-              staff = resolved.staff;
+              const phoneStored = formatPhone(phone);
+              const created = await db.addRider({
+                name: name || `Lead ${phoneStored}`,
+                email: '',
+                phone: phoneStored,
+                added_by_marketer_id: resolved.staff.id,
+                added_by_marketer_name: resolved.staff.name,
+                channel: 'telemarketer'
+              }, now);
+              if (area) {
+                await db.updateRiderLeadFields(created.id, {
+                  name: created.name, phone: created.phone, notes: area,
+                  marketerId: resolved.staff.id, marketerName: resolved.staff.name
+                });
+              }
+              rider = await db.getRider(created.id);
+              phoneToRider[tail] = rider.id;
+              statusText = `Created · ${resolved.staff.name}`;
+              stats.created++;
             }
-            await db.updateRiderLeadFields(id, {
-              name: name || rider.name, phone: formatPhone(phone), notes: area,
-              marketerId: staff.id, marketerName: staff.name
-            });
-            rider = await db.getRider(id);
-            if (mapping.lead_hash) stats.updated++;
+            info.newId = true;
+            mapping = { lead_hash: leadHash, call_hash: EMPTY_CALL_HASH };
+          } else {
+            const id = parseInt(appIdRaw, 10);
+            rider = ridersById[id] || await db.getRider(id);
+            if (!rider) { info.status = 'Lead not found — clear the App ID to add it as new'; stats.errors++; continue; }
+            mapping = syncRows[id] || { lead_hash: '', call_hash: '' };
+
+            if (leadHash !== mapping.lead_hash) {
+              if (!isValidPhone(phone)) { info.status = 'Needs a valid phone number'; stats.errors++; continue; }
+              let staff = { id: rider.added_by_marketer_id, name: rider.added_by_marketer_name };
+              if (assigned) {
+                const resolved = resolveStaff(assigned, staffList, null);
+                if (resolved.error) { info.status = resolved.error; stats.errors++; continue; }
+                staff = resolved.staff;
+              }
+              await db.updateRiderLeadFields(id, {
+                name: name || rider.name, phone: formatPhone(phone), notes: area,
+                marketerId: staff.id, marketerName: staff.name
+              });
+              rider = await db.getRider(id);
+              if (mapping.lead_hash) stats.updated++;
+            }
           }
-        }
 
-        seenIds.add(rider.id);
-        info.riderId = rider.id;
+          info.riderId = rider.id;
 
-        let callHashToStore = mapping.call_hash;
-        if (callHash !== mapping.call_hash) {
-          if (callBlockUsed) {
-            await logCall(rider, callFields, reasonCodes, now);
-            stats.callsLogged++;
+          let callHashToStore = mapping.call_hash;
+          if (callHash !== mapping.call_hash) {
+            if (callBlockUsed) {
+              await logCall(rider, callFields, reasonCodes, now);
+              stats.callsLogged++;
+            }
+            callHashToStore = callHash;
           }
-          callHashToStore = callHash;
-        }
 
-        await db.upsertSheetSyncRow(rider.id, leadHash, callHashToStore, now);
-        syncRows[rider.id] = { rider_id: rider.id, lead_hash: leadHash, call_hash: callHashToStore };
-        info.status = statusText;
-      } catch (err) {
-        info.status = `Error: ${err.message}`.slice(0, 200);
-        stats.errors++;
-        console.error(`sheetsSync row ${i + 2}:`, err.message);
+          // A redundant duplicate row never becomes the lead's mapped row.
+          if (!info.redundant) {
+            await db.upsertSheetSyncRow(rider.id, leadHash, callHashToStore, now);
+            syncRows[rider.id] = { rider_id: rider.id, lead_hash: leadHash, call_hash: callHashToStore };
+          }
+          info.status = statusText;
+        } catch (err) {
+          info.status = `Error: ${err.message}`.slice(0, 200);
+          stats.errors++;
+          console.error(`sheetsSync ${tabTitle(tabId)} row ${rowNumber}:`, err.message);
+        }
       }
     }
 
@@ -411,71 +592,91 @@ async function runSync() {
     ridersAfter.forEach(r => { ridersAfterById[r.id] = r; });
     const summary = await db.getFollowupSummaryByRider();
 
-    // Writes: newly assigned App IDs (column A) and any output cells (K-O)
-    // that changed. Each range is written only where something differs.
-    const writes = [];
-    const idRows = [];
-    const outputRows = [];
-    const outputValues = {};
-    dataRows.forEach((cells, i) => {
-      const info = rowInfo[i];
-      const rowNumber = i + 2;
-      if (info.newId && info.riderId) idRows.push(rowNumber);
+    // Decide what stays, what moves to another tab, and what is just a stale
+    // or redundant row to remove.
+    const idValues = {};   // tab id -> { rowNumber: riderId }
+    const outValues = {};  // tab id -> { rowNumber: [5 output cells] }
+    const moves = [];
+    const removals = [];
+    results.forEach(({ cells, info }) => {
+      const { tabId, rowNumber } = info;
+      if (info.stale) { removals.push({ tabId, rowNumber, riderId: info.staleId }); return; }
+
       let outputs;
       if (info.riderId && ridersAfterById[info.riderId]) {
-        outputs = outputCells(ridersAfterById[info.riderId], summary[info.riderId], info.status || 'Synced');
+        const rider = ridersAfterById[info.riderId];
+        if (info.newId) (idValues[tabId] = idValues[tabId] || {})[rowNumber] = rider.id;
+        if (info.redundant) { removals.push({ tabId, rowNumber, riderId: rider.id }); return; }
+        const target = targetTabId(rider);
+        if (target !== tabId) { moves.push({ tabId, rowNumber, rider, target }); return; }
+        outputs = outputCells(rider, summary[rider.id], info.status || 'Synced');
       } else if (info.status) {
         outputs = ['', '', '', '', info.status];
       } else {
         return;
       }
       const current = cells.slice(INPUT_COLS, TOTAL_COLS);
-      if (outputs.some((v, k) => v !== current[k])) {
-        outputRows.push(rowNumber);
-        outputValues[rowNumber] = outputs;
-      }
+      if (outputs.some((v, k) => v !== current[k])) (outValues[tabId] = outValues[tabId] || {})[rowNumber] = outputs;
     });
 
-    groupContiguous(idRows).forEach(([from, to]) => {
-      const values = [];
-      for (let r = from; r <= to; r++) values.push([rowInfo[r - 2].riderId]);
-      writes.push({ range: tabRange(cfg, `A${from}:A${to}`), values });
+    // Write newly assigned App IDs and any changed output cells.
+    const writes = [];
+    Object.keys(idValues).forEach(tabId => {
+      groupContiguous(Object.keys(idValues[tabId]).map(Number)).forEach(([from, to]) => {
+        const values = [];
+        for (let r = from; r <= to; r++) values.push([idValues[tabId][r]]);
+        writes.push({ range: tabRange(tabTitle(tabId), `A${from}:A${to}`), values });
+      });
     });
-    groupContiguous(outputRows).forEach(([from, to]) => {
-      const values = [];
-      for (let r = from; r <= to; r++) values.push(outputValues[r]);
-      writes.push({ range: tabRange(cfg, `K${from}:O${to}`), values });
+    Object.keys(outValues).forEach(tabId => {
+      groupContiguous(Object.keys(outValues[tabId]).map(Number)).forEach(([from, to]) => {
+        const values = [];
+        for (let r = from; r <= to; r++) values.push(outValues[tabId][r]);
+        writes.push({ range: tabRange(tabTitle(tabId), `K${from}:O${to}`), values });
+      });
     });
     if (writes.length) {
-      await sheetsRequest(cfg, 'post', '/values:batchUpdate', {
-        data: { valueInputOption: 'RAW', data: writes }
-      });
+      await sheetsRequest(cfg, 'post', '/values:batchUpdate', { data: { valueInputOption: 'RAW', data: writes } });
     }
 
-    // Leads created in the app that aren't on the sheet yet.
-    const toAppend = ridersAfter.filter(r => !syncRows[r.id]);
-    if (toAppend.length) {
-      const values = toAppend.map(r => [
-        r.id, r.name, r.phone, r.notes || '', r.added_by_marketer_name || '',
-        '', '', '', '', '',
-        ...outputCells(r, summary[r.id], 'Synced')
-      ]);
-      await sheetsRequest(cfg, 'post', `/values/${encodeURIComponent(tabRange(cfg, 'A:O'))}:append`, {
-        params: { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' },
-        data: { values }
-      });
-      for (const r of toAppend) {
-        await db.upsertSheetSyncRow(
-          r.id,
-          hashOf([r.name, r.phone, r.notes || '', r.added_by_marketer_name || '']),
-          hashOf(['', '', '', '', '']),
-          now
-        );
+    // Everything that needs a new row: leads moving to another stage's tab,
+    // plus leads that were never on the sheet (created in the app). A lead
+    // that has a mapping but isn't on any tab had its row deleted on purpose,
+    // so it is not re-added.
+    const placed = new Set(Object.keys(occurrences).map(Number));
+    results.forEach(({ info }) => { if (info.riderId) placed.add(info.riderId); });
+    const appendsByTab = {};
+    moves.forEach(m => { (appendsByTab[m.target] = appendsByTab[m.target] || []).push({ rider: m.rider, fromMove: true }); });
+    ridersAfter.forEach(r => {
+      if (!placed.has(r.id) && !syncRows[r.id]) {
+        (appendsByTab[targetTabId(r)] = appendsByTab[targetTabId(r)] || []).push({ rider: r, fromMove: false });
       }
-      stats.appended = toAppend.length;
+    });
+    const movedIds = new Set(); // moves whose new row was actually written
+    for (const tabId of Object.keys(appendsByTab)) {
+      if (!tabData[tabId]) continue; // that tab had a header problem
+      const items = appendsByTab[tabId];
+      await sheetsRequest(cfg, 'post', `/values/${encodeURIComponent(tabRange(tabTitle(tabId), 'A:O'))}:append`, {
+        params: { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' },
+        data: { values: items.map(it => sheetRow(it.rider, summary[it.rider.id])) }
+      });
+      for (const it of items) {
+        await db.upsertSheetSyncRow(it.rider.id, leadHashOf(it.rider), EMPTY_CALL_HASH, now);
+        syncRows[it.rider.id] = { rider_id: it.rider.id, lead_hash: leadHashOf(it.rider), call_hash: EMPTY_CALL_HASH };
+        if (it.fromMove) { stats.moved++; movedIds.add(it.rider.id); } else stats.appended++;
+      }
     }
 
-    return { ok: true, rows: dataRows.length, ...stats };
+    // Only now remove the old copies (moved rows, stale leftovers, redundant
+    // pasted duplicates) — after the new rows are safely written. A move whose
+    // destination couldn't be written keeps its old row.
+    const toRemove = [
+      ...moves.filter(m => movedIds.has(m.rider.id)).map(m => ({ tabId: m.tabId, rowNumber: m.rowNumber, riderId: m.rider.id })),
+      ...removals
+    ];
+    stats.deleted = await deleteRows(cfg, sheetIds, toRemove);
+
+    return { ok: true, rows: results.length, tabProblems, ...stats };
   } finally {
     running = false;
   }
@@ -491,4 +692,4 @@ function startInterval(intervalMs = 3 * 60 * 1000) {
   setInterval(tick, intervalMs);
 }
 
-module.exports = { runSync, startInterval, isConfigured, HEADERS };
+module.exports = { runSync, startInterval, isConfigured, HEADERS, TABS };
