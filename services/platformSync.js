@@ -19,9 +19,11 @@
 //     funnel-tracking record on the spot. Safe only while staff names don't
 //     collide — see namesMatch() below.
 //   syncOutcomes()   — for already-matched prospects, re-derives funnel
-//     timestamps from live platform data. Every write is COALESCE'd in
-//     db.updateRiderFunnelOutcomes so a stage can only be filled in, never
-//     regressed or invented.
+//     timestamps from live platform data. Activation/activity/storefront
+//     timestamps are COALESCE'd in db.updateRiderFunnelOutcomes so they can
+//     only be filled in, never regressed or invented. Order milestones are
+//     instead recomputed from the order history every run (see
+//     db.setRiderOrderMilestones), so wrongly counted test orders self-correct.
 const { createClient } = require('@supabase/supabase-js');
 const db = require('../db/database');
 const { toLagosDateTime, nowLagos } = require('../utils/time');
@@ -180,6 +182,19 @@ async function isBusinessActivated(supabase, business) {
   return hasPricingConfigured(supabase, business.id);
 }
 
+// An order placed within this long of the business registering is the
+// onboarding walkthrough — the marketer placing an order to show how it
+// works — not a sale, so it never counts toward first/completed/repeat order.
+// The customer_id filter alone wasn't enough: those walkthrough orders are
+// placed through the storefront and do have a customer.
+const TEST_ORDER_WINDOW_MS = 10 * 60 * 1000;
+
+function realOrders(orders, businessCreatedAt) {
+  if (!businessCreatedAt) return orders; // can't tell when they registered — don't guess
+  const cutoff = new Date(businessCreatedAt).getTime() + TEST_ORDER_WINDOW_MS;
+  return orders.filter(o => new Date(o.created_at).getTime() > cutoff);
+}
+
 async function syncOutcomes() {
   const supabase = getClient();
   if (!supabase) return { checked: 0 };
@@ -190,7 +205,7 @@ async function syncOutcomes() {
 
     const { data: business, error: businessError } = await supabase
       .from('businesses')
-      .select('id, is_active, is_accepting_orders, whatsapp_phone_number_id, slug, custom_domain, custom_domain_verified, bank_account_number')
+      .select('id, created_at, is_active, is_accepting_orders, whatsapp_phone_number_id, slug, custom_domain, custom_domain_verified, bank_account_number')
       .eq('id', businessId)
       .maybeSingle();
     if (businessError) { console.error('platformSync.syncOutcomes business:', businessError.message); continue; }
@@ -222,38 +237,41 @@ async function syncOutcomes() {
       }
     }
 
-    if (!prospect.first_order_at || !prospect.completed_order_at || !prospect.repeat_business_order_at) {
-      // customer_id IS NOT NULL excludes self-test orders — confirmed against
-      // real data that every order placed by the business itself from its own
-      // dashboard (source='dashboard') or bulk-imported (source='csv_import')
-      // has no customer_id, while every order actually placed by a customer
-      // (source in 'customer'/'website'/'whatsapp') always has one. Without
-      // this, a business testing their own storefront on day one would show
-      // up as their own "first order" — exactly the fake signal to avoid.
+    {
+      // Order milestones are recomputed from the platform on every run
+      // rather than filled in once and frozen: they're a pure function of the
+      // order history, so recomputing can't invent anything — and it means a
+      // test order that was wrongly counted before this rule existed gets
+      // corrected instead of staying stamped forever.
+      //
+      // customer_id IS NOT NULL excludes orders the business placed from its
+      // own dashboard (source='dashboard') or bulk-imported ('csv_import'),
+      // which have no customer_id; realOrders() then drops the onboarding
+      // walkthrough orders placed in the first minutes after registering.
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('created_at, delivered_at, status')
         .eq('business_id', businessId)
         .not('customer_id', 'is', null)
         .order('created_at', { ascending: true });
-      if (ordersError) console.error('platformSync.syncOutcomes orders:', ordersError.message);
-      else if (orders && orders.length > 0) {
-        // First order = first order PLACED, regardless of outcome — distinct
-        // from completed order below. Don't conflate the two.
-        if (!prospect.first_order_at) fields.first_order_at = toLagosDateTime(orders[0].created_at);
-
-        const delivered = orders
+      if (ordersError) {
+        // Leave the last known values alone rather than wiping them on a blip.
+        console.error('platformSync.syncOutcomes orders:', ordersError.message);
+      } else {
+        const real = realOrders(orders || [], business.created_at);
+        const delivered = real
           .filter(o => o.status === 'delivered' && o.delivered_at)
           .sort((a, b) => new Date(a.delivered_at) - new Date(b.delivered_at));
-        if (delivered.length > 0 && !prospect.completed_order_at) {
-          fields.completed_order_at = toLagosDateTime(delivered[0].delivered_at);
-        }
-        // Repeat, business-level: the 2nd COMPLETED order — "is this rider
-        // continuing to get business." Kept separate from customer-level
-        // repeat below; the two can disagree and both matter.
-        if (delivered.length >= 2 && !prospect.repeat_business_order_at) {
-          fields.repeat_business_order_at = toLagosDateTime(delivered[1].delivered_at);
-        }
+        await db.setRiderOrderMilestones(prospect.id, {
+          // First order = first order PLACED, regardless of outcome — distinct
+          // from completed order. Don't conflate the two.
+          first_order_at: real.length > 0 ? toLagosDateTime(real[0].created_at) : null,
+          completed_order_at: delivered.length > 0 ? toLagosDateTime(delivered[0].delivered_at) : null,
+          // Repeat, business-level: the 2nd COMPLETED order — "is this rider
+          // continuing to get business." Kept separate from customer-level
+          // repeat below; the two can disagree and both matter.
+          repeat_business_order_at: delivered.length >= 2 ? toLagosDateTime(delivered[1].delivered_at) : null
+        });
       }
     }
 

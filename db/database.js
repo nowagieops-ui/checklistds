@@ -432,6 +432,18 @@ const db = {
     await pool.execute(`UPDATE riders SET ${sets.join(', ')} WHERE id = ?`, values);
   },
 
+  // Unlike updateRiderFunnelOutcomes, this OVERWRITES (including back to
+  // NULL): order milestones are recomputed from the platform's order history
+  // on every sync, so a test order that was wrongly counted gets corrected
+  // rather than staying stamped. funnel_stage is a generated column, so the
+  // rider's stage follows automatically.
+  async setRiderOrderMilestones(riderId, { first_order_at, completed_order_at, repeat_business_order_at }) {
+    await pool.execute(
+      'UPDATE riders SET first_order_at = ?, completed_order_at = ?, repeat_business_order_at = ? WHERE id = ?',
+      [first_order_at || null, completed_order_at || null, repeat_business_order_at || null, parseInt(riderId)]
+    );
+  },
+
   async getRidersAddedByOnDate(marketerId, date) {
     const [rows] = await pool.execute(
       'SELECT * FROM riders WHERE added_by_marketer_id = ? AND DATE(created_at) = ?',
