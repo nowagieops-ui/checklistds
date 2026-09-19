@@ -34,17 +34,39 @@ const STAGE_LABELS = {
   customer_activity: 'Customer activity', first_order: 'First order', completed_order: 'Completed order'
 };
 
+// The key gets mangled in many ways when pasted into an env-var panel:
+// literal "\n" sequences, real newlines turned into spaces, wrapping quotes,
+// a trailing comma copied from the JSON, or a stray backslash. All of them
+// still contain the same base64 body, so pull that out and rebuild a
+// correctly wrapped PEM instead of trusting the pasted formatting.
+function normalizePrivateKey(raw) {
+  let s = String(raw).trim().replace(/^["']+|["',]+$/g, '');
+  s = s.replace(/\\n/g, '\n').replace(/\\/g, '');
+  const body = s
+    .replace(/-----BEGIN [A-Z ]+-----/, '')
+    .replace(/-----END [A-Z ]+-----/, '')
+    .replace(/\s+/g, '');
+  if (body.length < 200) {
+    throw new Error('GOOGLE_PRIVATE_KEY looks empty or truncated — paste the whole "private_key" value from the service account JSON');
+  }
+  return `-----BEGIN PRIVATE KEY-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
+}
+
 function getConfig() {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_PRIVATE_KEY;
   if (!spreadsheetId || !email || !rawKey) return null;
+  // A bad key must fail a sync run with a readable message, never the app's
+  // startup — so the error is carried on the config instead of thrown here.
+  let privateKey = null;
+  let configError = null;
+  try { privateKey = normalizePrivateKey(rawKey); } catch (err) { configError = err.message; }
   return {
     spreadsheetId,
     email,
-    // The key arrives with literal "\n" sequences (and sometimes wrapping
-    // quotes) when pasted into an env var — restore real PEM formatting.
-    privateKey: rawKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n'),
+    privateKey,
+    configError,
     tab: process.env.GOOGLE_SHEETS_TAB || 'Leads',
     defaultStaffId: process.env.SHEETS_DEFAULT_STAFF_ID ? parseInt(process.env.SHEETS_DEFAULT_STAFF_ID, 10) : null
   };
@@ -248,6 +270,7 @@ async function logCall(rider, fields, reasonCodes, now) {
 async function runSync() {
   const cfg = getConfig();
   if (!cfg) return { skipped: 'Google Sheet sync is not configured' };
+  if (cfg.configError) throw new Error(cfg.configError);
   if (running) return { skipped: 'A sync is already running' };
   running = true;
 
