@@ -20,6 +20,20 @@ const pool = mysql.createPool({
   dateStrings: ['DATE', 'DATETIME']
 });
 
+// MariaDB stores JSON columns as plain text, so the driver can hand them back
+// as strings instead of parsed objects. The training-progress code mutates
+// these (pushes to roleplay_log, reads completed_modules keys), so make sure
+// they're always real objects — a no-op when the driver already parsed them.
+function normalizeProgress(row) {
+  if (!row) return row;
+  const parse = (v, fallback) => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v !== 'string') return v;
+    try { return JSON.parse(v); } catch { return fallback; }
+  };
+  return { ...row, completed_modules: parse(row.completed_modules, {}), roleplay_log: parse(row.roleplay_log, []) };
+}
+
 function normalizeRider(r) {
   return { ...r, completed: !!r.completed, device_flagged: !!r.device_flagged };
 }
@@ -439,7 +453,7 @@ const db = {
       'SELECT * FROM training_progress WHERE marketer_id = ?',
       [parseInt(marketerId)]
     );
-    return rows[0] || null;
+    return rows[0] ? normalizeProgress(rows[0]) : null;
   },
 
   // now is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string (see nowLagos()
@@ -469,7 +483,7 @@ const db = {
       'SELECT * FROM training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
       [parseInt(marketerId), weekNumber]
     );
-    return rows[0] || null;
+    return rows[0] ? normalizeProgress(rows[0]) : null;
   },
 
   // All weeks (2-12) this marketer has any record for — used to find the
@@ -479,7 +493,7 @@ const db = {
       'SELECT * FROM training_weeks_progress WHERE marketer_id = ? ORDER BY week_number ASC',
       [parseInt(marketerId)]
     );
-    return rows;
+    return rows.map(normalizeProgress);
   },
 
   // now is a Lagos wall-clock 'YYYY-MM-DD HH:MM:SS' string — not SQL NOW().
