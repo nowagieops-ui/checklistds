@@ -13,6 +13,7 @@ const platformSync = require('./services/platformSync');
 const priorityLists = require('./services/priorityLists');
 const performance = require('./services/performance');
 const trainingWeeks = require('./services/trainingWeeks');
+const sheetsSync = require('./services/sheetsSync');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
@@ -1220,6 +1221,20 @@ app.post('/management/sync-platform', requireManagement, async (req, res) => {
   }
 });
 
+// Manual trigger for the Google Sheet sync, same idea as the platform sync
+// above — so a manager who just pasted a batch of leads doesn't have to wait
+// for the timer. Returns counts only.
+app.post('/management/sync-sheet', requireManagement, async (req, res) => {
+  try {
+    const result = await sheetsSync.runSync();
+    if (result.skipped) return res.json({ ok: false, error: result.skipped });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Manual sheet sync failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/management-logout', (req, res) => {
   req.session.isManagement = false;
   res.redirect('/management-login');
@@ -1232,3 +1247,4 @@ app.listen(PORT, () => {
 });
 
 platformSync.startInterval();
+sheetsSync.startInterval();

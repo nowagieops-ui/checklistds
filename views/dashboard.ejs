@@ -103,6 +103,16 @@
       <div id="sync-platform-result" style="width:100%;font-size:13px;color:var(--gray);"></div>
     </div>
 
+    <!-- GOOGLE SHEET SYNC -->
+    <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:14px;">Google Sheet sync</div>
+        <div style="font-size:13px;color:var(--gray);">Leads pasted into the sheet become P6 prospects; calls logged in the sheet show up here. Runs automatically every few minutes.</div>
+      </div>
+      <button id="sync-sheet-btn" type="button" class="btn" style="width:auto;padding:10px 20px;margin:0;">Sync now</button>
+      <div id="sync-sheet-result" style="width:100%;font-size:13px;color:var(--gray);"></div>
+    </div>
+
     <form method="GET" action="/dashboard" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;">
         <label for="date">View check-in status for</label>
@@ -418,6 +428,27 @@
         result.textContent = 'Matched ' + data.matchResult.matched + ' of ' + data.matchResult.checked + ' pending codes · ' +
           'attributed ' + data.nameMatchResult.attributed + ' of ' + data.nameMatchResult.checked + ' name-matched signups · ' +
           'checked ' + data.syncResult.checked + ' linked prospect(s) for order/storefront updates.';
+      } catch (err) {
+        result.textContent = 'Sync failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync now';
+      }
+    });
+
+    document.getElementById('sync-sheet-btn').addEventListener('click', async function () {
+      var btn = this;
+      var result = document.getElementById('sync-sheet-result');
+      btn.disabled = true;
+      btn.textContent = 'Syncing…';
+      result.textContent = '';
+      try {
+        var res = await fetch('/management/sync-sheet', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+        var data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Sync failed');
+        result.textContent = 'Read ' + data.rows + ' row(s) · created ' + data.created + ' lead(s) · linked ' + data.linked +
+          ' to existing · updated ' + data.updated + ' · logged ' + data.callsLogged + ' call(s) · added ' + data.appended +
+          ' app lead(s) to the sheet' + (data.errors ? ' · ' + data.errors + ' row(s) need attention (see Sync Status column)' : '') + '.';
       } catch (err) {
         result.textContent = 'Sync failed: ' + err.message;
       } finally {

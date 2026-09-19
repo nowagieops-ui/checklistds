@@ -112,6 +112,29 @@ New staff added with the **Telemarketer** role must complete an 8-module trainin
 
 The roleplay module's AI feedback needs `GEMINI_API_KEY` set (see above); without it, trainees still get a canned feedback message so practice still works.
 
+## Google Sheet sync (leads + call logging)
+
+Lets leads be bulk-pasted and calls logged in a Google Sheet instead of (or as well as) the app. Every ~3 minutes the app reads the sheet and applies it; the dashboard's "Google Sheet sync → Sync now" button forces it immediately.
+
+**One-time setup**
+
+1. Run `db/migrations/009_google_sheet_sync.sql`.
+2. In [Google Cloud Console](https://console.cloud.google.com/): create a project → enable the **Google Sheets API** → *IAM & Admin → Service Accounts* → create one → *Keys → Add key → JSON* and download it.
+3. Create a Google Sheet (any name; the tab must be called `Leads`, or set `GOOGLE_SHEETS_TAB`). In the sheet's *Settings*, set **Locale to Nigeria**, and format column C (Phone) as **Plain text**. Share the sheet with the service account's `client_email` as **Editor**.
+4. Set the env vars (from the downloaded JSON): `GOOGLE_SHEETS_SPREADSHEET_ID` (the long id in the sheet's URL), `GOOGLE_SERVICE_ACCOUNT_EMAIL` (`client_email`), `GOOGLE_PRIVATE_KEY` (`private_key`, with its `\n` sequences left as-is), and `SHEETS_DEFAULT_STAFF_ID` (a `marketers.id`, used when "Assigned To" is blank).
+5. Restart. The first sync writes the header row if the tab is empty.
+
+**How it behaves.** Columns A–J are input, K–O are written by the app — never both sides for the same cell, so there are no edit conflicts.
+
+| Column | Purpose |
+|---|---|
+| A App ID | Leave blank for new rows — the app fills it in |
+| B–E Name, Phone, Area / Notes, Assigned To | Lead details. Only a phone is required; a blank name becomes `Lead 0803…`. A phone already in the system links to that lead instead of duplicating it |
+| F–J Call Outcome, Reason, Feedback, Next Follow-up, Link Shared? | Each change to this block logs one call for the assigned staff member (visible on their pages and the manager dashboard). Reason accepts a reason code or its label; Link Shared? accepts Yes |
+| K–O Stage, Calls Logged, Last Called, Last Feedback, Sync Status | Written by the app; calls logged in the app show up here on the next sync. A row that can't be applied says why in Sync Status |
+
+Leads created in the app (telemarketer channel) are appended to the sheet automatically. Deleting a sheet row does not delete the lead. Don't sort or filter-and-edit the sheet at the exact moment a sync runs.
+
 ## Management Dashboard
 
 Access at: `checklist.dashspid.com/management-login`

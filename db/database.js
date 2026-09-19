@@ -507,6 +507,84 @@ const db = {
       [parseInt(marketerId), weekNumber]
     );
     return rows[0] || null;
+  },
+
+  // ── GOOGLE SHEET SYNC (services/sheetsSync.js) ────────────────────────────
+
+  // rider_id -> { lead_hash, call_hash } for every lead that has ever been on
+  // the sheet.
+  async getSheetSyncRows() {
+    const [rows] = await pool.execute('SELECT rider_id, lead_hash, call_hash FROM sheet_sync_rows');
+    const byRider = {};
+    rows.forEach(r => { byRider[r.rider_id] = r; });
+    return byRider;
+  },
+
+  async upsertSheetSyncRow(riderId, leadHash, callHash, now) {
+    await pool.execute(
+      `INSERT INTO sheet_sync_rows (rider_id, lead_hash, call_hash, last_synced_at)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE lead_hash = VALUES(lead_hash), call_hash = VALUES(call_hash), last_synced_at = VALUES(last_synced_at)`,
+      [parseInt(riderId), leadHash, callHash, now]
+    );
+  },
+
+  // Every lead the sheet covers: telemarketer-channel prospects, plus anything
+  // that was already on the sheet.
+  async getRidersForSheet() {
+    const [rows] = await pool.execute(
+      `SELECT r.* FROM riders r
+       LEFT JOIN sheet_sync_rows s ON s.rider_id = r.id
+       WHERE r.channel = 'telemarketer' OR s.rider_id IS NOT NULL`
+    );
+    return rows;
+  },
+
+  // Every prospect's phone, across all channels — pasting a list that
+  // includes someone already in the system should link to them, not create a
+  // duplicate.
+  async getAllRiderPhones() {
+    const [rows] = await pool.execute('SELECT id, phone FROM riders');
+    return rows;
+  },
+
+  async updateRiderLeadFields(riderId, { name, phone, notes, marketerId, marketerName }) {
+    await pool.execute(
+      'UPDATE riders SET name = ?, phone = ?, notes = ?, added_by_marketer_id = ?, added_by_marketer_name = ? WHERE id = ?',
+      [name, phone, notes || null, marketerId, marketerName, parseInt(riderId)]
+    );
+  },
+
+  // rider_id -> { calls, lastAt, lastNotes } across all logged contacts,
+  // whichever surface they came from.
+  async getFollowupSummaryByRider() {
+    const [counts] = await pool.execute(
+      'SELECT rider_id, COUNT(*) AS calls, MAX(created_at) AS last_at FROM followups GROUP BY rider_id'
+    );
+    const [latest] = await pool.execute(
+      `SELECT f.rider_id, f.notes FROM followups f
+       JOIN (SELECT rider_id, MAX(id) AS max_id FROM followups GROUP BY rider_id) m ON m.max_id = f.id`
+    );
+    const byRider = {};
+    counts.forEach(r => { byRider[r.rider_id] = { calls: Number(r.calls), lastAt: r.last_at, lastNotes: null }; });
+    latest.forEach(r => { if (byRider[r.rider_id]) byRider[r.rider_id].lastNotes = r.notes; });
+    return byRider;
+  },
+
+  // Same as addFollowup, plus the short call outcome and where it was logged
+  // from. Kept separate so the normal in-app path keeps working even on a
+  // database that hasn't had migration 009 applied yet.
+  async addSheetFollowup(data) {
+    await pool.execute(
+      `INSERT INTO followups
+        (rider_id, staff_id, type, stage_before, stage_after, reason_code, desired_action, action_completed, link_shared_confirmed, notes, next_followup_date, created_at, outcome, source)
+       VALUES (?, ?, 'call', ?, ?, ?, NULL, 0, ?, ?, ?, ?, ?, 'sheet')`,
+      [
+        data.rider_id, data.staff_id, data.stage_before, data.stage_after,
+        data.reason_code || null, data.link_shared_confirmed ? 1 : 0,
+        data.notes || null, data.next_followup_date || null, data.created_at, data.outcome || null
+      ]
+    );
   }
 };
 
