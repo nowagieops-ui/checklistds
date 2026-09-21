@@ -276,12 +276,29 @@ const db = {
   // member already has a prospect they onboarded but haven't linked yet,
   // prefer attaching the platform signup to that real record (keeps any
   // onboarding-checklist data) over creating a fresh one.
+  //
+  // Only riders onboarded in person qualify (device_id is recorded by the
+  // onboarding flow; leads logged by phone or pasted from a spreadsheet never
+  // have one). "Oldest unlinked lead" is a fair guess for the one rider a field
+  // marketer just walked through signup, but with a pile of cold leads it
+  // would attach a stranger's signup to whichever lead happens to be oldest —
+  // marking the wrong person registered. Phone matching (see
+  // getUnmatchedRidersForPhoneMatch) is what links cold leads.
   async getOldestUnmatchedProspectForMarketer(marketerId) {
     const [rows] = await pool.execute(
-      'SELECT id FROM riders WHERE added_by_marketer_id = ? AND platform_business_id IS NULL ORDER BY created_at ASC LIMIT 1',
+      'SELECT id FROM riders WHERE added_by_marketer_id = ? AND platform_business_id IS NULL AND device_id IS NOT NULL ORDER BY created_at ASC LIMIT 1',
       [parseInt(marketerId)]
     );
     return rows[0] || null;
+  },
+
+  // Every lead not yet linked to a platform account, oldest first — what the
+  // phone-number match works through.
+  async getUnmatchedRidersForPhoneMatch() {
+    const [rows] = await pool.execute(
+      'SELECT id, phone FROM riders WHERE platform_business_id IS NULL ORDER BY created_at ASC, id ASC'
+    );
+    return rows;
   },
 
   // Creates the funnel-tracking record directly from a platform signup that

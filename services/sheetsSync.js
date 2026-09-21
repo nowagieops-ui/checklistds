@@ -343,20 +343,24 @@ function leadHashOf(rider) {
 
 // ── TAB SETUP ────────────────────────────────────────────────────────────────
 
-function formatRequests(sheetId, reasonLabels) {
+// Dropdowns and number formats for the data rows of a stage tab — everything
+// that has to be present on EVERY row, not just the ones that existed when
+// the tab was created. Rows the app appends are inserted by Google without
+// the dropdown or formatting the rows around them have (which is how filled
+// rows ended up with no dropdown while the empty rows below still had one),
+// so this is re-applied over the whole column after the app adds rows.
+function columnRuleRequests(sheetId, reasonLabels) {
   const listRule = (col, values) => ({
     setDataValidation: {
       range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
       rule: {
         condition: { type: 'ONE_OF_LIST', values: values.map(v => ({ userEnteredValue: v })) },
         showCustomUi: true,
-        strict: false
+        strict: false // a suggestion list, not a restriction — typing something else is fine
       }
     }
   });
   return [
-    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
-    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
     // Output columns shaded so it's clear they're written by the app.
     { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: INPUT_COLS, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { backgroundColor: { red: 0.96, green: 0.96, blue: 0.96 } } }, fields: 'userEnteredFormat.backgroundColor' } },
     // Plain-text phone column keeps the leading zero; ISO dates keep the
@@ -365,9 +369,36 @@ function formatRequests(sheetId, reasonLabels) {
     { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: 8, endColumnIndex: 9 }, cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'yyyy-mm-dd' } } }, fields: 'userEnteredFormat.numberFormat' } },
     listRule(5, OUTCOMES),
     listRule(6, reasonLabels),
-    listRule(9, ['Yes', 'No']),
+    listRule(9, ['Yes', 'No'])
+  ];
+}
+
+function formatRequests(sheetId, reasonLabels) {
+  return [
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
+    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
+    ...columnRuleRequests(sheetId, reasonLabels),
     { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: TOTAL_COLS } } } }
   ];
+}
+
+// Set once the column rules have been re-applied to the existing rows since
+// this process started — that heals rows written before this fix existed
+// (and any the app wrote while a deploy was pending).
+let rulesHealed = false;
+
+// Cosmetic, so a failure only logs — it must never stop a sync. Returns
+// whether it worked, so a failed heal is retried on the next run.
+async function reapplyColumnRules(cfg, sheetIds, reasonCodes, tabIds) {
+  try {
+    const reasonLabels = reasonCodes.map(r => r.label);
+    const requests = tabIds.flatMap(id => columnRuleRequests(sheetIds[tabTitle(id)], reasonLabels));
+    await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
+    return true;
+  } catch (err) {
+    console.error('sheetsSync: re-applying column rules failed:', err.message);
+    return false;
+  }
 }
 
 function funnelFormatRequests(sheetId) {
@@ -787,6 +818,16 @@ async function runSync() {
         syncRows[it.rider.id] = { rider_id: it.rider.id, lead_hash: leadHashOf(it.rider), call_hash: EMPTY_CALL_HASH };
         if (it.fromMove) { stats.moved++; movedIds.add(it.rider.id); } else stats.appended++;
       }
+    }
+
+    // Rows the app just appended were inserted without the dropdowns and
+    // formats, so re-apply them over those tabs' whole columns. The first run
+    // after a restart does every tab, to heal rows written earlier.
+    const tabsToFormat = rulesHealed
+      ? Object.keys(appendsByTab).filter(id => tabData[id])
+      : Object.keys(tabData);
+    if (tabsToFormat.length && await reapplyColumnRules(cfg, sheetIds, reasonCodes, tabsToFormat)) {
+      rulesHealed = true;
     }
 
     // Only now remove the old copies (moved rows, stale leftovers, redundant

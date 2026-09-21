@@ -110,6 +110,65 @@ async function matchProspects() {
   return { checked: unmatched.length, matched };
 }
 
+// Last 10 digits — the same number written 0803…, +234803… or 234803…
+// compares equal. Numbers shorter than 10 digits never match (too ambiguous).
+function phoneTail(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+// PostgREST returns at most 1000 rows per request, so read in pages.
+async function fetchAllBusinessPhones(supabase) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('id, phone, created_at')
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) { console.error('platformSync.fetchAllBusinessPhones:', error.message); return null; }
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
+// A lead someone phoned and who then registers is recognised by their phone
+// number: the platform signup's phone equals the lead's. This is exact — no
+// guessing from a staff name — and covers every lead, including cold ones
+// nobody onboarded in person. Runs before the name-based attribution below so
+// that a number we already know is never handed to the wrong lead.
+async function matchProspectsByPhone() {
+  const supabase = getClient();
+  if (!supabase) return { checked: 0, matched: 0 };
+
+  const unmatchedRiders = await db.getUnmatchedRidersForPhoneMatch();
+  if (unmatchedRiders.length === 0) return { checked: 0, matched: 0 };
+
+  const businesses = await fetchAllBusinessPhones(supabase);
+  if (!businesses) return { checked: 0, matched: 0 };
+
+  const ridersByTail = {};
+  unmatchedRiders.forEach(r => {
+    const tail = phoneTail(r.phone);
+    if (tail) (ridersByTail[tail] = ridersByTail[tail] || []).push(r);
+  });
+
+  const alreadyLinked = new Set(await db.getLinkedPlatformBusinessIds());
+  let matched = 0;
+  for (const business of businesses) {
+    if (alreadyLinked.has(business.id)) continue;
+    const tail = phoneTail(business.phone);
+    const candidates = tail ? ridersByTail[tail] : null;
+    if (!candidates || candidates.length === 0) continue;
+    const rider = candidates.shift(); // oldest lead with this number; one lead links to one account
+    await db.linkRiderToPlatformBusiness(rider.id, business.id, toLagosDateTime(business.created_at));
+    matched++;
+  }
+  return { checked: unmatchedRiders.length, matched };
+}
+
 async function attributeUnlinkedPlatformSignups() {
   const supabase = getClient();
   if (!supabase) return { checked: 0, attributed: 0 };
@@ -346,9 +405,10 @@ async function syncOutcomes() {
 
 async function runSync() {
   const matchResult = await matchProspects();
+  const phoneMatchResult = await matchProspectsByPhone();
   const nameMatchResult = await attributeUnlinkedPlatformSignups();
   const syncResult = await syncOutcomes();
-  return { matchResult, nameMatchResult, syncResult };
+  return { matchResult, phoneMatchResult, nameMatchResult, syncResult };
 }
 
 // Live, on-demand fetch for the prospect detail page — NOT synced into
@@ -407,4 +467,4 @@ function startInterval(intervalMs = 5 * 60 * 1000) {
   }, intervalMs);
 }
 
-module.exports = { matchProspects, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage, getUnmatchedCandidatesForStaff, getCompanyUsageSummary };
+module.exports = { matchProspects, matchProspectsByPhone, attributeUnlinkedPlatformSignups, syncOutcomes, runSync, startInterval, getRecentUsage, getUnmatchedCandidatesForStaff, getCompanyUsageSummary };
