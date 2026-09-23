@@ -43,9 +43,10 @@
       <a href="/dashboard?overviewPeriod=all&date=<%= statusDate %>&from=<%= from %>&to=<%= to %>" class="priority-tab <%= overviewPeriod === 'all' ? 'priority-tab-active' : '' %>">All-Time</a>
     </div>
     <div class="card-sub" style="margin-bottom:10px;">
-      <strong><%= cohortOverview.total_leads %></strong> total leads logged in this window (warm leads + onboarded
-      riders) — everything below is how many of those same <%= cohortOverview.total_leads %> have reached each
-      stage so far, regardless of when.
+      <strong><%= cohortOverview.total_leads %></strong> total leads logged in this window across all channels
+      (warm leads + onboarded riders) — everything below is how many of those same <%= cohortOverview.total_leads %>
+      have reached each stage so far, regardless of when. Field marketing and telemarketing are broken out
+      separately further down.
     </div>
     <div class="status-grid">
       <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Total Leads</div><div class="dash-title" style="font-size:24px;"><%= cohortOverview.total_leads %></div></div>
@@ -65,6 +66,25 @@
         <span style="font-size:13px;color:var(--gray);"> (<%= companyOverview.biggestLeak.count %> prospects company-wide)</span>
       </div>
     <% } %>
+
+    <% [{ key: 'field_marketer', label: 'Field Marketing' }, { key: 'telemarketer', label: 'Telemarketing' }].forEach(ch => {
+      const d = cohortByChannel[ch.key]; %>
+      <div class="section-title" style="margin-top:20px;"><%= ch.label %></div>
+      <div class="card-sub" style="margin-bottom:10px;">
+        <strong><%= d.total_leads %></strong> total leads logged in this window via this channel.
+      </div>
+      <div class="status-grid">
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Total Leads</div><div class="dash-title" style="font-size:24px;"><%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Registered</div><div class="dash-title" style="font-size:24px;"><%= d.registered %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Activations</div><div class="dash-title" style="font-size:24px;"><%= d.activated %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Links Shared</div><div class="dash-title" style="font-size:24px;"><%= d.link_shared %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Customer Activity</div><div class="dash-title" style="font-size:24px;"><%= d.customer_activity %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">First Orders</div><div class="dash-title" style="font-size:24px;"><%= d.first_order %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Completed Orders</div><div class="dash-title" style="font-size:24px;"><%= d.completed_order %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Repeat Orders (Business)</div><div class="dash-title" style="font-size:24px;"><%= d.repeat_order %>/<%= d.total_leads %></div></div>
+        <div class="card" style="margin-bottom:0;"><div class="card-sub" style="margin-bottom:4px;">Businesses w/ Repeat Customers</div><div class="dash-title" style="font-size:24px;"><%= d.repeat_customer_businesses %>/<%= d.total_leads %></div></div>
+      </div>
+    <% }) %>
 
     <div class="section-title">Engagement — <%= overviewPeriod === 'all' ? 'All-Time' : overviewPeriod === 'today' ? "Usage Today (shares/visitors are always all-time)" : "Usage This Week (shares/visitors are always all-time)" %></div>
     <div class="status-grid">

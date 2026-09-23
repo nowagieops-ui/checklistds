@@ -1123,6 +1123,12 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const cohortOverview = overviewPeriod === 'all'
     ? await performance.getCohortOverview()
     : await performance.getCohortOverview(overviewFromDate, overviewToDate);
+  const cohortByChannel = {};
+  for (const ch of ['field_marketer', 'telemarketer']) {
+    cohortByChannel[ch] = overviewPeriod === 'all'
+      ? await performance.getCohortOverview(undefined, undefined, undefined, ch)
+      : await performance.getCohortOverview(overviewFromDate, overviewToDate, undefined, ch);
+  }
   const usageSummary = await platformSync.getCompanyUsageSummary(overviewPeriod === 'all' ? undefined : overviewFromDate);
   const checklistAccuracy = await performance.getChecklistAccuracy();
 
@@ -1204,7 +1210,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
     cutoff,
     formatTime, formatDateShort,
-    companyOverview, cohortOverview, overviewPeriod, usageSummary, checklistAccuracy
+    companyOverview, cohortOverview, cohortByChannel, overviewPeriod, usageSummary, checklistAccuracy
   });
 });
 

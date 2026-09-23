@@ -62,14 +62,17 @@ async function getCompanyOverview(fromDate, toDate) {
 // 50 people today, 5 have activated so far" needs 50 (everyone logged
 // today) as the denominator, not however many of them happen to have
 // registered yet. Pass marketerId to scope to one staff member (their own
-// leads); omit for company-wide. Omit fromDate/toDate for the all-time
-// cohort (everyone ever logged).
-async function getCohortOverview(fromDate, toDate, marketerId) {
+// leads), channel to scope to one lead source (e.g. telemarketer vs
+// field_marketer, so a bulk telemarketing import doesn't drown out field
+// marketing's numbers); omit either for company-wide. Omit fromDate/toDate
+// for the all-time cohort (everyone ever logged).
+async function getCohortOverview(fromDate, toDate, marketerId, channel) {
   const ranged = fromDate && toDate;
   const conditions = [];
   const params = [];
   if (ranged) { conditions.push('DATE(created_at) BETWEEN ? AND ?'); params.push(fromDate, toDate); }
   if (marketerId) { conditions.push('added_by_marketer_id = ?'); params.push(marketerId); }
+  if (channel) { conditions.push('channel = ?'); params.push(channel); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const [row] = await db.query(
