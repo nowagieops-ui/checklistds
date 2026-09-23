@@ -321,6 +321,10 @@ app.post('/submit', requireAuth, async (req, res) => {
     return res.status(400).send('Location access is required to submit your checklist. Please enable location and try again.');
   }
 
+  if (req.session.marketerRole === 'telemarketer' && (parseInt(targets, 10) || 0) < 25) {
+    return res.status(400).send('Call target must be at least 25.');
+  }
+
   const parsedLat = parseFloat(lat);
   const parsedLng = parseFloat(lng);
   const ip = clientIp(req);
@@ -962,23 +966,30 @@ app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
 app.get('/logout', requireAuth, async (req, res) => {
   if (req.session.marketerRole === 'telemarketer') {
     const sub = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
-    return res.render('logout-telemarketer', { name: req.session.marketerName, goal: sub ? sub.targets : null });
+    const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
+    return res.render('logout-telemarketer', {
+      name: req.session.marketerName,
+      target: sub ? parseInt(sub.targets, 10) || 0 : 0,
+      actualCalls: callSummary.total_calls
+    });
   }
   const ridersToday = (await db.getRidersAddedByOnDate(req.session.marketerId, today())).length;
   res.render('logout', { name: req.session.marketerName, ridersToday });
 });
 
-// "Did you hit your goal" folds into the same free-text summary column the
-// field checkout already writes to (no schema change) — Yes needs no reason,
-// Partly/No carry whatever she typed about what got in the way.
-function composeTelemarketerSummary(achieved, reason) {
-  const label = { yes: 'Yes', partly: 'Partly', no: 'No' }[String(achieved || '').toLowerCase()] || 'Not answered';
+// Target vs. what she actually logged is a real DB count, not self-reported —
+// folds into the same free-text summary column the field checkout already
+// writes to (no schema change). A reason is only meaningful when she fell
+// short, so it's dropped from the text entirely when she hit target.
+function composeTelemarketerSummary(target, actualCalls, reason) {
+  const short = target - actualCalls;
   const trimmedReason = (reason || '').trim();
-  return `Hit today's goal: ${label}` + (label !== 'Yes' && trimmedReason ? ` — ${trimmedReason}` : '');
+  return `Call target: ${target} · Logged: ${actualCalls}` +
+    (short <= 0 ? ' · Hit ✓' : ` · Short by ${short}` + (trimmedReason ? ` — ${trimmedReason}` : ''));
 }
 
 app.post('/logout', requireAuth, async (req, res) => {
-  const { lat, lng, accuracy, summary, achieved, reason } = req.body;
+  const { lat, lng, accuracy, summary, reason } = req.body;
   const wantsJson = req.get('X-Requested-With') === 'fetch';
 
   if (lat === undefined || lng === undefined || lat === '' || lng === '') {
@@ -1003,6 +1014,13 @@ app.post('/logout', requireAuth, async (req, res) => {
 
   const ridersToday = (await db.getRidersAddedByOnDate(marketerId, today())).length;
 
+  let finalSummary = (summary || '').trim();
+  if (req.session.marketerRole === 'telemarketer') {
+    const sub = await db.getSubmissionByMarketerToday(marketerId, today());
+    const callSummary = await performance.getTodayCallSummary(marketerId, today());
+    finalSummary = composeTelemarketerSummary(sub ? parseInt(sub.targets, 10) || 0 : 0, callSummary.total_calls, reason);
+  }
+
   await db.addAttendance({
     marketer_id: marketerId,
     marketer_name: marketerName,
@@ -1016,7 +1034,7 @@ app.post('/logout', requireAuth, async (req, res) => {
     flagged: result.flagged,
     flags: result.flags,
     riders_onboarded: ridersToday,
-    summary: req.session.marketerRole === 'telemarketer' ? composeTelemarketerSummary(achieved, reason) : (summary || '').trim(),
+    summary: finalSummary,
     address: result.address,
     timestamp: nowLagos()
   });

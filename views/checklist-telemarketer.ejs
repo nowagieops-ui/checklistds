@@ -79,8 +79,8 @@
             </span>
           </label>
 
-          <label for="targets">Today's goal <span style="color:var(--red)">*</span></label>
-          <input type="text" name="targets" id="targets" placeholder="e.g. 15 calls, 5 registrations" required>
+          <label for="targets">Call target for today (minimum 25) <span style="color:var(--red)">*</span></label>
+          <input type="number" name="targets" id="targets" min="25" step="1" placeholder="e.g. 25" required>
         </div>
 
         <!-- SECTION 3: READY -->
@@ -106,8 +106,8 @@
           <label class="check-item">
             <input type="checkbox" name="item_mindset" value="1" required>
             <span class="check-item-text">
-              I've read back the goal I just set and taken a moment to focus my mind on hitting it
-              — prayer, meditation, or just a quiet minute, whatever that looks like for you
+              I know my call target for today and have taken a moment to focus my mind on hitting
+              it — prayer, meditation, or just a quiet minute, whatever that looks like for you
               <span class="check-required"> *required</span>
             </span>
           </label>

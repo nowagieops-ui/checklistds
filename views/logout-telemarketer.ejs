@@ -29,20 +29,25 @@
       <div class="card-sub">Hi <%= name %>. Quick check before you go.</div>
 
       <div class="detail-row">
-        <span class="detail-label">Today's goal was</span>
-        <span class="detail-value"><%= goal || '—' %></span>
+        <span class="detail-label">Call target</span>
+        <span class="detail-value"><%= target %></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Calls logged today</span>
+        <span class="detail-value"><%= actualCalls %></span>
       </div>
 
-      <label for="achieved">Did you hit it?</label>
-      <select name="achieved" id="achieved" required>
-        <option value="" disabled selected>Select one</option>
-        <option value="yes">Yes</option>
-        <option value="partly">Partly</option>
-        <option value="no">No</option>
-      </select>
-
-      <label for="reason" id="reasonLabel" style="display:none;">What got in the way?</label>
-      <textarea id="reason" placeholder="What got in the way today?" style="display:none;"></textarea>
+      <% if (actualCalls >= target) { %>
+        <div class="note-box">
+          <div class="note-box-body">🎯 Target hit — nice work.</div>
+        </div>
+      <% } else { %>
+        <div class="note-box">
+          <div class="note-box-body"><%= target - actualCalls %> short of target today.</div>
+        </div>
+        <label for="reason">What got in the way?</label>
+        <textarea id="reason" placeholder="What got in the way today?"></textarea>
+      <% } %>
     </div>
 
     <div class="card">
@@ -61,19 +66,11 @@
   </div>
 
   <script>
-    var achievedSelect = document.getElementById('achieved');
-    var reasonLabel = document.getElementById('reasonLabel');
     var reasonBox = document.getElementById('reason');
     var btn = document.getElementById('confirmLogoutBtn');
     var errBox = document.getElementById('logoutError');
     var loaderOverlay = document.getElementById('loaderOverlay');
     var submitting = false;
-
-    achievedSelect.addEventListener('change', function () {
-      var showReason = achievedSelect.value === 'partly' || achievedSelect.value === 'no';
-      reasonLabel.style.display = showReason ? 'block' : 'none';
-      reasonBox.style.display = showReason ? 'block' : 'none';
-    });
 
     function showError(msg) {
       errBox.textContent = msg;
@@ -88,10 +85,6 @@
 
     btn.addEventListener('click', function () {
       if (submitting) return;
-      if (!achievedSelect.value) {
-        showError('Let us know whether you hit today\'s goal.');
-        return;
-      }
       submitting = true;
       btn.disabled = true;
       btn.textContent = 'Getting your location...';
@@ -107,8 +100,7 @@
         var body = 'lat=' + encodeURIComponent(pos.coords.latitude) +
           '&lng=' + encodeURIComponent(pos.coords.longitude) +
           '&accuracy=' + encodeURIComponent(pos.coords.accuracy) +
-          '&achieved=' + encodeURIComponent(achievedSelect.value) +
-          '&reason=' + encodeURIComponent(reasonBox.value);
+          '&reason=' + encodeURIComponent(reasonBox ? reasonBox.value : '');
 
         fetch('/logout', {
           method: 'POST',
