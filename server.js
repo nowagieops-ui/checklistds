@@ -960,12 +960,25 @@ app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
 });
 
 app.get('/logout', requireAuth, async (req, res) => {
+  if (req.session.marketerRole === 'telemarketer') {
+    const sub = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
+    return res.render('logout-telemarketer', { name: req.session.marketerName, goal: sub ? sub.targets : null });
+  }
   const ridersToday = (await db.getRidersAddedByOnDate(req.session.marketerId, today())).length;
   res.render('logout', { name: req.session.marketerName, ridersToday });
 });
 
+// "Did you hit your goal" folds into the same free-text summary column the
+// field checkout already writes to (no schema change) — Yes needs no reason,
+// Partly/No carry whatever she typed about what got in the way.
+function composeTelemarketerSummary(achieved, reason) {
+  const label = { yes: 'Yes', partly: 'Partly', no: 'No' }[String(achieved || '').toLowerCase()] || 'Not answered';
+  const trimmedReason = (reason || '').trim();
+  return `Hit today's goal: ${label}` + (label !== 'Yes' && trimmedReason ? ` — ${trimmedReason}` : '');
+}
+
 app.post('/logout', requireAuth, async (req, res) => {
-  const { lat, lng, accuracy, summary } = req.body;
+  const { lat, lng, accuracy, summary, achieved, reason } = req.body;
   const wantsJson = req.get('X-Requested-With') === 'fetch';
 
   if (lat === undefined || lng === undefined || lat === '' || lng === '') {
@@ -1003,7 +1016,7 @@ app.post('/logout', requireAuth, async (req, res) => {
     flagged: result.flagged,
     flags: result.flags,
     riders_onboarded: ridersToday,
-    summary: (summary || '').trim(),
+    summary: req.session.marketerRole === 'telemarketer' ? composeTelemarketerSummary(achieved, reason) : (summary || '').trim(),
     address: result.address,
     timestamp: nowLagos()
   });
