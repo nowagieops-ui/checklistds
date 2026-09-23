@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Morning Checklist — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+      <div class="app-header-spacer"></div>
+      <span class="badge badge-orange"><%= date %></span>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Morning Checklist</div>
+      <div class="card-sub">Hi <%= name %>. Complete every item before you start calling.</div>
+
+      <div class="error" id="checklistError" style="display:none;"></div>
+
+      <form method="POST" action="/submit" id="checklistForm">
+        <input type="hidden" name="lat" id="lat">
+        <input type="hidden" name="lng" id="lng">
+        <input type="hidden" name="accuracy" id="accuracy">
+        <input type="hidden" name="zone" value="Telemarketing (remote)">
+
+        <!-- SECTION 1: BEFORE YOU START -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Before You Start</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_phone" value="1" required>
+            <span class="check-item-text">
+              Phone is charged and has network / data — you'll be on it all day
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_sheet" value="1" required>
+            <span class="check-item-text">
+              Today's lead list (the Google Sheet / Call Queue) is open and ready
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_link" value="1">
+            <span class="check-item-text">
+              My Dashspid referral link is saved and ready to send during a call
+            </span>
+          </label>
+        </div>
+
+        <!-- SECTION 2: TODAY'S PLAN -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Today's Plan</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_followups" value="1" required>
+            <span class="check-item-text">
+              I have reviewed yesterday's follow-ups and know who to call back today
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_focus" value="1" required>
+            <span class="check-item-text">
+              I know which priority list I'm focused on today
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_goalwritten" value="1" required>
+            <span class="check-item-text">
+              I have written down today's call / registration goal (below)
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- SECTION 3: READY -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Ready</div>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_pitch" value="1" required>
+            <span class="check-item-text">
+              I know my opening line for a cold call
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_objections" value="1" required>
+            <span class="check-item-text">
+              I am ready to handle the top objections over the phone
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+
+          <label class="check-item">
+            <input type="checkbox" name="item_mindset" value="1" required>
+            <span class="check-item-text">
+              I've taken a moment to set my mindset for the day — prayer, meditation, or just a
+              quiet minute, whatever that looks like for you
+              <span class="check-required"> *required</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- TODAY'S DETAILS -->
+        <div class="checklist-section">
+          <div class="checklist-section-title">Today's Details</div>
+
+          <label for="targets">Today's goal <span style="color:var(--red)">*</span></label>
+          <input type="text" name="targets" id="targets" placeholder="e.g. 15 calls, 5 registrations" required>
+
+          <label for="notes">Anything else to flag before you start?</label>
+          <textarea name="notes" id="notes" placeholder="Any leads to follow up from yesterday, challenges expected, etc."></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">
+          Submit & Start Calling →
+        </button>
+
+      </form>
+    </div>
+
+    <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
+    <a href="/sign-out" class="logout-link">Not you? Log out</a>
+  </div>
+
+  <div class="loader-overlay" id="loaderOverlay">
+    <div>
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Submitting your checklist...</div>
+    </div>
+  </div>
+
+  <script>
+    var checklistForm = document.getElementById('checklistForm');
+    var submitBtn = document.getElementById('submitBtn');
+    var checklistError = document.getElementById('checklistError');
+    var loaderOverlay = document.getElementById('loaderOverlay');
+    var submitting = false;
+
+    function showChecklistError(msg) {
+      checklistError.textContent = msg;
+      checklistError.style.display = 'block';
+      checklistError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function resetSubmitBtn() {
+      submitting = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit & Start Calling →';
+    }
+
+    checklistForm.addEventListener('submit', function (e) {
+      if (submitting) { e.preventDefault(); return; }
+      e.preventDefault();
+      submitting = true;
+      checklistError.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Getting your location...';
+
+      if (!navigator.geolocation) {
+        resetSubmitBtn();
+        showChecklistError('Location is not supported on this device/browser.');
+        return;
+      }
+
+      function onLocationSuccess(pos) {
+        document.getElementById('lat').value = pos.coords.latitude;
+        document.getElementById('lng').value = pos.coords.longitude;
+        document.getElementById('accuracy').value = pos.coords.accuracy;
+        submitBtn.textContent = 'Submitting...';
+        loaderOverlay.classList.add('active');
+        checklistForm.submit();
+      }
+
+      function onLocationError(err) {
+        if (err && err.code === err.PERMISSION_DENIED) {
+          resetSubmitBtn();
+          showChecklistError('Location access is required to submit your checklist. Please enable location and try again.');
+          return;
+        }
+        // GPS fix can take longer than 10s indoors/low signal — retry once
+        // with lower accuracy before giving up, instead of blaming permissions.
+        navigator.geolocation.getCurrentPosition(onLocationSuccess, function () {
+          resetSubmitBtn();
+          showChecklistError('Could not get a location fix. Please move to an area with better GPS/signal and try again.');
+        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
+      }
+
+      navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    });
+  </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

@@ -307,7 +307,8 @@ app.get('/sign-out', requireAuth, (req, res) => {
 app.get('/checklist', requireAuth, async (req, res) => {
   const existing = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
   if (existing) return res.redirect('/submitted');
-  res.render('checklist', { name: req.session.marketerName, date: formatDate() });
+  const view = req.session.marketerRole === 'telemarketer' ? 'checklist-telemarketer' : 'checklist';
+  res.render(view, { name: req.session.marketerName, date: formatDate() });
 });
 
 app.post('/submit', requireAuth, async (req, res) => {
@@ -380,6 +381,7 @@ app.get('/submitted', requireAuth, async (req, res) => {
   const sub = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
   res.render('submitted', {
     name: req.session.marketerName,
+    role: req.session.marketerRole,
     submission: sub,
     time: sub ? formatTime(sub.submitted_at) : null
   });
