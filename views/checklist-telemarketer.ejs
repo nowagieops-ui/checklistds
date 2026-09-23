@@ -57,13 +57,6 @@
               <span class="check-required"> *required</span>
             </span>
           </label>
-
-          <label class="check-item">
-            <input type="checkbox" name="item_link" value="1">
-            <span class="check-item-text">
-              My Dashspid referral link is saved and ready to send during a call
-            </span>
-          </label>
         </div>
 
         <!-- SECTION 2: TODAY'S PLAN -->
@@ -86,13 +79,8 @@
             </span>
           </label>
 
-          <label class="check-item">
-            <input type="checkbox" name="item_goalwritten" value="1" required>
-            <span class="check-item-text">
-              I have written down today's call / registration goal (below)
-              <span class="check-required"> *required</span>
-            </span>
-          </label>
+          <label for="targets">Today's goal <span style="color:var(--red)">*</span></label>
+          <input type="text" name="targets" id="targets" placeholder="e.g. 15 calls, 5 registrations" required>
         </div>
 
         <!-- SECTION 3: READY -->
@@ -118,8 +106,8 @@
           <label class="check-item">
             <input type="checkbox" name="item_mindset" value="1" required>
             <span class="check-item-text">
-              I've taken a moment to set my mindset for the day — prayer, meditation, or just a
-              quiet minute, whatever that looks like for you
+              I've read back the goal I just set and taken a moment to focus my mind on hitting it
+              — prayer, meditation, or just a quiet minute, whatever that looks like for you
               <span class="check-required"> *required</span>
             </span>
           </label>
@@ -127,12 +115,9 @@
 
         <!-- TODAY'S DETAILS -->
         <div class="checklist-section">
-          <div class="checklist-section-title">Today's Details</div>
+          <div class="checklist-section-title">Anything Else</div>
 
-          <label for="targets">Today's goal <span style="color:var(--red)">*</span></label>
-          <input type="text" name="targets" id="targets" placeholder="e.g. 15 calls, 5 registrations" required>
-
-          <label for="notes">Anything else to flag before you start?</label>
+          <label for="notes">Anything to flag before you start?</label>
           <textarea name="notes" id="notes" placeholder="Any leads to follow up from yesterday, challenges expected, etc."></textarea>
         </div>
 
