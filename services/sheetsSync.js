@@ -36,13 +36,13 @@ const TOTAL_COLS = HEADERS.length; // A-O
 // Titled by who's in it and what the call is trying to achieve. The id ties a
 // tab to the app's priority lists (services/priorityLists.js).
 const TABS = [
-  { id: 'P6', title: 'P6 New - Register' },
-  { id: 'P1', title: 'P1 Registered - Activate' },
-  { id: 'P2', title: 'P2 Activated - Share Link' },
-  { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit' },
-  { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order' },
-  { id: 'P5', title: 'P5 Ordered - Repeat Order' },
-  { id: 'DONE', title: 'Graduated' }
+  { id: 'P6', title: 'P6 New - Register', goal: 'Goal: get them to register a free DashSpid account.' },
+  { id: 'P1', title: 'P1 Registered - Activate', goal: 'Goal: get them to activate — set up their storefront (pricing + payout).' },
+  { id: 'P2', title: 'P2 Activated - Share Link', goal: 'Goal: get them to share their storefront link with customers.' },
+  { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit', goal: 'Goal: get a customer to actually open their shared link.' },
+  { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order', goal: 'Goal: get a visitor to place their first order.' },
+  { id: 'P5', title: 'P5 Ordered - Repeat Order', goal: 'Goal: get them a repeat order from a customer.' },
+  { id: 'DONE', title: 'Graduated', goal: 'Fully onboarded with a repeat customer — no action needed, this is just a record.' }
 ];
 
 // A read-only overview of every lead against every stage. Nobody types in it,
@@ -373,11 +373,40 @@ function columnRuleRequests(sheetId, reasonLabels) {
   ];
 }
 
-function formatRequests(sheetId, reasonLabels) {
+// A banner in the top-right, clear of the A-O headers and dropdowns, so she
+// sees what this tab is trying to achieve the moment she opens it — without
+// disturbing row 1's actual column headers or the frozen-row/row-number math
+// the rest of the sync relies on.
+const GOAL_COL_START = 16; // Q
+const GOAL_COL_END = 26;   // through Z, merged into one banner cell
+
+function goalBannerRequests(sheetId, goalText) {
+  if (!goalText) return [];
+  const range = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: GOAL_COL_START, endColumnIndex: GOAL_COL_END };
+  return [
+    { mergeCells: { range, mergeType: 'MERGE_ALL' } },
+    { updateCells: {
+        range,
+        rows: [{ values: [{
+          userEnteredValue: { stringValue: goalText },
+          userEnteredFormat: {
+            textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+            backgroundColor: { red: 1, green: 0.36, blue: 0 },
+            wrapStrategy: 'WRAP',
+            verticalAlignment: 'MIDDLE'
+          }
+        }] }],
+        fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor,wrapStrategy,verticalAlignment)'
+    } }
+  ];
+}
+
+function formatRequests(sheetId, reasonLabels, goalText) {
   return [
     { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
     { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
     ...columnRuleRequests(sheetId, reasonLabels),
+    ...goalBannerRequests(sheetId, goalText),
     { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: TOTAL_COLS } } } }
   ];
 }
@@ -392,7 +421,10 @@ let rulesHealed = false;
 async function reapplyColumnRules(cfg, sheetIds, reasonCodes, tabIds) {
   try {
     const reasonLabels = reasonCodes.map(r => r.label);
-    const requests = tabIds.flatMap(id => columnRuleRequests(sheetIds[tabTitle(id)], reasonLabels));
+    const requests = tabIds.flatMap(id => [
+      ...columnRuleRequests(sheetIds[tabTitle(id)], reasonLabels),
+      ...goalBannerRequests(sheetIds[tabTitle(id)], TABS.find(t => t.id === id).goal)
+    ]);
     await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     return true;
   } catch (err) {
@@ -443,7 +475,7 @@ async function ensureTabs(cfg, reasonCodes) {
     renames.forEach(r => { sheetIds[r.to] = sheetIds[r.from]; delete sheetIds[r.from]; });
   }
 
-  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage' })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
+  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage', goal: t.goal })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
   const missing = wanted.filter(t => !(t.title in sheetIds));
   if (missing.length) {
     const res = await sheetsRequest(cfg, 'post', ':batchUpdate', {
@@ -455,7 +487,7 @@ async function ensureTabs(cfg, reasonCodes) {
       const reasonLabels = reasonCodes.map(r => r.label);
       const requests = missing.flatMap(t => (t.kind === 'funnel'
         ? funnelFormatRequests(sheetIds[t.title])
-        : formatRequests(sheetIds[t.title], reasonLabels)));
+        : formatRequests(sheetIds[t.title], reasonLabels, t.goal)));
       await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     } catch (err) {
       console.error('sheetsSync: tab formatting failed:', err.message);
