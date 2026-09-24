@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Which one today? — Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="app-header-badge">D</div>
+      Ops
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Hi <%= name %></div>
+      <div class="card-sub">Which one are you working today?</div>
+    </div>
+
+    <form method="POST" action="/choose-company">
+      <button type="submit" name="company" value="dashspid" class="home-tile" style="width:100%;border:none;text-align:left;cursor:pointer;">
+        <div class="home-tile-body">
+          <div class="home-tile-title">DashSpid</div>
+          <div class="home-tile-sub">Onboarding calls and follow-ups</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </button>
+      <button type="submit" name="company" value="nowagieops" class="home-tile" style="width:100%;border:none;text-align:left;cursor:pointer;">
+        <div class="home-tile-body">
+          <div class="home-tile-title">NowagieOps</div>
+          <div class="home-tile-sub">UK cold calls — book a strategy call</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </button>
+    </form>
+
+    <a href="/sign-out" class="logout-link">Not you? Log out</a>
+  </div>
+</body>
+</html>

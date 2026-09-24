@@ -45,6 +45,13 @@
           <div class="note-box-body">Telemarketers must complete the training academy the first time they log in, before they can reach anything else.</div>
         </div>
 
+        <div id="companyBox" style="display:none;">
+          <label class="check-item">
+            <input type="checkbox" name="works_nowagieops" value="1">
+            <span class="check-item-text">Also works NowagieOps cold calls (in addition to DashSpid) — she'll pick which one at login and complete both training academies separately.</span>
+          </label>
+        </div>
+
         <button type="submit" class="btn" id="submitBtn">Add Staff →</button>
       </form>
     </div>
@@ -60,6 +67,14 @@
   </div>
 
   <script>
+    var roleSelect = document.getElementById('role');
+    var companyBox = document.getElementById('companyBox');
+    function toggleCompanyBox() {
+      companyBox.style.display = roleSelect.value === 'telemarketer' ? 'block' : 'none';
+    }
+    roleSelect.addEventListener('change', toggleCompanyBox);
+    toggleCompanyBox();
+
     document.getElementById('staffForm').addEventListener('submit', function() {
       document.getElementById('submitBtn').disabled = true;
       document.getElementById('submitBtn').textContent = 'Please wait...';

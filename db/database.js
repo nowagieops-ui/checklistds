@@ -65,13 +65,22 @@ const db = {
     return rows[0];
   },
 
-  async addMarketer({ name, pin, role }) {
+  async addMarketer({ name, pin, role, worksDashspid, worksNowagieops }) {
     const [result] = await pool.execute(
-      'INSERT INTO marketers (name, pin, active, role) VALUES (?, ?, 1, ?)',
-      [name, pin, role || 'field_marketer']
+      'INSERT INTO marketers (name, pin, active, role, works_dashspid, works_nowagieops) VALUES (?, ?, 1, ?, ?, ?)',
+      [name, pin, role || 'field_marketer', worksDashspid === false ? 0 : 1, worksNowagieops ? 1 : 0]
     );
     const [rows] = await pool.execute('SELECT * FROM marketers WHERE id = ?', [result.insertId]);
     return rows[0];
+  },
+
+  // Only meaningful for telemarketers — which business(es) they work.
+  // Defaults to DashSpid-only for every existing row until this is used.
+  async updateMarketerCompanies(marketerId, { worksDashspid, worksNowagieops }) {
+    await pool.execute(
+      'UPDATE marketers SET works_dashspid = ?, works_nowagieops = ? WHERE id = ?',
+      [worksDashspid ? 1 : 0, worksNowagieops ? 1 : 0, parseInt(marketerId)]
+    );
   },
 
   async getSubmissionsToday(date) {
@@ -547,6 +556,80 @@ const db = {
     );
     const [rows] = await pool.execute(
       'SELECT * FROM training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0] || null;
+  },
+
+  // ── NOWAGIEOPS TRAINING ACADEMY ──────────────────────────────────────────
+  // Exact mirror of the two blocks above, against nowagie_training_progress /
+  // nowagie_training_weeks_progress — a separate 8-week academy for cold-
+  // calling UK businesses on behalf of NowagieOps, entirely independent of
+  // the DashSpid one so a marketer working both businesses progresses
+  // through each on its own schedule.
+
+  async getNowagieTrainingProgress(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM nowagie_training_progress WHERE marketer_id = ?',
+      [parseInt(marketerId)]
+    );
+    return rows[0] ? normalizeProgress(rows[0]) : null;
+  },
+
+  async upsertNowagieTrainingProgress(marketerId, completedModules, roleplayLog, now) {
+    await pool.execute(
+      `INSERT INTO nowagie_training_progress (marketer_id, completed_modules, roleplay_log, started_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE completed_modules = VALUES(completed_modules), roleplay_log = VALUES(roleplay_log), updated_at = VALUES(updated_at)`,
+      [parseInt(marketerId), JSON.stringify(completedModules || {}), JSON.stringify(roleplayLog || []), now, now]
+    );
+    const [rows] = await pool.execute('SELECT * FROM nowagie_training_progress WHERE marketer_id = ?', [parseInt(marketerId)]);
+    return rows[0];
+  },
+
+  async completeNowagieTraining(marketerId, completedAt) {
+    await pool.execute('UPDATE nowagie_training_progress SET completed_at = ? WHERE marketer_id = ?', [completedAt, parseInt(marketerId)]);
+    const [rows] = await pool.execute('SELECT * FROM nowagie_training_progress WHERE marketer_id = ?', [parseInt(marketerId)]);
+    return rows[0] || null;
+  },
+
+  async getNowagieWeekProgress(marketerId, weekNumber) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM nowagie_training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0] ? normalizeProgress(rows[0]) : null;
+  },
+
+  async getAllNowagieWeekProgress(marketerId) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM nowagie_training_weeks_progress WHERE marketer_id = ? ORDER BY week_number ASC',
+      [parseInt(marketerId)]
+    );
+    return rows.map(normalizeProgress);
+  },
+
+  async upsertNowagieWeekProgress(marketerId, weekNumber, completedModules, roleplayLog, now) {
+    await pool.execute(
+      `INSERT INTO nowagie_training_weeks_progress (marketer_id, week_number, completed_modules, roleplay_log, started_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE completed_modules = VALUES(completed_modules), roleplay_log = VALUES(roleplay_log), updated_at = VALUES(updated_at)`,
+      [parseInt(marketerId), weekNumber, JSON.stringify(completedModules || {}), JSON.stringify(roleplayLog || []), now, now]
+    );
+    const [rows] = await pool.execute(
+      'SELECT * FROM nowagie_training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
+      [parseInt(marketerId), weekNumber]
+    );
+    return rows[0];
+  },
+
+  async completeNowagieWeekProgress(marketerId, weekNumber, completedAt) {
+    await pool.execute(
+      'UPDATE nowagie_training_weeks_progress SET completed_at = ? WHERE marketer_id = ? AND week_number = ?',
+      [completedAt, parseInt(marketerId), weekNumber]
+    );
+    const [rows] = await pool.execute(
+      'SELECT * FROM nowagie_training_weeks_progress WHERE marketer_id = ? AND week_number = ?',
       [parseInt(marketerId), weekNumber]
     );
     return rows[0] || null;

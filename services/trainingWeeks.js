@@ -10,11 +10,24 @@
 // client always sees the same shape regardless of which week it's viewing.
 const path = require('path');
 
-const TOTAL_WEEKS = 12;
+// Two independent curricula share this one engine/renderer — only the data
+// directory and week count differ. 'dashspid' is the default everywhere
+// existing callers don't pass a track, so nothing about the original
+// 12-week academy changes.
+const TRACKS = {
+  dashspid: { dir: 'trainingWeeks', totalWeeks: 12 },
+  nowagieops: { dir: 'trainingWeeksNowagieOps', totalWeeks: 8 }
+};
 
-function loadWeekRaw(weekNumber) {
+const TOTAL_WEEKS = TRACKS.dashspid.totalWeeks;
+
+function totalWeeksFor(track) {
+  return TRACKS[track || 'dashspid'].totalWeeks;
+}
+
+function loadWeekRaw(weekNumber, track) {
   const file = `week${String(weekNumber).padStart(2, '0')}.js`;
-  return require(path.join(__dirname, '..', 'data', 'trainingWeeks', file));
+  return require(path.join(__dirname, '..', 'data', TRACKS[track || 'dashspid'].dir, file));
 }
 
 // A content block is one of: {type:'table', headers, rows}, {callout},
@@ -65,9 +78,9 @@ function normalizeModule(m) {
 }
 
 // Returns the normalized week, or null if that week number doesn't exist.
-function loadWeek(weekNumber) {
-  if (weekNumber < 1 || weekNumber > TOTAL_WEEKS) return null;
-  const raw = loadWeekRaw(weekNumber);
+function loadWeek(weekNumber, track) {
+  if (weekNumber < 1 || weekNumber > totalWeeksFor(track)) return null;
+  const raw = loadWeekRaw(weekNumber, track);
   return {
     weekNumber: raw.weekNumber,
     title: raw.title,
@@ -91,4 +104,14 @@ function ceilToMonday(dateStr) {
   return date.toISOString().split('T')[0];
 }
 
-module.exports = { TOTAL_WEEKS, loadWeek, ceilToMonday };
+// Same idea as ceilToMonday, for NowagieOps's Friday-unlock cadence.
+function ceilToFriday(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const dow = date.getUTCDay(); // 0=Sun..6=Sat
+  const daysUntilFriday = (5 - dow + 7) % 7;
+  date.setUTCDate(date.getUTCDate() + daysUntilFriday);
+  return date.toISOString().split('T')[0];
+}
+
+module.exports = { TOTAL_WEEKS, totalWeeksFor, loadWeek, ceilToMonday, ceilToFriday };

@@ -23,16 +23,8 @@ const sheetsSync = require('./services/sheetsSync');
 const geminiClient = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 const FALLBACK_ROLEPLAY_FEEDBACK = 'Good attempt. Acknowledge the concern first, then pivot to the benefit. Always mention the free trial when someone hesitates on cost or complexity.';
 
-async function getRoleplayFeedback(scenario, traineeResponse) {
-  if (!geminiClient) return FALLBACK_ROLEPLAY_FEEDBACK;
-  try {
-    const result = await geminiClient.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `You are a training evaluator for Dashspid, a Nigerian logistics SaaS. A telemarketer is practising objection handling.
-
-PROSPECT: ${scenario.prospect}
-OBJECTION: "${scenario.objection}"
-TRAINEE SAID: "${traineeResponse}"
+const ROLEPLAY_BRIEF = {
+  dashspid: `You are a training evaluator for Dashspid, a Nigerian logistics SaaS. A telemarketer is practising objection handling.
 
 KEY DASHSPID FACTS:
 - Plans: Free N0/30 orders, Rider N5999/250 orders (bot included), Growth N10799/750 orders, Pro N23999/unlimited
@@ -42,7 +34,28 @@ KEY DASHSPID FACTS:
 - Instant payout to operator bank account
 - Payment via Paystack before rider moves
 - Setup 10 minutes
-- Shield welfare fund for riders
+- Shield welfare fund for riders`,
+  nowagieops: `You are a training evaluator for NowagieOps, a UK brand growth agency. A telemarketer is practising cold-call objection handling. Her ONLY goal on every call is to book a free, no-obligation strategy call -- nothing is being sold or closed on this call itself.
+
+KEY NOWAGIEOPS FACTS:
+- Services: social media management, email marketing, video editing, content creation, website development, app development
+- Positioning: "one team, one plan, growth you can measure" instead of juggling multiple freelancers and tools with no strategy
+- Engagement types: a la carte, growth partner (full team retainer, most popular), project-based
+- The ask is always a free 30-minute strategy call -- no obligation, no card
+- Response promised within 1 business day`
+};
+
+async function getRoleplayFeedback(scenario, traineeResponse, track) {
+  if (!geminiClient) return FALLBACK_ROLEPLAY_FEEDBACK;
+  const brief = ROLEPLAY_BRIEF[track] || ROLEPLAY_BRIEF.dashspid;
+  try {
+    const result = await geminiClient.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `${brief}
+
+PROSPECT: ${scenario.prospect}
+OBJECTION: "${scenario.objection}"
+TRAINEE SAID: "${traineeResponse}"
 
 Give feedback in 2-3 sentences max. One thing done well, one thing to improve, then a sample better response in quotes. Be brief and direct.`
     });
@@ -105,13 +118,26 @@ function clientIp(req) {
 // the module; only recording that she showed up on time is exempt.
 const CHECKIN_PATHS = ['/checklist', '/submit', '/submitted'];
 
+// A marketer assigned to both businesses picks one at login (see
+// POST /login and /choose-company) before anything else is gated — this
+// page has to stay reachable even though trainingCompleted isn't set yet.
+const COMPANY_CHOICE_PATH = '/choose-company';
+
 async function requireAuth(req, res, next) {
   if (!req.session.marketerId) return res.redirect('/');
+  if (req.path === COMPANY_CHOICE_PATH) return next();
 
-  // A gate below wants to send her to /training or /weekly-training — but if
-  // she hasn't checked in yet today, send her to check in first instead, so
-  // the module (which can take a while) never delays her attendance
-  // timestamp past the cutoff. She still can't reach real work either way.
+  // Which academy/gate applies is decided by which business she picked for
+  // this session (defaults to DashSpid for anyone who never sees a choice —
+  // field marketers, and telemarketers assigned to only one business).
+  const isNowagie = req.session.activeCompany === 'nowagieops';
+  const trainingPath = isNowagie ? '/nowagie-training' : '/training';
+  const weeklyPath = isNowagie ? '/nowagie-weekly-training' : '/weekly-training';
+
+  // A gate below wants to send her into training — but if she hasn't
+  // checked in yet today, send her to check in first instead, so the module
+  // (which can take a while) never delays her attendance timestamp past the
+  // cutoff. She still can't reach real work either way.
   async function redirectToGate(gatePath) {
     const checkedInToday = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
     return res.redirect(checkedInToday ? gatePath : '/checklist');
@@ -121,31 +147,33 @@ async function requireAuth(req, res, next) {
   // else — field marketers are unaffected (trainingCompleted is set true for
   // them at login, see POST /login). /sign-out stays reachable so a trainee
   // isn't stuck with no way to log out mid-training.
-  if (!req.session.trainingCompleted && !req.path.startsWith('/training') && req.path !== '/sign-out'
+  if (!req.session.trainingCompleted && !req.path.startsWith(trainingPath) && req.path !== '/sign-out'
       && !CHECKIN_PATHS.includes(req.path)) {
-    return redirectToGate('/training');
+    return redirectToGate(trainingPath);
   }
 
-  // Same hard block for whichever week (2-12) is currently unlocked — a
+  // Same hard block for whichever week is currently unlocked — a
   // telemarketer can't reach anything else until she finishes it, exactly
-  // like Week 1. Re-checked once per calendar day (cached on the session)
-  // rather than on every request, since this can only change by a new
-  // Monday arriving, not by anything she does mid-day.
+  // like the initial academy. Re-checked once per calendar day (cached on
+  // the session) rather than on every request, since this can only change
+  // by the next unlock day arriving, not by anything she does mid-day.
   if (req.session.trainingCompleted && req.session.marketerRole === 'telemarketer'
-      && !req.path.startsWith('/weekly-training') && !req.path.startsWith('/training') && req.path !== '/sign-out'
+      && !req.path.startsWith(weeklyPath) && !req.path.startsWith(trainingPath) && req.path !== '/sign-out'
       && !CHECKIN_PATHS.includes(req.path)) {
     const checkDate = today();
     if (req.session.weeklyGateCheckedDate !== checkDate) {
       req.session.weeklyGateCheckedDate = checkDate;
       try {
-        const state = await getWeeklyTrainingState(req.session.marketerId);
+        const state = isNowagie
+          ? await getNowagieWeeklyTrainingState(req.session.marketerId)
+          : await getWeeklyTrainingState(req.session.marketerId);
         req.session.weeklyGateBlocked = !state.done && !!state.isUnlocked;
       } catch (err) {
         console.error('Weekly training gate check failed:', err.message);
         req.session.weeklyGateBlocked = false; // fail open — never lock her out of real work over an error here
       }
     }
-    if (req.session.weeklyGateBlocked) return redirectToGate('/weekly-training');
+    if (req.session.weeklyGateBlocked) return redirectToGate(weeklyPath);
   }
 
   next();
@@ -221,16 +249,50 @@ app.post('/login', async (req, res) => {
   req.session.marketerName = marketer.name;
   req.session.marketerRole = marketer.role;
 
-  if (marketer.role === 'telemarketer') {
-    const progress = await db.getTrainingProgress(marketer.id);
-    req.session.trainingCompleted = !!(progress && progress.completed_at);
-  } else {
-    req.session.trainingCompleted = true; // gate only applies to telemarketers
+  // A telemarketer assigned to both businesses picks which one she's
+  // working today before anything else is decided — everyone else (field
+  // marketers, and telemarketers assigned to only one business) skips
+  // straight past this and is never shown it.
+  if (marketer.role === 'telemarketer' && marketer.works_dashspid && marketer.works_nowagieops) {
+    if (wantsJson) return res.json({ ok: true, redirect: COMPANY_CHOICE_PATH });
+    return res.redirect(COMPANY_CHOICE_PATH);
   }
+  req.session.activeCompany = (marketer.role === 'telemarketer' && marketer.works_nowagieops) ? 'nowagieops' : 'dashspid';
+  await enterActiveCompany(req);
 
   const redirectTo = req.session.trainingCompleted ? '/home' : '/training';
   if (wantsJson) return res.json({ ok: true, redirect: redirectTo });
   res.redirect(redirectTo);
+});
+
+// Sets trainingCompleted (and resets the weekly-gate cache) for whichever
+// company is now active — called right after activeCompany is decided,
+// either automatically at login or from the company-choice screen below.
+async function enterActiveCompany(req) {
+  if (req.session.marketerRole !== 'telemarketer') {
+    req.session.trainingCompleted = true; // gate only applies to telemarketers
+  } else if (req.session.activeCompany === 'nowagieops') {
+    const progress = await db.getNowagieTrainingProgress(req.session.marketerId);
+    req.session.trainingCompleted = !!(progress && progress.completed_at);
+  } else {
+    const progress = await db.getTrainingProgress(req.session.marketerId);
+    req.session.trainingCompleted = !!(progress && progress.completed_at);
+  }
+  req.session.weeklyGateCheckedDate = null;
+  req.session.weeklyGateBlocked = false;
+}
+
+app.get(COMPANY_CHOICE_PATH, requireAuth, (req, res) => {
+  res.render('choose-company', { name: req.session.marketerName });
+});
+
+app.post(COMPANY_CHOICE_PATH, requireAuth, async (req, res) => {
+  const { company } = req.body;
+  if (!['dashspid', 'nowagieops'].includes(company)) return res.redirect(COMPANY_CHOICE_PATH);
+  req.session.activeCompany = company;
+  await enterActiveCompany(req);
+  const trainingPath = company === 'nowagieops' ? '/nowagie-training' : '/training';
+  res.redirect(req.session.trainingCompleted ? '/home' : trainingPath);
 });
 
 // A day counts green only once BOTH a login and a logout event exist for it
@@ -298,15 +360,18 @@ app.get('/home', requireAuth, async (req, res) => {
   // never break the home screen.
   let weeklyTraining = null;
   if (role === 'telemarketer') {
+    const nowagie = req.session.activeCompany === 'nowagieops';
+    const href = nowagie ? '/nowagie-weekly-training' : '/weekly-training';
+    const totalWeeks = trainingWeeks.totalWeeksFor(nowagie ? 'nowagieops' : 'dashspid');
     try {
-      const state = await getWeeklyTrainingState(req.session.marketerId);
+      const state = nowagie ? await getNowagieWeeklyTrainingState(req.session.marketerId) : await getWeeklyTrainingState(req.session.marketerId);
       if (state.done) {
-        weeklyTraining = { done: true };
+        weeklyTraining = { done: true, href, totalWeeks };
       } else {
-        const weekTitle = trainingWeeks.loadWeek(state.nextWeek).title;
+        const weekTitle = trainingWeeks.loadWeek(state.nextWeek, nowagie ? 'nowagieops' : 'dashspid').title;
         weeklyTraining = state.isUnlocked
-          ? { available: true, weekNumber: state.nextWeek, title: weekTitle }
-          : { available: false, weekNumber: state.nextWeek, title: weekTitle, unlockDateFormatted: formatDateShort(state.unlockDate) };
+          ? { available: true, weekNumber: state.nextWeek, title: weekTitle, href }
+          : { available: false, weekNumber: state.nextWeek, title: weekTitle, unlockDateFormatted: formatDateShort(state.unlockDate), href };
       }
     } catch (err) {
       console.error('Weekly training status error:', err.message);
@@ -469,7 +534,7 @@ app.get('/weekly-training', requireAuth, async (req, res) => {
   const state = await getWeeklyTrainingState(req.session.marketerId);
 
   if (state.done) {
-    return res.render('weekly-training-locked', { name: req.session.marketerName, done: true });
+    return res.render('weekly-training-locked', { name: req.session.marketerName, done: true, totalWeeks: trainingWeeks.totalWeeksFor('dashspid') });
   }
   if (!state.isUnlocked) {
     const nextWeekData = trainingWeeks.loadWeek(state.nextWeek);
@@ -490,15 +555,99 @@ app.get('/weekly-training', requireAuth, async (req, res) => {
   });
 });
 
+// ── NOWAGIEOPS TRAINING ACADEMY (mirrors the two routes/function above) ──────
+
+app.get('/nowagie-training', requireAuth, async (req, res) => {
+  if (req.session.trainingCompleted) return res.redirect('/home');
+  const progress = await db.getNowagieTrainingProgress(req.session.marketerId);
+  res.render('training', {
+    name: req.session.marketerName,
+    weekData: trainingWeeks.loadWeek(1, 'nowagieops'),
+    weekMode: 'gate',
+    initialCompleted: progress ? progress.completed_modules : {}
+  });
+});
+
+async function getNowagieWeeklyTrainingState(marketerId) {
+  const week1Progress = await db.getNowagieTrainingProgress(marketerId);
+  const week1CompletedAt = week1Progress ? week1Progress.completed_at : null;
+  if (!week1CompletedAt) return { locked: true, nextWeek: 2, unlockDate: null, isUnlocked: false };
+
+  const weekRows = await db.getAllNowagieWeekProgress(marketerId);
+  const byWeek = {};
+  weekRows.forEach(r => { byWeek[r.week_number] = r; });
+
+  const totalWeeks = trainingWeeks.totalWeeksFor('nowagieops');
+  let lastCompletedWeek = 1;
+  let lastCompletedDate = week1CompletedAt.slice(0, 10);
+  for (let w = 2; w <= totalWeeks; w++) {
+    const row = byWeek[w];
+    if (row && row.completed_at) {
+      lastCompletedWeek = w;
+      lastCompletedDate = row.completed_at.slice(0, 10);
+    } else {
+      break;
+    }
+  }
+
+  const nextWeek = lastCompletedWeek + 1;
+  if (nextWeek > totalWeeks) return { done: true, lastCompletedWeek };
+
+  const unlockDate = trainingWeeks.ceilToFriday(lastCompletedDate);
+  const nextWeekRow = byWeek[nextWeek] || null;
+
+  return {
+    done: false,
+    nextWeek,
+    unlockDate,
+    isUnlocked: today() >= unlockDate,
+    initialCompleted: nextWeekRow ? nextWeekRow.completed_modules : {}
+  };
+}
+
+app.get('/nowagie-weekly-training', requireAuth, async (req, res) => {
+  if (req.session.marketerRole !== 'telemarketer') return res.redirect('/home');
+
+  const state = await getNowagieWeeklyTrainingState(req.session.marketerId);
+
+  if (state.done) {
+    return res.render('weekly-training-locked', { name: req.session.marketerName, done: true, totalWeeks: trainingWeeks.totalWeeksFor('nowagieops') });
+  }
+  if (!state.isUnlocked) {
+    const nextWeekData = trainingWeeks.loadWeek(state.nextWeek, 'nowagieops');
+    return res.render('weekly-training-locked', {
+      name: req.session.marketerName,
+      done: false,
+      nextWeekNumber: state.nextWeek,
+      nextWeekTitle: nextWeekData.title,
+      unlockDateFormatted: formatDateLong(state.unlockDate)
+    });
+  }
+
+  res.render('training', {
+    name: req.session.marketerName,
+    weekData: trainingWeeks.loadWeek(state.nextWeek, 'nowagieops'),
+    weekMode: 'weekly',
+    initialCompleted: state.initialCompleted || {}
+  });
+});
+
+// The three routes below are shared by both academies — which company's
+// tables they read/write is decided by req.session.activeCompany, already
+// known server-side, so the training.ejs client code needs no changes at
+// all to work for either track.
 app.post('/training/progress', requireAuth, async (req, res) => {
   const { completedModules, week } = req.body;
   const weekNumber = week || 1;
+  const nowagie = req.session.activeCompany === 'nowagieops';
   if (weekNumber === 1) {
-    const existing = await db.getTrainingProgress(req.session.marketerId);
-    await db.upsertTrainingProgress(req.session.marketerId, completedModules, existing ? existing.roleplay_log : [], nowLagos());
+    const existing = nowagie ? await db.getNowagieTrainingProgress(req.session.marketerId) : await db.getTrainingProgress(req.session.marketerId);
+    const upsert = nowagie ? db.upsertNowagieTrainingProgress : db.upsertTrainingProgress;
+    await upsert(req.session.marketerId, completedModules, existing ? existing.roleplay_log : [], nowLagos());
   } else {
-    const existing = await db.getWeekProgress(req.session.marketerId, weekNumber);
-    await db.upsertWeekProgress(req.session.marketerId, weekNumber, completedModules, existing ? existing.roleplay_log : [], nowLagos());
+    const existing = nowagie ? await db.getNowagieWeekProgress(req.session.marketerId, weekNumber) : await db.getWeekProgress(req.session.marketerId, weekNumber);
+    const upsert = nowagie ? db.upsertNowagieWeekProgress : db.upsertWeekProgress;
+    await upsert(req.session.marketerId, weekNumber, completedModules, existing ? existing.roleplay_log : [], nowLagos());
   }
   res.json({ ok: true });
 });
@@ -507,19 +656,22 @@ app.post('/training/roleplay-feedback', requireAuth, async (req, res) => {
   const { scenario, response: traineeResponse, week } = req.body;
   if (!scenario || !traineeResponse) return res.status(400).json({ ok: false, error: 'Missing scenario or response.' });
   const weekNumber = week || 1;
+  const nowagie = req.session.activeCompany === 'nowagieops';
 
-  const feedback = await getRoleplayFeedback(scenario, traineeResponse);
+  const feedback = await getRoleplayFeedback(scenario, traineeResponse, nowagie ? 'nowagieops' : 'dashspid');
 
   if (weekNumber === 1) {
-    const existing = await db.getTrainingProgress(req.session.marketerId);
+    const existing = nowagie ? await db.getNowagieTrainingProgress(req.session.marketerId) : await db.getTrainingProgress(req.session.marketerId);
     const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
     roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
-    await db.upsertTrainingProgress(req.session.marketerId, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
+    const upsert = nowagie ? db.upsertNowagieTrainingProgress : db.upsertTrainingProgress;
+    await upsert(req.session.marketerId, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
   } else {
-    const existing = await db.getWeekProgress(req.session.marketerId, weekNumber);
+    const existing = nowagie ? await db.getNowagieWeekProgress(req.session.marketerId, weekNumber) : await db.getWeekProgress(req.session.marketerId, weekNumber);
     const roleplayLog = existing && existing.roleplay_log ? existing.roleplay_log : [];
     roleplayLog.push({ scenario, response: traineeResponse, feedback, at: nowLagos() });
-    await db.upsertWeekProgress(req.session.marketerId, weekNumber, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
+    const upsert = nowagie ? db.upsertNowagieWeekProgress : db.upsertWeekProgress;
+    await upsert(req.session.marketerId, weekNumber, existing ? existing.completed_modules : {}, roleplayLog, nowLagos());
   }
 
   res.json({ ok: true, feedback });
@@ -528,12 +680,13 @@ app.post('/training/roleplay-feedback', requireAuth, async (req, res) => {
 app.post('/training/complete', requireAuth, async (req, res) => {
   const { week } = req.body;
   const weekNumber = week || 1;
+  const nowagie = req.session.activeCompany === 'nowagieops';
   if (weekNumber === 1) {
-    await db.completeTraining(req.session.marketerId, nowLagos());
+    await (nowagie ? db.completeNowagieTraining(req.session.marketerId, nowLagos()) : db.completeTraining(req.session.marketerId, nowLagos()));
     req.session.trainingCompleted = true;
     return res.json({ ok: true, redirect: '/home' });
   }
-  await db.completeWeekProgress(req.session.marketerId, weekNumber, nowLagos());
+  await (nowagie ? db.completeNowagieWeekProgress(req.session.marketerId, weekNumber, nowLagos()) : db.completeWeekProgress(req.session.marketerId, weekNumber, nowLagos()));
   req.session.weeklyGateBlocked = false; // she just cleared it — don't wait for tomorrow's re-check to let her back in
   res.json({ ok: true, redirect: '/home' });
 });
@@ -1101,7 +1254,10 @@ app.post('/management/staff', requireManagement, async (req, res) => {
     return res.render('staff-new', { error: 'Choose a role.', role });
   }
 
-  await db.addMarketer({ name: name.trim(), pin, role });
+  // Company assignment only matters for telemarketers — field marketers are
+  // DashSpid-only by definition (NowagieOps has no field/in-person role).
+  const worksNowagieops = role === 'telemarketer' && req.body.works_nowagieops === '1';
+  await db.addMarketer({ name: name.trim(), pin, role, worksDashspid: true, worksNowagieops });
   res.redirect('/dashboard');
 });
 
