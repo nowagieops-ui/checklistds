@@ -564,8 +564,23 @@ app.get('/weekly-training', requireAuth, async (req, res) => {
 
 // ── NOWAGIEOPS TRAINING ACADEMY (mirrors the two routes/function above) ──────
 
+// The whole academy launches on this date — not "whenever someone first
+// logs in and picks NowagieOps." Once this date has passed it's a no-op
+// (today() >= it forever after), so a telemarketer added to NowagieOps
+// later just gets immediate Week 1 access like DashSpid's does.
+const NOWAGIE_ACADEMY_START_DATE = '2026-10-02';
+
 app.get('/nowagie-training', requireAuth, async (req, res) => {
   if (req.session.trainingCompleted) return res.redirect('/home');
+  if (today() < NOWAGIE_ACADEMY_START_DATE) {
+    return res.render('weekly-training-locked', {
+      name: req.session.marketerName,
+      done: false,
+      nextWeekNumber: 1,
+      nextWeekTitle: trainingWeeks.loadWeek(1, 'nowagieops').title,
+      unlockDateFormatted: formatDateLong(NOWAGIE_ACADEMY_START_DATE)
+    });
+  }
   const progress = await db.getNowagieTrainingProgress(req.session.marketerId);
   res.render('training', {
     name: req.session.marketerName,
