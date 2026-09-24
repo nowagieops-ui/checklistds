@@ -125,6 +125,14 @@ const CHECKIN_PATHS = ['/checklist', '/submit', '/submitted'];
 // page has to stay reachable even though trainingCompleted isn't set yet.
 const COMPANY_CHOICE_PATH = '/choose-company';
 
+// The NowagieOps academy launches on this date — not "whenever someone
+// first logs in and picks NowagieOps." Before it arrives she can still work
+// real NowagieOps leads (the queue/sheet are open — see requireAuth below);
+// only the training content itself stays locked until then. Once the date
+// has passed this is a no-op forever after, so a telemarketer added to
+// NowagieOps later just gets immediate Week 1 access like DashSpid's does.
+const NOWAGIE_ACADEMY_START_DATE = '2026-10-02';
+
 async function requireAuth(req, res, next) {
   if (!req.session.marketerId) return res.redirect('/');
   if (req.path === COMPANY_CHOICE_PATH) return next();
@@ -148,8 +156,13 @@ async function requireAuth(req, res, next) {
   // Telemarketers must finish the training academy before reaching anything
   // else — field marketers are unaffected (trainingCompleted is set true for
   // them at login, see POST /login). /sign-out stays reachable so a trainee
-  // isn't stuck with no way to log out mid-training.
-  if (!req.session.trainingCompleted && !req.path.startsWith(trainingPath) && req.path !== '/sign-out'
+  // isn't stuck with no way to log out mid-training. Exception: before the
+  // NowagieOps academy has actually launched, don't block real leads/queue
+  // work over training she can't start yet — only /nowagie-training itself
+  // shows the "starts <date>" message. This stops being true the moment the
+  // launch date arrives, at which point it's the same hard block as always.
+  const nowagiePrelaunch = isNowagie && today() < NOWAGIE_ACADEMY_START_DATE;
+  if (!nowagiePrelaunch && !req.session.trainingCompleted && !req.path.startsWith(trainingPath) && req.path !== '/sign-out'
       && !CHECKIN_PATHS.includes(req.path)) {
     return redirectToGate(trainingPath);
   }
@@ -366,7 +379,12 @@ app.get('/home', requireAuth, async (req, res) => {
   // this, and it's just a status line, not a gate, so a failure here should
   // never break the home screen.
   let weeklyTraining = null;
-  if (role === 'telemarketer') {
+  if (role === 'telemarketer' && req.session.activeCompany === 'nowagieops' && !req.session.trainingCompleted) {
+    // Only reachable during the NowagieOps prelaunch window (requireAuth
+    // lets her through to /home without training done) — Week 1 itself
+    // isn't unlocked yet, so there's no weekly state to compute at all.
+    weeklyTraining = { prelaunch: true, unlockDateFormatted: formatDateLong(NOWAGIE_ACADEMY_START_DATE), href: '/nowagie-training' };
+  } else if (role === 'telemarketer') {
     const nowagie = req.session.activeCompany === 'nowagieops';
     const href = nowagie ? '/nowagie-weekly-training' : '/weekly-training';
     const totalWeeks = trainingWeeks.totalWeeksFor(nowagie ? 'nowagieops' : 'dashspid');
@@ -563,12 +581,6 @@ app.get('/weekly-training', requireAuth, async (req, res) => {
 });
 
 // ── NOWAGIEOPS TRAINING ACADEMY (mirrors the two routes/function above) ──────
-
-// The whole academy launches on this date — not "whenever someone first
-// logs in and picks NowagieOps." Once this date has passed it's a no-op
-// (today() >= it forever after), so a telemarketer added to NowagieOps
-// later just gets immediate Week 1 access like DashSpid's does.
-const NOWAGIE_ACADEMY_START_DATE = '2026-10-02';
 
 app.get('/nowagie-training', requireAuth, async (req, res) => {
   if (req.session.trainingCompleted) return res.redirect('/home');
