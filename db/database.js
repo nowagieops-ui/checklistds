@@ -489,6 +489,57 @@ const db = {
     );
   },
 
+  // ── NOWAGIEOPS GOOGLE SHEET SYNC (services/nowagieSheetsSync.js) ──────────
+  // Exact mirror of the DashSpid sheet-sync methods above, against
+  // nowagie_leads/nowagie_followups/nowagie_sheet_sync_rows.
+
+  async getAllNowagieLeads() {
+    const [rows] = await pool.execute('SELECT * FROM nowagie_leads ORDER BY created_at ASC, id ASC');
+    return rows;
+  },
+
+  async getAllNowagieLeadPhones() {
+    const [rows] = await pool.execute('SELECT id, phone FROM nowagie_leads');
+    return rows;
+  },
+
+  async updateNowagieLeadFields(leadId, { name, phone, businessName, marketerId, marketerName }) {
+    await pool.execute(
+      'UPDATE nowagie_leads SET name = ?, phone = ?, business_name = ?, added_by_marketer_id = ?, added_by_marketer_name = ? WHERE id = ?',
+      [name, phone, businessName || null, marketerId, marketerName, parseInt(leadId)]
+    );
+  },
+
+  async getNowagieSheetSyncRows() {
+    const [rows] = await pool.execute('SELECT lead_id, lead_hash, call_hash FROM nowagie_sheet_sync_rows');
+    const byLead = {};
+    rows.forEach(r => { byLead[r.lead_id] = r; });
+    return byLead;
+  },
+
+  async upsertNowagieSheetSyncRow(leadId, leadHash, callHash, now) {
+    await pool.execute(
+      `INSERT INTO nowagie_sheet_sync_rows (lead_id, lead_hash, call_hash, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE lead_hash = VALUES(lead_hash), call_hash = VALUES(call_hash), updated_at = VALUES(updated_at)`,
+      [parseInt(leadId), leadHash, callHash, now]
+    );
+  },
+
+  async getNowagieFollowupSummary() {
+    const [counts] = await pool.execute(
+      'SELECT lead_id, COUNT(*) AS calls, MAX(created_at) AS last_at FROM nowagie_followups GROUP BY lead_id'
+    );
+    const [latest] = await pool.execute(
+      `SELECT f.lead_id, f.notes FROM nowagie_followups f
+       JOIN (SELECT lead_id, MAX(id) AS max_id FROM nowagie_followups GROUP BY lead_id) m ON m.max_id = f.id`
+    );
+    const byLead = {};
+    counts.forEach(r => { byLead[r.lead_id] = { calls: Number(r.calls), lastAt: r.last_at, lastNotes: null }; });
+    latest.forEach(r => { if (byLead[r.lead_id]) byLead[r.lead_id].lastNotes = r.notes; });
+    return byLead;
+  },
+
   async getExperiments() {
     const [rows] = await pool.execute('SELECT * FROM experiments ORDER BY start_date DESC, id DESC');
     return rows;

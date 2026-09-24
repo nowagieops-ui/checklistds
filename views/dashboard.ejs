@@ -133,6 +133,16 @@
       <div id="sync-sheet-result" style="width:100%;font-size:13px;color:var(--gray);"></div>
     </div>
 
+    <!-- NOWAGIEOPS SHEET SYNC -->
+    <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:14px;">NowagieOps Sheet sync</div>
+        <div style="font-size:13px;color:var(--gray);">Same idea, against the NowagieOps cold-call sheet (New / Contacted / Call Booked). Runs automatically every few minutes once configured.</div>
+      </div>
+      <button id="sync-nowagie-sheet-btn" type="button" class="btn" style="width:auto;padding:10px 20px;margin:0;">Sync now</button>
+      <div id="sync-nowagie-sheet-result" style="width:100%;font-size:13px;color:var(--gray);"></div>
+    </div>
+
     <form method="GET" action="/dashboard" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;">
         <label for="date">View check-in status for</label>
@@ -465,6 +475,32 @@
       result.textContent = '';
       try {
         var res = await fetch('/management/sync-sheet', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
+        if (res.redirected || (res.headers.get('content-type') || '').indexOf('json') === -1) {
+          throw new Error('Your management session expired (the app restarts on every deploy) — reload this page and log in again, then retry.');
+        }
+        var data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Sync failed');
+        result.textContent = 'Read ' + data.rows + ' row(s) · created ' + data.created + ' lead(s) · linked ' + data.linked +
+          ' to existing · updated ' + data.updated + ' · logged ' + data.callsLogged + ' call(s) · added ' + data.appended +
+          ' lead(s) to the sheet · moved ' + data.moved + ' to a new stage tab' +
+          (data.errors ? ' · ' + data.errors + ' row(s) need attention (see Sync Status column)' : '') +
+          (data.tabProblems && data.tabProblems.length ? ' · ' + data.tabProblems.join('; ') : '') + '.';
+      } catch (err) {
+        result.textContent = 'Sync failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync now';
+      }
+    });
+
+    document.getElementById('sync-nowagie-sheet-btn').addEventListener('click', async function () {
+      var btn = this;
+      var result = document.getElementById('sync-nowagie-sheet-result');
+      btn.disabled = true;
+      btn.textContent = 'Syncing…';
+      result.textContent = '';
+      try {
+        var res = await fetch('/management/sync-nowagie-sheet', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } });
         if (res.redirected || (res.headers.get('content-type') || '').indexOf('json') === -1) {
           throw new Error('Your management session expired (the app restarts on every deploy) — reload this page and log in again, then retry.');
         }

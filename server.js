@@ -15,6 +15,7 @@ const nowagieLists = require('./services/nowagieLists');
 const performance = require('./services/performance');
 const trainingWeeks = require('./services/trainingWeeks');
 const sheetsSync = require('./services/sheetsSync');
+const nowagieSheetsSync = require('./services/nowagieSheetsSync');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
@@ -1647,6 +1648,18 @@ app.post('/management/sync-sheet', requireManagement, async (req, res) => {
   }
 });
 
+// Same as above, against the NowagieOps sheet (services/nowagieSheetsSync.js).
+app.post('/management/sync-nowagie-sheet', requireManagement, async (req, res) => {
+  try {
+    const result = await nowagieSheetsSync.runSync();
+    if (result.skipped) return res.json({ ok: false, error: result.skipped });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Manual NowagieOps sheet sync failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/management-logout', (req, res) => {
   req.session.isManagement = false;
   res.redirect('/management-login');
@@ -1660,3 +1673,4 @@ app.listen(PORT, () => {
 
 platformSync.startInterval();
 sheetsSync.startInterval();
+nowagieSheetsSync.startInterval();
