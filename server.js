@@ -98,14 +98,32 @@ function clientIp(req) {
   return (req.get('CF-Connecting-IP') || req.ip || '').replace('::ffff:', '');
 }
 
+// Check-in must never be delayed by a training gate — a module can take a
+// while, and making her finish it first would push her attendance timestamp
+// past the cutoff and mark an on-time morning as late. She's still fully
+// blocked from real work (priority lists, riders, etc.) until she finishes
+// the module; only recording that she showed up on time is exempt.
+const CHECKIN_PATHS = ['/checklist', '/submit', '/submitted'];
+
 async function requireAuth(req, res, next) {
   if (!req.session.marketerId) return res.redirect('/');
+
+  // A gate below wants to send her to /training or /weekly-training — but if
+  // she hasn't checked in yet today, send her to check in first instead, so
+  // the module (which can take a while) never delays her attendance
+  // timestamp past the cutoff. She still can't reach real work either way.
+  async function redirectToGate(gatePath) {
+    const checkedInToday = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
+    return res.redirect(checkedInToday ? gatePath : '/checklist');
+  }
+
   // Telemarketers must finish the training academy before reaching anything
   // else — field marketers are unaffected (trainingCompleted is set true for
   // them at login, see POST /login). /sign-out stays reachable so a trainee
   // isn't stuck with no way to log out mid-training.
-  if (!req.session.trainingCompleted && !req.path.startsWith('/training') && req.path !== '/sign-out') {
-    return res.redirect('/training');
+  if (!req.session.trainingCompleted && !req.path.startsWith('/training') && req.path !== '/sign-out'
+      && !CHECKIN_PATHS.includes(req.path)) {
+    return redirectToGate('/training');
   }
 
   // Same hard block for whichever week (2-12) is currently unlocked — a
@@ -114,7 +132,8 @@ async function requireAuth(req, res, next) {
   // rather than on every request, since this can only change by a new
   // Monday arriving, not by anything she does mid-day.
   if (req.session.trainingCompleted && req.session.marketerRole === 'telemarketer'
-      && !req.path.startsWith('/weekly-training') && !req.path.startsWith('/training') && req.path !== '/sign-out') {
+      && !req.path.startsWith('/weekly-training') && !req.path.startsWith('/training') && req.path !== '/sign-out'
+      && !CHECKIN_PATHS.includes(req.path)) {
     const checkDate = today();
     if (req.session.weeklyGateCheckedDate !== checkDate) {
       req.session.weeklyGateCheckedDate = checkDate;
@@ -126,7 +145,7 @@ async function requireAuth(req, res, next) {
         req.session.weeklyGateBlocked = false; // fail open — never lock her out of real work over an error here
       }
     }
-    if (req.session.weeklyGateBlocked) return res.redirect('/weekly-training');
+    if (req.session.weeklyGateBlocked) return redirectToGate('/weekly-training');
   }
 
   next();
