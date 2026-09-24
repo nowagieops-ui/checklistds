@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title><%= lead.name %> — NowagieOps</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title"><%= lead.name %></div>
+      <div class="card-sub" style="margin-bottom:10px;">
+        <% if (lead.business_name) { %><%= lead.business_name %><% } %>
+        <% if (lead.phone) { %> · <%= lead.phone %><% } %>
+      </div>
+      <span class="badge <%= lead.stage === 'call_booked' ? 'badge-green' : lead.stage === 'not_interested' ? 'badge-red' : 'badge-amber' %>"><%= stageLabel %></span>
+
+      <% if (lead.stage === 'call_booked') { %>
+        <div class="note-box" style="margin-top:12px;">
+          <div class="note-box-title">🎯 Call booked</div>
+          <div class="note-box-body">
+            <% if (lead.cal_booking_time) { %>Confirmed for <%= lead.cal_booking_time %><% } else { %>Confirmed via Cal.com<% } %> — nothing more needed here, it's handed off.
+          </div>
+        </div>
+      <% } %>
+
+      <% if (lead.notes) { %>
+        <div class="detail-row" style="margin-top:12px;">
+          <span class="detail-label">Notes</span>
+          <span class="detail-value"><%= lead.notes %></span>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (lead.stage !== 'call_booked' && lead.stage !== 'not_interested') { %>
+      <div class="card">
+        <div class="card-title" style="font-size:15px;margin-bottom:12px;">Log a Call</div>
+        <form method="POST" action="/nowagie-leads/<%= lead.id %>/followups">
+          <label for="outcome">Outcome</label>
+          <select name="outcome" id="outcome">
+            <option value="">— Select —</option>
+            <option value="No answer">No answer</option>
+            <option value="Busy - call back">Busy - call back</option>
+            <option value="Switched off">Switched off</option>
+            <option value="Wrong number">Wrong number</option>
+            <option value="Reached">Reached</option>
+            <option value="Interested">Interested</option>
+            <option value="Not interested">Not interested</option>
+          </select>
+
+          <label for="reason_code">Reason / objection (if any)</label>
+          <select name="reason_code" id="reason_code">
+            <option value="">— None —</option>
+            <% reasonCodes.forEach(function (rc) { %>
+              <option value="<%= rc.code %>"><%= rc.label %></option>
+            <% }) %>
+          </select>
+
+          <label for="notes">Notes</label>
+          <textarea name="notes" id="notes" rows="3" placeholder="Anything else worth recording"></textarea>
+
+          <label for="next_followup_date">Next follow-up date</label>
+          <input type="date" name="next_followup_date" id="next_followup_date" min="<%= today %>">
+
+          <button type="submit" class="btn">Save Call →</button>
+        </form>
+      </div>
+
+      <form method="POST" action="/nowagie-leads/<%= lead.id %>/not-interested" style="margin-bottom:16px;">
+        <button type="submit" class="btn btn-outline" style="border-color:var(--red);color:var(--red);" onclick="return confirm('Mark this lead as not interested? Stop calling them.');">Mark Not Interested</button>
+      </form>
+    <% } %>
+
+    <% if (followups.length > 0) { %>
+      <div class="section-title">Call History</div>
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Staff</th>
+              <th>Outcome</th>
+              <th>Reason</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% followups.forEach(function (f) { %>
+              <tr>
+                <td><%= f.dateFormatted %> <%= f.timeFormatted %></td>
+                <td><%= f.staff_name %></td>
+                <td><%= f.outcome || '—' %></td>
+                <td><%= f.reason_code || '—' %></td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= f.notes || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <a href="<%= backHref %>" class="logout-link"><%= backLabel %></a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

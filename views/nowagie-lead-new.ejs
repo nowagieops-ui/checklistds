@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Add New Lead — NowagieOps</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
+  <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="app-header">
+    <div class="app-header-inner">
+      <a href="/home" class="app-header-brand">
+        <div class="app-header-badge">D</div>
+        Dashspid Ops
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Add New Lead</div>
+      <div class="card-sub">A UK business to cold-call — no checklist, just enough to start working them.</div>
+
+      <% if (error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/nowagie-leads" id="leadForm">
+        <label for="name">Contact name <span style="color:var(--red)">*</span></label>
+        <input type="text" name="name" id="name" placeholder="e.g. Sarah Thompson" required>
+
+        <label for="business_name">Business name</label>
+        <input type="text" name="business_name" id="business_name" placeholder="e.g. Thompson's Bakery">
+
+        <label for="phone">Phone number</label>
+        <input type="tel" name="phone" id="phone" placeholder="e.g. 07912345678">
+
+        <label for="reason_code">Reason they didn't book yet (if any)</label>
+        <select name="reason_code" id="reason_code">
+          <option value="">— None / still deciding —</option>
+          <% reasonCodes.forEach(function (rc) { %>
+            <option value="<%= rc.code %>"><%= rc.label %></option>
+          <% }) %>
+        </select>
+
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" rows="3" placeholder="Anything else worth recording about this conversation"></textarea>
+
+        <button type="submit" class="btn" id="submitBtn">Add Lead →</button>
+      </form>
+    </div>
+
+    <a href="/home" class="auth-link" style="display:block;text-align:center;">← Back to Home</a>
+  </div>
+
+  <script>
+    document.getElementById('leadForm').addEventListener('submit', function() {
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Please wait...';
+    });
+  </script>
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

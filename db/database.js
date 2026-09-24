@@ -418,6 +418,77 @@ const db = {
     );
   },
 
+  // ── NOWAGIEOPS LEADS ──────────────────────────────────────────────────────
+  // Far simpler than riders: no funnel_stage-per-timestamp fan-out, just
+  // new -> contacted -> call_booked (verified by Cal.com) or not_interested.
+
+  async addNowagieLead({ name, phone, email, business_name, notes, added_by_marketer_id, added_by_marketer_name, channel }, createdAt) {
+    const [result] = await pool.execute(
+      `INSERT INTO nowagie_leads (name, phone, email, business_name, notes, added_by_marketer_id, added_by_marketer_name, channel, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, phone || null, email || null, business_name || null, notes || null, added_by_marketer_id, added_by_marketer_name, channel || 'telemarketer', createdAt]
+    );
+    const [rows] = await pool.execute('SELECT * FROM nowagie_leads WHERE id = ?', [result.insertId]);
+    return rows[0];
+  },
+
+  async getNowagieLead(id) {
+    const [rows] = await pool.execute('SELECT * FROM nowagie_leads WHERE id = ?', [parseInt(id)]);
+    return rows[0];
+  },
+
+  // The first logged call marks contacted_at; later calls don't touch it.
+  async markNowagieContacted(leadId, now) {
+    await pool.execute('UPDATE nowagie_leads SET contacted_at = COALESCE(contacted_at, ?) WHERE id = ?', [now, parseInt(leadId)]);
+  },
+
+  async markNowagieNotInterested(leadId, now) {
+    await pool.execute('UPDATE nowagie_leads SET not_interested_at = ? WHERE id = ?', [now, parseInt(leadId)]);
+  },
+
+  async getNowagieReasonCodes() {
+    const [rows] = await pool.execute('SELECT code, label FROM nowagie_reason_codes WHERE active = 1 ORDER BY label ASC');
+    return rows;
+  },
+
+  async getFollowupsForNowagieLead(leadId) {
+    const [rows] = await pool.execute(
+      `SELECT f.*, m.name AS staff_name FROM nowagie_followups f
+       JOIN marketers m ON m.id = f.staff_id
+       WHERE f.lead_id = ? ORDER BY f.created_at DESC`,
+      [parseInt(leadId)]
+    );
+    return rows;
+  },
+
+  async getContactedTodayNowagieLeadIds(staffId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT DISTINCT lead_id FROM nowagie_followups WHERE staff_id = ? AND DATE(created_at) = ?',
+      [staffId, todayDate]
+    );
+    return rows.map(r => r.lead_id);
+  },
+
+  async hasContactedNowagieToday(staffId, leadId, todayDate) {
+    const [rows] = await pool.execute(
+      'SELECT id FROM nowagie_followups WHERE staff_id = ? AND lead_id = ? AND DATE(created_at) = ? LIMIT 1',
+      [staffId, parseInt(leadId), todayDate]
+    );
+    return rows.length > 0;
+  },
+
+  async addNowagieFollowup(data) {
+    await pool.execute(
+      `INSERT INTO nowagie_followups (lead_id, staff_id, stage_before, stage_after, reason_code, outcome, notes, next_followup_date, source, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.lead_id, data.staff_id, data.stage_before, data.stage_after,
+        data.reason_code || null, data.outcome || null, data.notes || null,
+        data.next_followup_date || null, data.source || 'app', data.created_at
+      ]
+    );
+  },
+
   async getExperiments() {
     const [rows] = await pool.execute('SELECT * FROM experiments ORDER BY start_date DESC, id DESC');
     return rows;

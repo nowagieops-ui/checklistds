@@ -11,6 +11,7 @@ const { evaluateAttendance } = require('./utils/attendance');
 const { lagosParts, today, nowLagos, daysSince, addDaysUTC, formatDate, formatDateShort, formatDateLong, formatTime } = require('./utils/time');
 const platformSync = require('./services/platformSync');
 const priorityLists = require('./services/priorityLists');
+const nowagieLists = require('./services/nowagieLists');
 const performance = require('./services/performance');
 const trainingWeeks = require('./services/trainingWeeks');
 const sheetsSync = require('./services/sheetsSync');
@@ -336,8 +337,13 @@ function buildAttendanceCalendar(events, fromDateStr, toDateStr, cutoff) {
 app.get('/home', requireAuth, async (req, res) => {
   const marketer = await db.getMarketerById(req.session.marketerId);
   const role = marketer ? marketer.role : 'field_marketer';
-  const priorityCounts = await priorityLists.getAllListCounts(scopeMarketerId(marketer));
-  const openProspects = priorityCounts.reduce((sum, l) => sum + l.count, 0);
+  const nowagie = req.session.activeCompany === 'nowagieops';
+  const queueHref = nowagie ? '/nowagie-queue' : '/priority-lists';
+  const addLeadHref = nowagie ? '/nowagie-leads/new' : '/prospects/new';
+  const queueHeading = nowagie ? "Today's Call Queue" : (role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists');
+  const openProspects = nowagie
+    ? (await nowagieLists.getAllListCounts()).reduce((sum, l) => sum + l.count, 0)
+    : (await priorityLists.getAllListCounts(scopeMarketerId(marketer))).reduce((sum, l) => sum + l.count, 0);
 
   const submittedToday = !!(await db.getSubmissionByMarketerToday(req.session.marketerId, today()));
 
@@ -378,7 +384,7 @@ app.get('/home', requireAuth, async (req, res) => {
     }
   }
 
-  res.render('home', { name: req.session.marketerName, role, openProspects, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar, weeklyTraining });
+  res.render('home', { name: req.session.marketerName, role, openProspects, queueHref, queueHeading, addLeadHref, submittedToday, canCheckin, missedCheckin, canCheckout, date: formatDate(), attendanceCalendar, weeklyTraining });
 });
 
 // Plain sign-out for "wrong person is logged in on this device" — ends the
@@ -1132,6 +1138,198 @@ app.post('/riders/:id/quick-call', requireAuth, async (req, res) => {
   }
 
   const redirectTo = isSafeLocalRedirect(req.query.redirect) ? req.query.redirect : '/priority-lists';
+  res.redirect(redirectTo);
+});
+
+// ── NOWAGIEOPS LEADS (mirrors the DashSpid prospect/priority-list routes
+// above, against the flatter nowagie_leads pipeline) ─────────────────────────
+// Only telemarketers work NowagieOps, and it's always the whole shared
+// queue — no per-marketer ownership split the way DashSpid's field
+// marketers have their own leads.
+function canAccessNowagie(req) {
+  return req.session.marketerRole === 'telemarketer' && req.session.activeCompany === 'nowagieops';
+}
+
+const NOWAGIE_STAGE_LABELS = { new: 'New', contacted: 'Contacted', call_booked: 'Call Booked', not_interested: 'Not Interested' };
+
+app.get('/nowagie-leads/new', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const reasonCodes = await db.getNowagieReasonCodes();
+  res.render('nowagie-lead-new', { error: null, reasonCodes });
+});
+
+app.post('/nowagie-leads', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const { name, phone, business_name, reason_code, notes } = req.body;
+  if (!name || !name.trim()) {
+    const reasonCodes = await db.getNowagieReasonCodes();
+    return res.render('nowagie-lead-new', { error: "Enter the lead's name.", reasonCodes });
+  }
+
+  const lead = await db.addNowagieLead({
+    name: name.trim(),
+    phone: phone && phone.trim() ? phone.trim() : null,
+    email: null,
+    business_name: business_name && business_name.trim() ? business_name.trim() : null,
+    notes: notes && notes.trim() ? notes.trim() : null,
+    added_by_marketer_id: req.session.marketerId,
+    added_by_marketer_name: req.session.marketerName,
+    channel: 'telemarketer'
+  }, nowLagos());
+
+  // Same convention as DashSpid's prospect flow — adding a lead IS the
+  // day's first contact with them, so it marks contacted_at immediately
+  // rather than needing a separate "Called" tap right after.
+  await db.markNowagieContacted(lead.id, nowLagos());
+  await db.addNowagieFollowup({
+    lead_id: lead.id,
+    staff_id: req.session.marketerId,
+    stage_before: 'new',
+    stage_after: 'contacted',
+    reason_code: reason_code || null,
+    outcome: null,
+    notes: notes && notes.trim() ? notes.trim() : null,
+    next_followup_date: null,
+    source: 'app',
+    created_at: nowLagos()
+  });
+
+  res.redirect(`/nowagie-leads/${lead.id}`);
+});
+
+app.get('/nowagie-queue', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+
+  const counts = await nowagieLists.getAllListCounts();
+  const activeList = nowagieLists.LISTS[req.query.list] ? req.query.list : 'N1';
+  const meta = nowagieLists.LISTS[activeList];
+
+  const contactedTodayIds = new Set(await db.getContactedTodayNowagieLeadIds(req.session.marketerId, today()));
+  const rawRows = await nowagieLists.getListRows(activeList);
+  const rows = rawRows.map(r => ({
+    ...r,
+    daysInStage: daysSince(r[meta.orderByColumn] || r.created_at),
+    contactedToday: contactedTodayIds.has(r.id)
+  }));
+
+  const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
+
+  res.render('priority-lists', {
+    heading: "NowagieOps Call Queue",
+    baseUrl: '/nowagie-queue',
+    riderBaseUrl: '/nowagie-leads',
+    backHref: '/home',
+    backLabel: '← Back to Home',
+    viewerIsManagement: false,
+    hideMyPerformance: true,
+    callSummary,
+    counts,
+    activeList,
+    activeMeta: nowagieLists.listMeta(activeList),
+    rows
+  });
+});
+
+app.get('/nowagie-leads/:id', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const lead = await db.getNowagieLead(req.params.id);
+  if (!lead) return res.redirect('/nowagie-queue');
+
+  const followups = (await db.getFollowupsForNowagieLead(lead.id)).map(f => ({
+    ...f,
+    stageBeforeLabel: NOWAGIE_STAGE_LABELS[f.stage_before] || f.stage_before,
+    stageAfterLabel: NOWAGIE_STAGE_LABELS[f.stage_after] || f.stage_after,
+    dateFormatted: formatDateShort(f.created_at.slice(0, 10)),
+    timeFormatted: formatTime(f.created_at)
+  }));
+  const reasonCodes = await db.getNowagieReasonCodes();
+
+  res.render('nowagie-lead-detail', {
+    lead,
+    stageLabel: NOWAGIE_STAGE_LABELS[lead.stage] || lead.stage,
+    followups,
+    reasonCodes,
+    today: today(),
+    backHref: '/nowagie-queue',
+    backLabel: '← Back to Call Queue'
+  });
+});
+
+app.post('/nowagie-leads/:id/followups', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const lead = await db.getNowagieLead(req.params.id);
+  if (!lead) return res.redirect('/nowagie-queue');
+
+  const { reason_code, outcome, notes, next_followup_date } = req.body;
+  const stageBefore = lead.stage;
+
+  await db.markNowagieContacted(lead.id, nowLagos());
+  const updatedLead = await db.getNowagieLead(lead.id);
+
+  await db.addNowagieFollowup({
+    lead_id: lead.id,
+    staff_id: req.session.marketerId,
+    stage_before: stageBefore,
+    stage_after: updatedLead.stage,
+    reason_code: reason_code || null,
+    outcome: outcome || null,
+    notes: notes && notes.trim() ? notes.trim() : null,
+    next_followup_date: next_followup_date || null,
+    source: 'app',
+    created_at: nowLagos()
+  });
+
+  res.redirect(`/nowagie-leads/${lead.id}`);
+});
+
+app.post('/nowagie-leads/:id/not-interested', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const lead = await db.getNowagieLead(req.params.id);
+  if (!lead) return res.redirect('/nowagie-queue');
+
+  const stageBefore = lead.stage;
+  await db.markNowagieNotInterested(lead.id, nowLagos());
+  await db.addNowagieFollowup({
+    lead_id: lead.id,
+    staff_id: req.session.marketerId,
+    stage_before: stageBefore,
+    stage_after: 'not_interested',
+    reason_code: req.body.reason_code || null,
+    outcome: 'Not interested',
+    notes: null,
+    next_followup_date: null,
+    source: 'app',
+    created_at: nowLagos()
+  });
+
+  res.redirect('/nowagie-queue');
+});
+
+app.post('/nowagie-leads/:id/quick-call', requireAuth, async (req, res) => {
+  if (!canAccessNowagie(req)) return res.redirect('/home');
+  const lead = await db.getNowagieLead(req.params.id);
+  if (!lead) return res.redirect('/nowagie-queue');
+
+  const alreadyContacted = await db.hasContactedNowagieToday(req.session.marketerId, lead.id, today());
+  if (!alreadyContacted) {
+    const stageBefore = lead.stage;
+    await db.markNowagieContacted(lead.id, nowLagos());
+    const updatedLead = await db.getNowagieLead(lead.id);
+    await db.addNowagieFollowup({
+      lead_id: lead.id,
+      staff_id: req.session.marketerId,
+      stage_before: stageBefore,
+      stage_after: updatedLead.stage,
+      reason_code: null,
+      outcome: null,
+      notes: null,
+      next_followup_date: null,
+      source: 'app',
+      created_at: nowLagos()
+    });
+  }
+
+  const redirectTo = isSafeLocalRedirect(req.query.redirect) ? req.query.redirect : '/nowagie-queue';
   res.redirect(redirectTo);
 });
 

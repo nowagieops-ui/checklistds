@@ -53,10 +53,10 @@
       </div>
     <% } %>
 
-    <a href="/priority-lists" class="home-tile">
+    <a href="<%= queueHref %>" class="home-tile">
       <div class="home-tile-body">
-        <div class="home-tile-title"><%= role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists' %></div>
-        <div class="home-tile-sub"><%= openProspects %> prospect<%= openProspects === 1 ? '' : 's' %> need<%= openProspects === 1 ? 's' : '' %> action</div>
+        <div class="home-tile-title"><%= queueHeading %></div>
+        <div class="home-tile-sub"><%= openProspects %> lead<%= openProspects === 1 ? '' : 's' %> need<%= openProspects === 1 ? 's' : '' %> action</div>
       </div>
       <div class="home-tile-arrow">→</div>
     </a>
@@ -93,7 +93,7 @@
       </a>
     <% } %>
 
-    <a href="/prospects/new" class="home-tile">
+    <a href="<%= addLeadHref %>" class="home-tile">
       <div class="home-tile-body">
         <div class="home-tile-title">Add New Lead</div>
         <div class="home-tile-sub">Log a new warm prospect to call — no checklist</div>

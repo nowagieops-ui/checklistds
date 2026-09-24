@@ -89,7 +89,7 @@
       <% }) %>
     <% } %>
 
-    <% if (!viewerIsManagement) { %>
+    <% if (!viewerIsManagement && typeof hideMyPerformance === 'undefined') { %>
       <a href="/my-performance" class="logout-link">My Performance →</a>
     <% } %>
     <a href="<%= backHref %>" class="logout-link"><%= backLabel %></a>
