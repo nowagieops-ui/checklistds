@@ -53,6 +53,21 @@
     </div>
 
     <div class="card">
+      <div class="card-title" style="font-size:15px;margin-bottom:4px;">Recently Registered</div>
+      <div class="card-sub" style="margin-bottom:10px;">Anyone you've called who has since registered — this is how you'll know a contact came through.</div>
+      <% if (recentRegistrations.length === 0) { %>
+        <div class="card-sub" style="margin-bottom:0;">No registrations yet from your calls — check back after you've worked your queue for a bit.</div>
+      <% } else { %>
+        <% recentRegistrations.forEach(function (r) { %>
+          <div class="detail-row">
+            <span class="detail-label"><%= r.name %> <span style="color:var(--gray);font-weight:400;">· <%= r.phone %></span></span>
+            <span class="detail-value">Registered <%= r.dateFormatted %></span>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+
+    <div class="card">
       <div class="card-title" style="font-size:15px;margin-bottom:10px;">Your Priority Lists Right Now</div>
       <% scorecard.priorityCounts.forEach(function (l) { %>
         <div class="detail-row">

@@ -164,4 +164,21 @@ async function getTodayCallSummary(staffId, todayDate) {
   return { total_calls: row.total_calls, moved_stage: row.moved_stage || 0 };
 }
 
-module.exports = { getCompanyOverview, getCohortOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary, getChecklistAccuracy };
+// Answers "did anyone I actually called go on to register?" — a lead she's
+// logged at least one followup against (not just ones she originally added;
+// a telemarketer works the whole company-wide funnel, so credit follows who
+// called them, not just who sourced them), that has since registered.
+// Newest first, capped so this stays a quick glance, not a full report.
+async function getRecentRegistrations(staffId, limit = 15) {
+  return db.query(
+    `SELECT DISTINCT r.id, r.name, r.phone, r.registered_at
+     FROM riders r
+     JOIN followups f ON f.rider_id = r.id AND f.staff_id = ?
+     WHERE r.registered_at IS NOT NULL
+     ORDER BY r.registered_at DESC
+     LIMIT ${parseInt(limit, 10)}`,
+    [staffId]
+  );
+}
+
+module.exports = { getCompanyOverview, getCohortOverview, getChannelBreakdown, getStaffBreakdown, getStaffScorecard, getTodayCallSummary, getChecklistAccuracy, getRecentRegistrations };

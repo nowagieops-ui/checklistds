@@ -968,7 +968,11 @@ app.get('/my-performance', requireAuth, async (req, res) => {
   const fromDate = period === 'today' ? toDate : period === 'week' ? addDaysUTC(toDate, -6) : addDaysUTC(toDate, -29);
 
   const scorecard = await performance.getStaffScorecard(req.session.marketerId, fromDate, toDate);
-  res.render('my-performance', { name: req.session.marketerName, period, scorecard });
+  const recentRegistrations = (await performance.getRecentRegistrations(req.session.marketerId)).map(r => ({
+    ...r,
+    dateFormatted: formatDateShort(r.registered_at.slice(0, 10))
+  }));
+  res.render('my-performance', { name: req.session.marketerName, period, scorecard, recentRegistrations });
 });
 
 // Live daily app-usage rows (opens/active minutes) for the prospect detail
