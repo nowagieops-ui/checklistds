@@ -101,6 +101,31 @@ Respond as JSON only, matching exactly this shape, no markdown fences:
 {"transcript": "...", "grade": 7, "didWell": "...", "toImprove": "...", "summary": "..."}`;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Google's own overload/rate-limit errors (503 UNAVAILABLE, 429 with a
+// retryable status) are transient — a spike that clears in seconds, not a
+// real failure. Retrying a couple of times with a short backoff avoids
+// permanently marking a call "Couldn't review" over Google's momentary
+// traffic, while still giving up (and surfacing the real error) for
+// anything that won't fix itself on retry, like bad billing or a bad model
+// name.
+const RETRYABLE_PATTERN = /"status"\s*:\s*"(UNAVAILABLE|RESOURCE_EXHAUSTED)"|"code"\s*:\s*(503|429)\b/;
+
+async function generateWithRetry(request, attempts = 3) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await geminiClient.models.generateContent(request);
+    } catch (err) {
+      const retryable = RETRYABLE_PATTERN.test(err.message || '');
+      if (!retryable || i === attempts) throw err;
+      await sleep(5000 * i); // 5s, then 10s
+    }
+  }
+}
+
 async function analyzeCall(filePath, mimeType, company) {
   const buffer = fs.readFileSync(filePath);
   if (buffer.length > MAX_INLINE_BYTES) {
@@ -108,7 +133,7 @@ async function analyzeCall(filePath, mimeType, company) {
   }
   const extraKnowledge = await db.getCompanyKnowledge(company === 'nowagieops' ? 'nowagieops' : 'dashspid');
 
-  const result = await geminiClient.models.generateContent({
+  const result = await generateWithRetry({
     model: 'gemini-3.8-flash',
     contents: [
       { inlineData: { mimeType: mimeType || 'audio/mpeg', data: buffer.toString('base64') } },
