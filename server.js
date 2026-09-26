@@ -1009,7 +1009,8 @@ app.get('/call-reviews', requireAuth, async (req, res) => {
   res.render('call-reviews', {
     name: req.session.marketerName,
     reviews,
-    aiConfigured: callReviews.isConfigured()
+    aiConfigured: callReviews.isConfigured(),
+    viewerIsManagement: false
   });
 });
 
@@ -1037,6 +1038,20 @@ app.post('/call-reviews', requireAuth, (req, res, next) => {
     });
   }
   res.redirect('/call-reviews');
+});
+
+// Management's read-only, cross-staff view of every uploaded call review.
+app.get('/management/call-reviews', requireManagement, async (req, res) => {
+  const reviews = (await db.getAllCallReviews()).map(r => ({
+    ...r,
+    uploadedFormatted: `${formatDateShort(r.uploaded_at.slice(0, 10))} ${formatTime(r.uploaded_at)}`
+  }));
+  res.render('call-reviews', {
+    name: null,
+    reviews,
+    aiConfigured: callReviews.isConfigured(),
+    viewerIsManagement: true
+  });
 });
 
 // Live daily app-usage rows (opens/active minutes) for the prospect detail

@@ -853,6 +853,17 @@ const db = {
     return rows;
   },
 
+  // Management's cross-staff view — everyone's uploads, newest first.
+  async getAllCallReviews(limit = 100) {
+    const [rows] = await pool.execute(
+      `SELECT cr.*, m.name AS staff_name FROM call_reviews cr
+       JOIN marketers m ON m.id = cr.staff_id
+       ORDER BY cr.uploaded_at DESC LIMIT ?`,
+      [parseInt(limit, 10)]
+    );
+    return rows;
+  },
+
   async getNextPendingCallReview() {
     const [rows] = await pool.execute(
       "SELECT * FROM call_reviews WHERE status = 'pending' ORDER BY uploaded_at ASC LIMIT 1"

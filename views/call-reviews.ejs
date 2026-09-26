@@ -14,37 +14,55 @@
 </head>
 <body class="app-bg">
 
-  <div class="app-header">
-    <div class="app-header-inner">
-      <a href="/home" class="app-header-brand">
+  <% if (viewerIsManagement) { %>
+    <div class="mgr-header">
+      <div class="mgr-header-inner">
         <div class="app-header-badge">D</div>
-        Dashspid Ops
-      </a>
+        <div class="mgr-header-brand">Dashspid Ops</div>
+        <span class="badge badge-orange" style="background:rgba(255,92,0,0.2);color:#ffb37a;">Manager</span>
+        <div class="app-header-spacer"></div>
+        <a href="/management-logout" class="btn btn-outline" style="width:auto;padding:8px 16px;font-size:13px;margin:0;color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">Log out</a>
+      </div>
     </div>
-  </div>
+  <% } else { %>
+    <div class="app-header">
+      <div class="app-header-inner">
+        <a href="/home" class="app-header-brand">
+          <div class="app-header-badge">D</div>
+          Dashspid Ops
+        </a>
+      </div>
+    </div>
+  <% } %>
 
   <div class="container">
     <div class="card">
       <div class="card-title">Call Reviews</div>
-      <div class="card-sub" style="margin-bottom:0;">Upload your recorded calls — AI transcribes and grades each one, so you know exactly where you did well and where to improve.</div>
+      <% if (viewerIsManagement) { %>
+        <div class="card-sub" style="margin-bottom:0;">Every telemarketer's uploaded calls, AI-transcribed and graded — newest first.</div>
+      <% } else { %>
+        <div class="card-sub" style="margin-bottom:0;">Upload your recorded calls — AI transcribes and grades each one, so you know exactly where you did well and where to improve.</div>
+      <% } %>
     </div>
 
     <% if (!aiConfigured) { %>
       <div class="note-box">
-        <div class="note-box-body">AI review isn't switched on yet for this app — your uploads will sit as "Pending" until it is. Nothing is lost, they'll process automatically once it's configured.</div>
+        <div class="note-box-body">AI review isn't switched on yet for this app — <%= viewerIsManagement ? 'uploads' : 'your uploads' %> will sit as "Pending" until it is. Nothing is lost, they'll process automatically once it's configured.</div>
       </div>
     <% } %>
 
-    <div class="card">
-      <form method="POST" action="/call-reviews" enctype="multipart/form-data" id="uploadForm">
-        <label for="calls">Upload one or many call recordings</label>
-        <input type="file" name="calls" id="calls" accept="audio/*" multiple required>
-        <div style="font-size:12px;color:var(--gray);margin:6px 0 14px;">Up to 50 at once, 15MB each. You can upload as many as you called today — each is reviewed on its own.</div>
-        <button type="submit" class="btn" id="uploadBtn">Upload →</button>
-      </form>
-    </div>
+    <% if (!viewerIsManagement) { %>
+      <div class="card">
+        <form method="POST" action="/call-reviews" enctype="multipart/form-data" id="uploadForm">
+          <label for="calls">Upload one or many call recordings</label>
+          <input type="file" name="calls" id="calls" accept="audio/*" multiple required>
+          <div style="font-size:12px;color:var(--gray);margin:6px 0 14px;">Up to 50 at once, 15MB each. You can upload as many as you called today — each is reviewed on its own.</div>
+          <button type="submit" class="btn" id="uploadBtn">Upload →</button>
+        </form>
+      </div>
+    <% } %>
 
-    <div class="section-title">Your Uploads</div>
+    <div class="section-title"><%= viewerIsManagement ? 'All Uploads' : 'Your Uploads' %></div>
     <% if (reviews.length === 0) { %>
       <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">Nothing uploaded yet.</div>
     <% } else { %>
@@ -53,7 +71,9 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
             <div>
               <div style="font-weight:700;font-size:14px;"><%= r.original_filename %></div>
-              <div style="font-size:12px;color:var(--gray);"><%= r.uploadedFormatted %> · <%= r.company === 'nowagieops' ? 'NowagieOps' : 'DashSpid' %></div>
+              <div style="font-size:12px;color:var(--gray);">
+                <% if (viewerIsManagement) { %><%= r.staff_name %> · <% } %><%= r.uploadedFormatted %> · <%= r.company === 'nowagieops' ? 'NowagieOps' : 'DashSpid' %>
+              </div>
             </div>
             <div style="text-align:right;">
               <% if (r.status === 'pending') { %>
@@ -91,15 +111,21 @@
       <% }) %>
     <% } %>
 
-    <a href="/home" class="logout-link">← Back to Home</a>
+    <% if (viewerIsManagement) { %>
+      <a href="/dashboard" class="logout-link">← Back to Dashboard</a>
+    <% } else { %>
+      <a href="/home" class="logout-link">← Back to Home</a>
+    <% } %>
   </div>
 
-  <script>
-    document.getElementById('uploadForm').addEventListener('submit', function () {
-      document.getElementById('uploadBtn').disabled = true;
-      document.getElementById('uploadBtn').textContent = 'Uploading…';
-    });
-  </script>
+  <% if (!viewerIsManagement) { %>
+    <script>
+      document.getElementById('uploadForm').addEventListener('submit', function () {
+        document.getElementById('uploadBtn').disabled = true;
+        document.getElementById('uploadBtn').textContent = 'Uploading…';
+      });
+    </script>
+  <% } %>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
 </body>
 </html>
