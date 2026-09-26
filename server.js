@@ -1002,13 +1002,18 @@ app.get('/my-performance', requireAuth, async (req, res) => {
 // one, one at a time, so this page never blocks waiting on Gemini.
 app.get('/call-reviews', requireAuth, async (req, res) => {
   if (req.session.marketerRole !== 'telemarketer') return res.redirect('/home');
-  const reviews = (await db.getCallReviewsForStaff(req.session.marketerId)).map(r => ({
+  const fromDate = isValidDateParam(req.query.from) ? req.query.from : '';
+  const toDate = isValidDateParam(req.query.to) ? req.query.to : '';
+  const sort = req.query.sort === 'asc' ? 'asc' : 'desc';
+  const reviews = (await db.getCallReviewsForStaff(req.session.marketerId, { fromDate, toDate, sort })).map(r => ({
     ...r,
     uploadedFormatted: `${formatDateShort(r.uploaded_at.slice(0, 10))} ${formatTime(r.uploaded_at)}`
   }));
   res.render('call-reviews', {
     name: req.session.marketerName,
     reviews,
+    fromDate, toDate, sort,
+    baseUrl: '/call-reviews',
     aiConfigured: callReviews.isConfigured(),
     viewerIsManagement: false
   });
@@ -1042,13 +1047,18 @@ app.post('/call-reviews', requireAuth, (req, res, next) => {
 
 // Management's read-only, cross-staff view of every uploaded call review.
 app.get('/management/call-reviews', requireManagement, async (req, res) => {
-  const reviews = (await db.getAllCallReviews()).map(r => ({
+  const fromDate = isValidDateParam(req.query.from) ? req.query.from : '';
+  const toDate = isValidDateParam(req.query.to) ? req.query.to : '';
+  const sort = req.query.sort === 'asc' ? 'asc' : 'desc';
+  const reviews = (await db.getAllCallReviews({ fromDate, toDate, sort })).map(r => ({
     ...r,
     uploadedFormatted: `${formatDateShort(r.uploaded_at.slice(0, 10))} ${formatTime(r.uploaded_at)}`
   }));
   res.render('call-reviews', {
     name: null,
     reviews,
+    fromDate, toDate, sort,
+    baseUrl: '/management/call-reviews',
     aiConfigured: callReviews.isConfigured(),
     viewerIsManagement: true
   });

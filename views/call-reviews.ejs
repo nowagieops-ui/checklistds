@@ -11,10 +11,6 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=<%= assetVersion %>">
   <link rel="manifest" href="/manifest.json?v=<%= assetVersion %>">
   <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
-  <% var stillWorking = reviews.some(function (r) { return r.status === 'pending' || r.status === 'processing'; }); %>
-  <% if (stillWorking) { %>
-    <meta http-equiv="refresh" content="10">
-  <% } %>
 </head>
 <body class="app-bg">
 
@@ -67,8 +63,33 @@
     <% } %>
 
     <div class="section-title"><%= viewerIsManagement ? 'All Uploads' : 'Your Uploads' %></div>
+
+    <form method="GET" action="<%= baseUrl %>" class="card" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:130px;">
+        <label for="from">From</label>
+        <input type="date" name="from" id="from" value="<%= fromDate %>" style="margin-bottom:0;">
+      </div>
+      <div style="flex:1;min-width:130px;">
+        <label for="to">To</label>
+        <input type="date" name="to" id="to" value="<%= toDate %>" style="margin-bottom:0;">
+      </div>
+      <div style="flex:1;min-width:130px;">
+        <label for="sort">Order</label>
+        <select name="sort" id="sort" style="margin-bottom:0;">
+          <option value="desc" <%= sort === 'desc' ? 'selected' : '' %>>Newest first</option>
+          <option value="asc" <%= sort === 'asc' ? 'selected' : '' %>>Oldest first</option>
+        </select>
+      </div>
+      <button type="submit" class="btn" style="width:auto;padding:10px 18px;margin:0;">Apply</button>
+      <% if (fromDate || toDate) { %>
+        <a href="<%= baseUrl %>" class="btn btn-outline" style="width:auto;padding:10px 18px;margin:0;">Clear</a>
+      <% } %>
+    </form>
+
     <% if (reviews.length === 0) { %>
-      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">Nothing uploaded yet.</div>
+      <div class="card" style="text-align:center;color:var(--gray);font-size:14px;">
+        <%= (fromDate || toDate) ? 'Nothing uploaded in that date range.' : 'Nothing uploaded yet.' %>
+      </div>
     <% } else { %>
       <% reviews.forEach(function (r) { %>
         <div class="card">
@@ -134,6 +155,15 @@
         document.getElementById('uploadBtn').disabled = true;
         document.getElementById('uploadBtn').textContent = 'Uploading…';
       });
+    </script>
+  <% } %>
+  <% var stillWorking = reviews.some(function (r) { return r.status === 'pending' || r.status === 'processing'; }); %>
+  <% if (stillWorking) { %>
+    <script>
+      // A plain <meta refresh> is unreliable inside an installed PWA/webview
+      // (can silently not fire while backgrounded) — a JS timer reloading
+      // the same URL (filters and all) is more consistent.
+      setTimeout(function () { location.reload(); }, 8000);
     </script>
   <% } %>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

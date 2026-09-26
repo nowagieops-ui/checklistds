@@ -845,22 +845,29 @@ const db = {
     return result.insertId;
   },
 
-  async getCallReviewsForStaff(staffId, limit = 50) {
-    const [rows] = await pool.execute(
-      'SELECT * FROM call_reviews WHERE staff_id = ? ORDER BY uploaded_at DESC LIMIT ?',
-      [parseInt(staffId), parseInt(limit, 10)]
-    );
+  // fromDate/toDate are optional 'YYYY-MM-DD' — omit both for all time.
+  // sort is 'asc' or 'desc'. Limit is generous (300) since with a date
+  // filter and hundreds of uploads over time, cutting off a range she
+  // asked for would be worse than a long page.
+  async getCallReviewsForStaff(staffId, { fromDate, toDate, sort = 'desc', limit = 300 } = {}) {
+    let sql = 'SELECT * FROM call_reviews WHERE staff_id = ?';
+    const params = [parseInt(staffId)];
+    if (fromDate && toDate) { sql += ' AND DATE(uploaded_at) BETWEEN ? AND ?'; params.push(fromDate, toDate); }
+    sql += ` ORDER BY uploaded_at ${sort === 'asc' ? 'ASC' : 'DESC'} LIMIT ?`;
+    params.push(parseInt(limit, 10));
+    const [rows] = await pool.execute(sql, params);
     return rows;
   },
 
-  // Management's cross-staff view — everyone's uploads, newest first.
-  async getAllCallReviews(limit = 100) {
-    const [rows] = await pool.execute(
-      `SELECT cr.*, m.name AS staff_name FROM call_reviews cr
-       JOIN marketers m ON m.id = cr.staff_id
-       ORDER BY cr.uploaded_at DESC LIMIT ?`,
-      [parseInt(limit, 10)]
-    );
+  // Management's cross-staff view — everyone's uploads, same filter/sort
+  // options as getCallReviewsForStaff above.
+  async getAllCallReviews({ fromDate, toDate, sort = 'desc', limit = 300 } = {}) {
+    let sql = `SELECT cr.*, m.name AS staff_name FROM call_reviews cr JOIN marketers m ON m.id = cr.staff_id`;
+    const params = [];
+    if (fromDate && toDate) { sql += ' WHERE DATE(cr.uploaded_at) BETWEEN ? AND ?'; params.push(fromDate, toDate); }
+    sql += ` ORDER BY cr.uploaded_at ${sort === 'asc' ? 'ASC' : 'DESC'} LIMIT ?`;
+    params.push(parseInt(limit, 10));
+    const [rows] = await pool.execute(sql, params);
     return rows;
   },
 
