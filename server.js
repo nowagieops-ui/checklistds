@@ -55,7 +55,7 @@ async function getRoleplayFeedback(scenario, traineeResponse, track) {
   const brief = ROLEPLAY_BRIEF[track] || ROLEPLAY_BRIEF.dashspid;
   try {
     const result = await geminiClient.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: `${brief}
 
 PROSPECT: ${scenario.prospect}

@@ -109,7 +109,7 @@ async function analyzeCall(filePath, mimeType, company) {
   const extraKnowledge = await db.getCompanyKnowledge(company === 'nowagieops' ? 'nowagieops' : 'dashspid');
 
   const result = await geminiClient.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     contents: [
       { inlineData: { mimeType: mimeType || 'audio/mpeg', data: buffer.toString('base64') } },
       { text: buildPrompt(company, extraKnowledge) }
