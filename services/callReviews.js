@@ -7,7 +7,7 @@
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const db = require('../db/database');
-const { nowLagos } = require('../utils/time');
+const { nowLagos, toLagosDateTime } = require('../utils/time');
 const trainingWeeks = require('./trainingWeeks');
 
 const geminiClient = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
@@ -165,25 +165,40 @@ async function analyzeCall(filePath, mimeType, company) {
 
 let running = false;
 
-// Reviews one call, oldest first across everyone. One at a time (not
-// concurrent) keeps this predictable and easy to reason about rather than
-// firing a burst of requests at Gemini together.
+// A demand spike can outlast the ~15s of in-call retries in analyzeCall —
+// this is the second, longer-horizon layer: up to 5 total attempts,
+// spaced further apart each time (2, 4, 6, 8 minutes), before finally
+// giving up for good.
+const MAX_ATTEMPTS = 5;
+
+// Reviews one call, oldest (and due) first across everyone. One at a time
+// (not concurrent) keeps this predictable and easy to reason about rather
+// than firing a burst of requests at Gemini together.
 async function processOne() {
-  const review = await db.getNextPendingCallReview();
+  const review = await db.getNextPendingCallReview(nowLagos());
   if (!review) return false;
 
   await db.markCallReviewProcessing(review.id);
+  let keepFile = false;
   try {
     const analysis = await analyzeCall(review.file_path, review.mime_type, review.company);
     await db.completeCallReview(review.id, { ...analysis, processedAt: nowLagos() });
   } catch (err) {
-    console.error(`callReviews: review ${review.id} failed:`, err.message);
-    await db.failCallReview(review.id, err.message, nowLagos());
+    const attempts = (review.attempts || 0) + 1;
+    const willRetry = RETRYABLE_PATTERN.test(err.message || '') && attempts < MAX_ATTEMPTS;
+    console.error(`callReviews: review ${review.id} failed (attempt ${attempts}${willRetry ? ', will retry' : ', giving up'}):`, err.message);
+    if (willRetry) {
+      const nextAttemptAt = toLagosDateTime(new Date(Date.now() + Math.min(attempts * 2, 8) * 60 * 1000));
+      await db.retryCallReviewLater(review.id, nextAttemptAt, attempts);
+      keepFile = true; // still needed for the retry
+    } else {
+      const finalMessage = attempts > 1 ? `${err.message} (tried ${attempts} times)` : err.message;
+      await db.failCallReview(review.id, finalMessage, nowLagos());
+    }
   } finally {
-    // The raw audio is never needed again either way (analysis is stored
-    // as text, or it's failed for good) — delete it so uploads don't pile
-    // up on disk.
-    fs.unlink(review.file_path, () => {});
+    // The raw audio is only deleted once there's nothing left to retry —
+    // done, or permanently failed. A queued retry needs it kept.
+    if (!keepFile) fs.unlink(review.file_path, () => {});
   }
   return true;
 }

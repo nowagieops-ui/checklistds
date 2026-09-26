@@ -864,9 +864,15 @@ const db = {
     return rows;
   },
 
-  async getNextPendingCallReview() {
+  // now is Lagos wall-clock (nowLagos()), same as everywhere else in this
+  // app — never SQL NOW(), to avoid a DB-server-timezone mismatch. Only
+  // rows that are actually due (no next_attempt_at, or it's already past)
+  // are eligible, so a review waiting out a longer backoff is skipped
+  // rather than retried too soon.
+  async getNextPendingCallReview(now) {
     const [rows] = await pool.execute(
-      "SELECT * FROM call_reviews WHERE status = 'pending' ORDER BY uploaded_at ASC LIMIT 1"
+      "SELECT * FROM call_reviews WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY uploaded_at ASC LIMIT 1",
+      [now]
     );
     return rows[0] || null;
   },
@@ -881,6 +887,16 @@ const db = {
        SET status = 'done', transcript = ?, grade = ?, did_well = ?, to_improve = ?, summary = ?, processed_at = ?
        WHERE id = ?`,
       [transcript, grade, didWell, toImprove, summary, processedAt, parseInt(id)]
+    );
+  },
+
+  // A transient failure (Gemini overloaded/rate-limited) goes back to
+  // "pending" with a future next_attempt_at instead of a permanent error,
+  // so it's retried automatically once the spike has had time to clear.
+  async retryCallReviewLater(id, nextAttemptAt, attempts) {
+    await pool.execute(
+      "UPDATE call_reviews SET status = 'pending', attempts = ?, next_attempt_at = ? WHERE id = ?",
+      [attempts, nextAttemptAt, parseInt(id)]
     );
   },
 

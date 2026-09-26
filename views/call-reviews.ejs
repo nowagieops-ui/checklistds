@@ -81,7 +81,7 @@
             </div>
             <div style="text-align:right;">
               <% if (r.status === 'pending') { %>
-                <span class="badge badge-amber">Pending</span>
+                <span class="badge badge-amber"><%= r.attempts > 0 ? `Retrying (${r.attempts}/5)` : 'Pending' %></span>
               <% } else if (r.status === 'processing') { %>
                 <span class="badge badge-amber">Reviewing…</span>
               <% } else if (r.status === 'error') { %>
