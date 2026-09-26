@@ -73,14 +73,21 @@ const PRODUCT_BRIEFS = {
 
 const COMPANY_LABEL = { dashspid: 'Dashspid (Nigerian delivery-logistics SaaS)', nowagieops: 'NowagieOps (UK brand growth agency)' };
 
-function buildPrompt(company) {
+// extraKnowledge is whatever management has pasted in at
+// /management/knowledge (db.company_knowledge) — entirely optional, on top
+// of the Week 1 brief above, re-fetched fresh per call since (unlike the
+// training files) it can be edited at any time.
+function buildPrompt(company, extraKnowledge) {
   const track = company === 'nowagieops' ? 'nowagieops' : 'dashspid';
+  const extraBlock = extraKnowledge && extraKnowledge.trim()
+    ? `\n━━━ ADDITIONAL KNOWLEDGE (provided by management) ━━━\n${extraKnowledge.trim()}\n━━━ END ADDITIONAL KNOWLEDGE ━━━\n`
+    : '';
   return `You are a sales call quality reviewer for a telemarketing team selling ${COMPANY_LABEL[track]}. You are given one recorded phone call. Use the product knowledge below to judge not just HOW she sold, but WHETHER what she said was actually correct — a confident answer that gets the price, a feature, or a policy wrong is a real mistake, not a stylistic quibble.
 
 ━━━ PRODUCT KNOWLEDGE (${track === 'nowagieops' ? 'NowagieOps' : 'DashSpid'}) ━━━
 ${PRODUCT_BRIEFS[track]}
 ━━━ END PRODUCT KNOWLEDGE ━━━
-
+${extraBlock}
 Do all of the following:
 1. Transcribe the call as accurately as you can. Label speakers "Telemarketer" and "Prospect" where you can tell them apart.
 2. Grade the call from 1 to 10 on how well the telemarketer handled it — opening with the prospect's pain (not a pitch), one thing explained deep rather than a feature dump, questions before pitching, objections answered then re-engaged, factual accuracy against the product knowledge above, and a close that ends with a named concrete outcome. 10 is an excellent, textbook call. Be honest, not generous — most real calls are a 4-7.
@@ -99,12 +106,13 @@ async function analyzeCall(filePath, mimeType, company) {
   if (buffer.length > MAX_INLINE_BYTES) {
     throw new Error(`File is ${(buffer.length / 1024 / 1024).toFixed(1)}MB — keep recordings under 15MB.`);
   }
+  const extraKnowledge = await db.getCompanyKnowledge(company === 'nowagieops' ? 'nowagieops' : 'dashspid');
 
   const result = await geminiClient.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: [
       { inlineData: { mimeType: mimeType || 'audio/mpeg', data: buffer.toString('base64') } },
-      { text: buildPrompt(company) }
+      { text: buildPrompt(company, extraKnowledge) }
     ],
     config: { responseMimeType: 'application/json' }
   });

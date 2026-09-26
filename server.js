@@ -1054,6 +1054,23 @@ app.get('/management/call-reviews', requireManagement, async (req, res) => {
   });
 });
 
+// Lets management hand the call-review grader extra product knowledge on
+// top of the Week 1 training brief it already uses — a full feature list,
+// FAQ, pricing detail, objection playbook, whatever's useful. Read fresh
+// per call in services/callReviews.js, so an edit here applies to the very
+// next review processed, no redeploy needed.
+app.get('/management/knowledge', requireManagement, async (req, res) => {
+  const company = req.query.company === 'nowagieops' ? 'nowagieops' : 'dashspid';
+  const content = (await db.getCompanyKnowledge(company)) || '';
+  res.render('management-knowledge', { company, content, saved: false });
+});
+
+app.post('/management/knowledge', requireManagement, async (req, res) => {
+  const company = req.body.company === 'nowagieops' ? 'nowagieops' : 'dashspid';
+  await db.upsertCompanyKnowledge(company, req.body.content || '', nowLagos());
+  res.render('management-knowledge', { company, content: req.body.content || '', saved: true });
+});
+
 // Live daily app-usage rows (opens/active minutes) for the prospect detail
 // screen — fetched fresh from Supabase each view, not synced into MySQL
 // (see platformSync.getRecentUsage). Sparse: a day with zero activity

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF5C00">
+  <title>Product Knowledge — Dashspid Ops</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/style.css?v=<%= assetVersion %>">
+</head>
+<body class="app-bg">
+
+  <div class="mgr-header">
+    <div class="mgr-header-inner">
+      <div class="app-header-badge">D</div>
+      <div class="mgr-header-brand">Dashspid Ops</div>
+      <span class="badge badge-orange" style="background:rgba(255,92,0,0.2);color:#ffb37a;">Manager</span>
+      <div class="app-header-spacer"></div>
+      <a href="/management-logout" class="btn btn-outline" style="width:auto;padding:8px 16px;font-size:13px;margin:0;color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">Log out</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Product Knowledge for Call Reviews</div>
+      <div class="card-sub" style="margin-bottom:0;">
+        Anything you paste here is added to what the AI already knows from Week 1 training, and used to grade every uploaded call — a full feature list, FAQ, pricing detail, objection playbook, whatever's useful. Saves apply to the very next call reviewed, no redeploy needed.
+      </div>
+    </div>
+
+    <div class="priority-tabs">
+      <a href="/management/knowledge?company=dashspid" class="priority-tab <%= company === 'dashspid' ? 'priority-tab-active' : '' %>">DashSpid</a>
+      <a href="/management/knowledge?company=nowagieops" class="priority-tab <%= company === 'nowagieops' ? 'priority-tab-active' : '' %>">NowagieOps</a>
+    </div>
+
+    <% if (saved) { %>
+      <div class="note-box">
+        <div class="note-box-body">Saved — this now applies to every new call review for <%= company === 'nowagieops' ? 'NowagieOps' : 'DashSpid' %>.</div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <form method="POST" action="/management/knowledge">
+        <input type="hidden" name="company" value="<%= company %>">
+        <label for="content">Additional knowledge (<%= company === 'nowagieops' ? 'NowagieOps' : 'DashSpid' %>)</label>
+        <textarea name="content" id="content" rows="18" placeholder="Paste anything here — a full feature list, FAQ, pricing sheet, objection handling guide, whatever you want the grader to know."><%= content %></textarea>
+        <button type="submit" class="btn">Save →</button>
+      </form>
+    </div>
+
+    <a href="/dashboard" class="logout-link">← Back to Dashboard</a>
+  </div>
+
+  <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+</body>
+</html>

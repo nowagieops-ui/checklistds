@@ -889,6 +889,21 @@ const db = {
       "UPDATE call_reviews SET status = 'error', error_message = ?, processed_at = ? WHERE id = ?",
       [String(errorMessage).slice(0, 500), processedAt, parseInt(id)]
     );
+  },
+
+  // ── COMPANY KNOWLEDGE (management-supplied, on top of Week 1 training) ────
+
+  async getCompanyKnowledge(company) {
+    const [rows] = await pool.execute('SELECT content FROM company_knowledge WHERE company = ?', [company]);
+    return rows[0] ? rows[0].content : null;
+  },
+
+  async upsertCompanyKnowledge(company, content, now) {
+    await pool.execute(
+      `INSERT INTO company_knowledge (company, content, updated_at) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE content = VALUES(content), updated_at = VALUES(updated_at)`,
+      [company, content, now]
+    );
   }
 };
 
