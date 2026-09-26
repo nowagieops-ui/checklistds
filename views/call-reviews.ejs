@@ -93,7 +93,13 @@
           </div>
 
           <% if (r.status === 'error') { %>
-            <div style="font-size:13px;color:var(--red);margin-top:8px;"><%= r.error_message %></div>
+            <div style="font-size:13px;color:var(--red);margin-top:8px;">
+              <% if (viewerIsManagement) { %>
+                <%= r.error_message %>
+              <% } else { %>
+                Something went wrong reviewing this call. Try re-uploading it — if it keeps happening, let your manager know.
+              <% } %>
+            </div>
           <% } else if (r.status === 'done') { %>
             <div style="margin-top:10px;font-size:13px;"><%= r.summary %></div>
             <div class="detail-row" style="margin-top:8px;">
