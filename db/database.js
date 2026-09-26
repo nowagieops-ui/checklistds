@@ -830,6 +830,54 @@ const db = {
         data.notes || null, data.next_followup_date || null, data.created_at, data.outcome || null
       ]
     );
+  },
+
+  // ── CALL REVIEWS (services/callReviews.js) ────────────────────────────────
+  // She uploads recorded calls; each becomes one row here, processed one at a
+  // time by the background worker (Gemini transcribes + grades it).
+
+  async addCallReview({ staffId, company, originalFilename, filePath, mimeType, uploadedAt }) {
+    const [result] = await pool.execute(
+      `INSERT INTO call_reviews (staff_id, company, original_filename, file_path, mime_type, status, uploaded_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+      [staffId, company, originalFilename, filePath, mimeType || null, uploadedAt]
+    );
+    return result.insertId;
+  },
+
+  async getCallReviewsForStaff(staffId, limit = 50) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM call_reviews WHERE staff_id = ? ORDER BY uploaded_at DESC LIMIT ?',
+      [parseInt(staffId), parseInt(limit, 10)]
+    );
+    return rows;
+  },
+
+  async getNextPendingCallReview() {
+    const [rows] = await pool.execute(
+      "SELECT * FROM call_reviews WHERE status = 'pending' ORDER BY uploaded_at ASC LIMIT 1"
+    );
+    return rows[0] || null;
+  },
+
+  async markCallReviewProcessing(id) {
+    await pool.execute("UPDATE call_reviews SET status = 'processing' WHERE id = ?", [parseInt(id)]);
+  },
+
+  async completeCallReview(id, { transcript, grade, didWell, toImprove, summary, processedAt }) {
+    await pool.execute(
+      `UPDATE call_reviews
+       SET status = 'done', transcript = ?, grade = ?, did_well = ?, to_improve = ?, summary = ?, processed_at = ?
+       WHERE id = ?`,
+      [transcript, grade, didWell, toImprove, summary, processedAt, parseInt(id)]
+    );
+  },
+
+  async failCallReview(id, errorMessage, processedAt) {
+    await pool.execute(
+      "UPDATE call_reviews SET status = 'error', error_message = ?, processed_at = ? WHERE id = ?",
+      [String(errorMessage).slice(0, 500), processedAt, parseInt(id)]
+    );
   }
 };
 

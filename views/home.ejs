@@ -69,6 +69,16 @@
       <div class="home-tile-arrow">→</div>
     </a>
 
+    <% if (role === 'telemarketer') { %>
+      <a href="/call-reviews" class="home-tile">
+        <div class="home-tile-body">
+          <div class="home-tile-title">Call Reviews</div>
+          <div class="home-tile-sub">Upload today's calls — AI grades each one and shows what to improve</div>
+        </div>
+        <div class="home-tile-arrow">→</div>
+      </a>
+    <% } %>
+
     <% if (weeklyTraining && weeklyTraining.prelaunch) { %>
       <div class="card">
         <div class="card-sub">NowagieOps training starts <%= weeklyTraining.unlockDateFormatted %>. You can still work the call queue and leads in the meantime.</div>

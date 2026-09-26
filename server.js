@@ -4,6 +4,8 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { GoogleGenAI } = require('@google/genai');
 const db = require('./db/database');
 const { sendWhatsApp } = require('./utils/whatsapp');
@@ -16,6 +18,7 @@ const performance = require('./services/performance');
 const trainingWeeks = require('./services/trainingWeeks');
 const sheetsSync = require('./services/sheetsSync');
 const nowagieSheetsSync = require('./services/nowagieSheetsSync');
+const callReviews = require('./services/callReviews');
 
 // Only used for the telemarketer training academy's AI roleplay feedback.
 // Falls back to a canned message if unconfigured, same convention as
@@ -75,6 +78,20 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', true); // behind Cloudflare — needed for accurate req.ip
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Uploaded call recordings land here only briefly — services/callReviews.js
+// deletes each file the moment it's been analyzed (or failed for good), so
+// this never grows unbounded.
+const CALL_UPLOAD_DIR = path.join(__dirname, 'uploads', 'call-reviews');
+fs.mkdirSync(CALL_UPLOAD_DIR, { recursive: true });
+const callUpload = multer({
+  storage: multer.diskStorage({
+    destination: CALL_UPLOAD_DIR,
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname)}`)
+  }),
+  limits: { fileSize: callReviews.MAX_INLINE_BYTES, files: 50 },
+  fileFilter: (req, file, cb) => cb(null, /^audio\//.test(file.mimetype))
+});
 
 // Bumps on every process start (i.e. every deploy), so /style.css?v=... and
 // /favicon.svg?v=... become new URLs the CDN has never cached — no more
@@ -979,6 +996,49 @@ app.get('/my-performance', requireAuth, async (req, res) => {
   res.render('my-performance', { name: req.session.marketerName, period, scorecard, recentRegistrations });
 });
 
+// ── CALL REVIEWS (AI-graded call recordings) ─────────────────────────────
+// She uploads recordings at the end of the day, for either business — a
+// background worker (services/callReviews.js) transcribes and grades each
+// one, one at a time, so this page never blocks waiting on Gemini.
+app.get('/call-reviews', requireAuth, async (req, res) => {
+  if (req.session.marketerRole !== 'telemarketer') return res.redirect('/home');
+  const reviews = (await db.getCallReviewsForStaff(req.session.marketerId)).map(r => ({
+    ...r,
+    uploadedFormatted: `${formatDateShort(r.uploaded_at.slice(0, 10))} ${formatTime(r.uploaded_at)}`
+  }));
+  res.render('call-reviews', {
+    name: req.session.marketerName,
+    reviews,
+    aiConfigured: callReviews.isConfigured()
+  });
+});
+
+app.post('/call-reviews', requireAuth, (req, res, next) => {
+  callUpload.array('calls', 50)(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'One of those files is over the 15MB limit — trim it or compress it and try again.' : err.message;
+      return res.status(400).send(msg);
+    }
+    next();
+  });
+}, async (req, res) => {
+  if (req.session.marketerRole !== 'telemarketer') return res.redirect('/home');
+  const files = req.files || [];
+  const company = req.session.activeCompany === 'nowagieops' ? 'nowagieops' : 'dashspid';
+  const now = nowLagos();
+  for (const file of files) {
+    await db.addCallReview({
+      staffId: req.session.marketerId,
+      company,
+      originalFilename: file.originalname,
+      filePath: file.path,
+      mimeType: file.mimetype,
+      uploadedAt: now
+    });
+  }
+  res.redirect('/call-reviews');
+});
+
 // Live daily app-usage rows (opens/active minutes) for the prospect detail
 // screen — fetched fresh from Supabase each view, not synced into MySQL
 // (see platformSync.getRecentUsage). Sparse: a day with zero activity
@@ -1712,3 +1772,4 @@ app.listen(PORT, () => {
 platformSync.startInterval();
 sheetsSync.startInterval();
 nowagieSheetsSync.startInterval();
+callReviews.startInterval();
