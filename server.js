@@ -425,17 +425,21 @@ app.post('/submit', requireAuth, async (req, res) => {
   if (existing) return res.redirect('/submitted');
 
   const { zone, targets, notes, lat, lng, accuracy } = req.body;
+  const isTelemarketer = req.session.marketerRole === 'telemarketer';
 
-  if (lat === undefined || lng === undefined || lat === '' || lng === '') {
+  // Field marketers are location-verified (they're meant to be out visiting
+  // businesses); telemarketers work from a desk, so we don't ask for or
+  // check their location at all.
+  if (!isTelemarketer && (lat === undefined || lng === undefined || lat === '' || lng === '')) {
     return res.status(400).send('Location access is required to submit your checklist. Please enable location and try again.');
   }
 
-  if (req.session.marketerRole === 'telemarketer' && (parseInt(targets, 10) || 0) < 25) {
+  if (isTelemarketer && (parseInt(targets, 10) || 0) < 25) {
     return res.status(400).send('Call target must be at least 25.');
   }
 
-  const parsedLat = parseFloat(lat);
-  const parsedLng = parseFloat(lng);
+  const parsedLat = isTelemarketer ? null : parseFloat(lat);
+  const parsedLng = isTelemarketer ? null : parseFloat(lng);
   const ip = clientIp(req);
   const owner = await db.getDeviceOwner(req.deviceId);
   const marketerId = req.session.marketerId;
@@ -1393,15 +1397,18 @@ function composeTelemarketerSummary(target, actualCalls, reason) {
 app.post('/logout', requireAuth, async (req, res) => {
   const { lat, lng, accuracy, summary, reason } = req.body;
   const wantsJson = req.get('X-Requested-With') === 'fetch';
+  const isTelemarketer = req.session.marketerRole === 'telemarketer';
 
-  if (lat === undefined || lng === undefined || lat === '' || lng === '') {
+  // Telemarketers work from a desk — no location asked for or checked,
+  // same as their checklist check-in.
+  if (!isTelemarketer && (lat === undefined || lng === undefined || lat === '' || lng === '')) {
     const error = 'Location access is required to check out. Please enable location and try again.';
     if (wantsJson) return res.status(400).json({ ok: false, error, needsLocation: true });
     return res.status(400).send(error);
   }
 
-  const parsedLat = parseFloat(lat);
-  const parsedLng = parseFloat(lng);
+  const parsedLat = isTelemarketer ? null : parseFloat(lat);
+  const parsedLng = isTelemarketer ? null : parseFloat(lng);
   const ip = clientIp(req);
   const owner = await db.getDeviceOwner(req.deviceId);
   const marketerId = req.session.marketerId;

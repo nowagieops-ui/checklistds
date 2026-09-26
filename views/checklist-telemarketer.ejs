@@ -30,12 +30,7 @@
       <div class="card-title">Morning Checklist</div>
       <div class="card-sub">Hi <%= name %>. Complete every item before you start calling.</div>
 
-      <div class="error" id="checklistError" style="display:none;"></div>
-
       <form method="POST" action="/submit" id="checklistForm">
-        <input type="hidden" name="lat" id="lat">
-        <input type="hidden" name="lng" id="lng">
-        <input type="hidden" name="accuracy" id="accuracy">
         <input type="hidden" name="zone" value="Telemarketing (remote)">
 
         <!-- SECTION 1: BEFORE YOU START -->
@@ -142,60 +137,17 @@
   <script>
     var checklistForm = document.getElementById('checklistForm');
     var submitBtn = document.getElementById('submitBtn');
-    var checklistError = document.getElementById('checklistError');
     var loaderOverlay = document.getElementById('loaderOverlay');
     var submitting = false;
 
-    function showChecklistError(msg) {
-      checklistError.textContent = msg;
-      checklistError.style.display = 'block';
-      checklistError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function resetSubmitBtn() {
-      submitting = false;
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit & Start Calling →';
-    }
-
+    // No location capture here — telemarketers work from a desk, not in
+    // the field, so unlike the field checklist this just submits.
     checklistForm.addEventListener('submit', function (e) {
       if (submitting) { e.preventDefault(); return; }
-      e.preventDefault();
       submitting = true;
-      checklistError.style.display = 'none';
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Getting your location...';
-
-      if (!navigator.geolocation) {
-        resetSubmitBtn();
-        showChecklistError('Location is not supported on this device/browser.');
-        return;
-      }
-
-      function onLocationSuccess(pos) {
-        document.getElementById('lat').value = pos.coords.latitude;
-        document.getElementById('lng').value = pos.coords.longitude;
-        document.getElementById('accuracy').value = pos.coords.accuracy;
-        submitBtn.textContent = 'Submitting...';
-        loaderOverlay.classList.add('active');
-        checklistForm.submit();
-      }
-
-      function onLocationError(err) {
-        if (err && err.code === err.PERMISSION_DENIED) {
-          resetSubmitBtn();
-          showChecklistError('Location access is required to submit your checklist. Please enable location and try again.');
-          return;
-        }
-        // GPS fix can take longer than 10s indoors/low signal — retry once
-        // with lower accuracy before giving up, instead of blaming permissions.
-        navigator.geolocation.getCurrentPosition(onLocationSuccess, function () {
-          resetSubmitBtn();
-          showChecklistError('Could not get a location fix. Please move to an area with better GPS/signal and try again.');
-        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
-      }
-
-      navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+      submitBtn.textContent = 'Submitting...';
+      loaderOverlay.classList.add('active');
     });
   </script>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>

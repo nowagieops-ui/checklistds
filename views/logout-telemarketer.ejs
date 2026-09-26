@@ -83,61 +83,36 @@
       btn.textContent = 'Confirm Checkout →';
     }
 
+    // No location capture here — telemarketers work from a desk, not in
+    // the field, so unlike the field checkout this just posts directly.
     btn.addEventListener('click', function () {
       if (submitting) return;
       submitting = true;
       btn.disabled = true;
-      btn.textContent = 'Getting your location...';
+      btn.textContent = 'Submitting...';
       errBox.style.display = 'none';
 
-      if (!navigator.geolocation) {
-        resetButton();
-        showError('Location is not supported on this device/browser.');
-        return;
-      }
+      var body = 'reason=' + encodeURIComponent(reasonBox ? reasonBox.value : '');
 
-      function onLocationSuccess(pos) {
-        var body = 'lat=' + encodeURIComponent(pos.coords.latitude) +
-          '&lng=' + encodeURIComponent(pos.coords.longitude) +
-          '&accuracy=' + encodeURIComponent(pos.coords.accuracy) +
-          '&reason=' + encodeURIComponent(reasonBox ? reasonBox.value : '');
-
-        fetch('/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
-          body: body
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.ok) {
-              loaderOverlay.classList.add('active');
-              window.location.href = data.redirect;
-            } else {
-              resetButton();
-              showError(data.error || 'Something went wrong. Please try again.');
-            }
-          })
-          .catch(function () {
+      fetch('/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+        body: body
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok) {
+            loaderOverlay.classList.add('active');
+            window.location.href = data.redirect;
+          } else {
             resetButton();
-            showError('Connection error. Please try again.');
-          });
-      }
-
-      function onLocationError(err) {
-        if (err && err.code === err.PERMISSION_DENIED) {
+            showError(data.error || 'Something went wrong. Please try again.');
+          }
+        })
+        .catch(function () {
           resetButton();
-          showError('Location access is required to check out. Please enable location and try again.');
-          return;
-        }
-        // GPS fix can take longer than 10s indoors/low signal — retry once
-        // with lower accuracy before giving up, instead of blaming permissions.
-        navigator.geolocation.getCurrentPosition(onLocationSuccess, function () {
-          resetButton();
-          showError('Could not get a location fix. Please move to an area with better GPS/signal and try again.');
-        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
-      }
-
-      navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+          showError('Connection error. Please try again.');
+        });
     });
   </script>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
