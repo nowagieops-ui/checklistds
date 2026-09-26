@@ -89,7 +89,7 @@ const callUpload = multer({
     destination: CALL_UPLOAD_DIR,
     filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname)}`)
   }),
-  limits: { fileSize: callReviews.MAX_INLINE_BYTES, files: 50 },
+  limits: { fileSize: callReviews.MAX_INLINE_BYTES, files: 100 },
   fileFilter: (req, file, cb) => cb(null, /^audio\//.test(file.mimetype))
 });
 
@@ -1015,7 +1015,7 @@ app.get('/call-reviews', requireAuth, async (req, res) => {
 });
 
 app.post('/call-reviews', requireAuth, (req, res, next) => {
-  callUpload.array('calls', 50)(req, res, (err) => {
+  callUpload.array('calls', 100)(req, res, (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE' ? 'One of those files is over the 15MB limit — trim it or compress it and try again.' : err.message;
       return res.status(400).send(msg);

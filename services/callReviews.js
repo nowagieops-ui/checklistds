@@ -8,6 +8,7 @@ const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 const db = require('../db/database');
 const { nowLagos } = require('../utils/time');
+const trainingWeeks = require('./trainingWeeks');
 
 const geminiClient = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
@@ -21,21 +22,79 @@ function isConfigured() {
   return !!geminiClient;
 }
 
-const PROMPT = `You are a sales call quality reviewer for a telemarketing team. They cold-call either to sell a Nigerian delivery-logistics SaaS platform, or separately to book a free strategy call for a UK brand growth agency. You are given one recorded phone call.
+// Flattens a training week's content blocks (everything except the quiz and
+// the roleplay module) into plain text — this is how the grader gets real
+// product knowledge (every plan, price, feature, and the Rider Hub/Shield
+// for DashSpid; every service and the booking ask for NowagieOps) instead
+// of a thin hand-written summary that drifts out of sync. Week 1 is the
+// foundation week for both academies, so it's the single source of truth
+// here — if the curriculum changes, the grader's knowledge changes with it.
+function flattenWeekContent(weekData) {
+  const lines = [];
+  weekData.modules.forEach(m => {
+    if (m.isRoleplay) return;
+    lines.push(`## ${m.title}`);
+    (m.content || []).forEach(block => {
+      if (block.callout) { lines.push(`Note: ${block.callout}`); return; }
+      if (block.type === 'table') {
+        lines.push(block.headers.join(' | '));
+        block.rows.forEach(row => lines.push(row.join(' | ')));
+        return;
+      }
+      if (block.example) { lines.push(`Example — ${block.example.label}: ${block.example.text}`); return; }
+      if (block.script) {
+        lines.push(`Script — ${block.script.label}: ${block.script.text}`);
+        if (block.script.response) lines.push(`  Response: ${block.script.response}`);
+        return;
+      }
+      if (block.steps) {
+        if (block.header) lines.push(block.header);
+        block.steps.forEach(s => lines.push(`  ${s.num}. ${s.title} — ${s.body}`));
+        return;
+      }
+      if (block.header) lines.push(block.header);
+      if (block.body) lines.push(block.body);
+      if (block.bullets) block.bullets.forEach(b => lines.push(`- ${b}`));
+    });
+  });
+  if (weekData.cheatsheet) {
+    lines.push('## Quick Facts');
+    weekData.cheatsheet.forEach(c => lines.push(`${c.label}: ${c.value}`));
+  }
+  return lines.join('\n');
+}
+
+// Built once at startup, not per call — these files only change on a
+// deploy, and flattening them is pure computation with no I/O to repeat.
+const PRODUCT_BRIEFS = {
+  dashspid: flattenWeekContent(trainingWeeks.loadWeek(1, 'dashspid')),
+  nowagieops: flattenWeekContent(trainingWeeks.loadWeek(1, 'nowagieops'))
+};
+
+const COMPANY_LABEL = { dashspid: 'Dashspid (Nigerian delivery-logistics SaaS)', nowagieops: 'NowagieOps (UK brand growth agency)' };
+
+function buildPrompt(company) {
+  const track = company === 'nowagieops' ? 'nowagieops' : 'dashspid';
+  return `You are a sales call quality reviewer for a telemarketing team selling ${COMPANY_LABEL[track]}. You are given one recorded phone call. Use the product knowledge below to judge not just HOW she sold, but WHETHER what she said was actually correct — a confident answer that gets the price, a feature, or a policy wrong is a real mistake, not a stylistic quibble.
+
+━━━ PRODUCT KNOWLEDGE (${track === 'nowagieops' ? 'NowagieOps' : 'DashSpid'}) ━━━
+${PRODUCT_BRIEFS[track]}
+━━━ END PRODUCT KNOWLEDGE ━━━
 
 Do all of the following:
 1. Transcribe the call as accurately as you can. Label speakers "Telemarketer" and "Prospect" where you can tell them apart.
-2. Grade the call from 1 to 10 on how well the telemarketer handled it overall (opening, listening, objection handling, closing) — 10 is an excellent, textbook call. Be honest, not generous — most real calls are a 4-7.
+2. Grade the call from 1 to 10 on how well the telemarketer handled it — opening with the prospect's pain (not a pitch), one thing explained deep rather than a feature dump, questions before pitching, objections answered then re-engaged, factual accuracy against the product knowledge above, and a close that ends with a named concrete outcome. 10 is an excellent, textbook call. Be honest, not generous — most real calls are a 4-7.
 3. Say specifically what she did well in THIS call, quoting a moment if useful.
-4. Say specifically what she could have done better in THIS call, quoting a moment if useful.
+4. Say specifically what she could have done better in THIS call — including calling out any factual mistake against the product knowledge above (wrong price, wrong feature, wrong policy), by name.
 5. Give a short 2-3 sentence summary of what actually happened on the call (e.g. booked a call, hit an objection, no answer, hung up early, wrong number).
 
 If the audio is not a sales call, or is silent/unintelligible, say so plainly in "summary" and give a grade of 1.
 
 Respond as JSON only, matching exactly this shape, no markdown fences:
 {"transcript": "...", "grade": 7, "didWell": "...", "toImprove": "...", "summary": "..."}`;
+}
 
-async function analyzeCall(filePath, mimeType) {
+async function analyzeCall(filePath, mimeType, company) {
   const buffer = fs.readFileSync(filePath);
   if (buffer.length > MAX_INLINE_BYTES) {
     throw new Error(`File is ${(buffer.length / 1024 / 1024).toFixed(1)}MB — keep recordings under 15MB.`);
@@ -45,7 +104,7 @@ async function analyzeCall(filePath, mimeType) {
     model: 'gemini-2.5-flash',
     contents: [
       { inlineData: { mimeType: mimeType || 'audio/mpeg', data: buffer.toString('base64') } },
-      { text: PROMPT }
+      { text: buildPrompt(company) }
     ],
     config: { responseMimeType: 'application/json' }
   });
@@ -82,7 +141,7 @@ async function processOne() {
 
   await db.markCallReviewProcessing(review.id);
   try {
-    const analysis = await analyzeCall(review.file_path, review.mime_type);
+    const analysis = await analyzeCall(review.file_path, review.mime_type, review.company);
     await db.completeCallReview(review.id, { ...analysis, processedAt: nowLagos() });
   } catch (err) {
     console.error(`callReviews: review ${review.id} failed:`, err.message);
