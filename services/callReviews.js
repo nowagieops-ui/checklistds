@@ -91,14 +91,14 @@ ${extraBlock}
 Do all of the following:
 1. Transcribe the call as accurately as you can. Label speakers "Telemarketer" and "Prospect" where you can tell them apart.
 2. Grade the call from 1 to 10 on how well the telemarketer handled it — opening with the prospect's pain (not a pitch), one thing explained deep rather than a feature dump, questions before pitching, objections answered then re-engaged, factual accuracy against the product knowledge above, and a close that ends with a named concrete outcome. 10 is an excellent, textbook call. Be honest, not generous — most real calls are a 4-7.
-3. Say specifically what she did well in THIS call, quoting a moment if useful.
-4. Say specifically what she could have done better in THIS call — including calling out any factual mistake against the product knowledge above (wrong price, wrong feature, wrong policy), by name.
-5. Give a short 2-3 sentence summary of what actually happened on the call (e.g. booked a call, hit an objection, no answer, hung up early, wrong number).
+3. "didWell" — a real bulleted breakdown, not one blanket sentence: one bullet per distinct good moment in the call (an opening line, a specific question, handling a specific objection, tone, rapport, whatever actually happened), quoting or closely paraphrasing the moment. A longer call should produce more bullets, covering the call roughly start to finish, not just one overall takeaway. Use literal "- " at the start of each line, one per line.
+4. "toImprove" — same format, one bullet per distinct issue, in the order they happened in the call: a missed opportunity, a weak answer, a factual mistake against the product knowledge above (wrong price, wrong feature, wrong policy — name it explicitly), a place she talked over the prospect, etc. If a call is genuinely clean, say so, but still look for the small stuff (pace, filler words, a follow-up question she didn't ask) rather than leaving this empty.
+5. "summary" — a short 2-3 sentence overview of what actually happened on the call (e.g. booked a call, hit an objection, no answer, hung up early, wrong number). This one stays brief — it's the at-a-glance version; didWell/toImprove are where the detail goes.
 
 If the audio is not a sales call, or is silent/unintelligible, say so plainly in "summary" and give a grade of 1.
 
 Respond as JSON only, matching exactly this shape, no markdown fences:
-{"transcript": "...", "grade": 7, "didWell": "...", "toImprove": "...", "summary": "..."}`;
+{"transcript": "...", "grade": 7, "didWell": "- ...\\n- ...", "toImprove": "- ...\\n- ...", "summary": "..."}`;
 }
 
 function sleep(ms) {

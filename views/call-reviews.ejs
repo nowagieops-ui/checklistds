@@ -102,13 +102,13 @@
             </div>
           <% } else if (r.status === 'done') { %>
             <div style="margin-top:10px;font-size:13px;"><%= r.summary %></div>
-            <div class="detail-row" style="margin-top:8px;">
-              <span class="detail-label">What went well</span>
-              <span class="detail-value"><%= r.did_well %></span>
+            <div style="margin-top:12px;">
+              <div class="detail-label" style="margin-bottom:4px;">What went well</div>
+              <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;"><%= r.did_well %></div>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">Where to improve</span>
-              <span class="detail-value"><%= r.to_improve %></span>
+            <div style="margin-top:12px;">
+              <div class="detail-label" style="margin-bottom:4px;">Where to improve</div>
+              <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;"><%= r.to_improve %></div>
             </div>
             <% if (r.transcript) { %>
               <details style="margin-top:10px;">
