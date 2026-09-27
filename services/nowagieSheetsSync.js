@@ -510,7 +510,7 @@ async function runSync() {
           } else {
             const id = parseInt(appIdRaw, 10);
             lead = leadsById[id] || await db.getNowagieLead(id);
-            if (!lead) { info.status = 'Lead not found — clear the App ID to add it as new'; stats.errors++; continue; }
+            if (!lead) { info.orphan = true; continue; }
             mapping = syncRowsByLead[id] || { lead_hash: '', call_hash: '' };
 
             if (leadHash !== mapping.lead_hash) {
@@ -569,6 +569,7 @@ async function runSync() {
     results.forEach(({ cells, info }) => {
       const { tabId, rowNumber } = info;
       if (info.stale) { removals.push({ tabId, rowNumber, leadId: info.staleId }); return; }
+      if (info.orphan) { removals.push({ tabId, rowNumber, leadId: parseInt(cells[0], 10) }); return; }
 
       let outputs;
       if (info.leadId && leadsAfterById[info.leadId]) {
