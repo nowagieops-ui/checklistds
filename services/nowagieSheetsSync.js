@@ -15,10 +15,12 @@ const { nowLagos } = require('../utils/time');
 const HEADERS = [
   'App ID', 'Name', 'Phone', 'Business Name', 'Assigned To',
   'Call Outcome', 'Reason', 'Feedback', 'Next Follow-up',
-  'Source', 'Calls Logged', 'Last Called', 'Last Feedback', 'Sync Status'
+  'Source', 'Calls Logged', 'Last Called', 'Last Feedback', 'Sync Status',
+  'Website', 'Priority'
 ];
 const INPUT_COLS = 9; // A-I
-const TOTAL_COLS = HEADERS.length; // A-N
+const TOTAL_COLS = HEADERS.length; // A-P
+const LAST_COL = String.fromCharCode(64 + TOTAL_COLS); // 'P'
 
 const TABS = [
   { id: 'N1', title: 'N1 New - First Contact', goal: 'Goal: make first contact and start the conversation.' },
@@ -121,7 +123,9 @@ function outputCells(lead, summary, status) {
     String(s.calls),
     s.lastAt ? String(s.lastAt).slice(0, 10) : '',
     s.lastNotes ? String(s.lastNotes).trim().slice(0, 200).trim() : '',
-    status
+    status,
+    lead.website || '',
+    lead.priority || ''
   ];
 }
 
@@ -383,7 +387,7 @@ async function runSync() {
     const reasonCodes = await db.getNowagieReasonCodes();
     const sheetIds = await ensureTabs(cfg, reasonCodes);
 
-    const read = await sheetsRequest(cfg, 'get', batchGetPath(TABS.map(t => tabRange(t.title, 'A1:N'))));
+    const read = await sheetsRequest(cfg, 'get', batchGetPath(TABS.map(t => tabRange(t.title, `A1:${LAST_COL}`))));
     const tabProblems = [];
     const headerWrites = [];
     const tabData = {};
@@ -392,14 +396,14 @@ async function runSync() {
       const grid = values.map(r => Array.from({ length: TOTAL_COLS }, (_, k) => cellText(r[k])));
       const first = grid[0] || new Array(TOTAL_COLS).fill('');
       if (first.every(c => !c)) {
-        headerWrites.push({ range: tabRange(t.title, 'A1:N1'), values: [HEADERS] });
+        headerWrites.push({ range: tabRange(t.title, `A1:${LAST_COL}1`), values: [HEADERS] });
       } else {
         if (HEADERS.slice(0, INPUT_COLS).some((h, k) => first[k].toLowerCase() !== h.toLowerCase())) {
           tabProblems.push(`"${t.title}": row 1 doesn't match the expected headers, so this tab was skipped`);
           return;
         }
         if (HEADERS.slice(INPUT_COLS).some((h, k) => first[INPUT_COLS + k].toLowerCase() !== h.toLowerCase())) {
-          headerWrites.push({ range: tabRange(t.title, `${String.fromCharCode(65 + INPUT_COLS)}1:N1`), values: [HEADERS.slice(INPUT_COLS)] });
+          headerWrites.push({ range: tabRange(t.title, `${String.fromCharCode(65 + INPUT_COLS)}1:${LAST_COL}1`), values: [HEADERS.slice(INPUT_COLS)] });
         }
       }
       tabData[t.id] = grid.slice(1);
@@ -596,7 +600,7 @@ async function runSync() {
       groupContiguous(Object.keys(outValues[tabId]).map(Number)).forEach(([from, to]) => {
         const values = [];
         for (let r = from; r <= to; r++) values.push(outValues[tabId][r]);
-        writes.push({ range: tabRange(tabTitle(tabId), `${outStartCol}${from}:N${to}`), values });
+        writes.push({ range: tabRange(tabTitle(tabId), `${outStartCol}${from}:${LAST_COL}${to}`), values });
       });
     });
     if (writes.length) {
@@ -616,7 +620,7 @@ async function runSync() {
     for (const tabId of Object.keys(appendsByTab)) {
       if (!tabData[tabId]) continue;
       const items = appendsByTab[tabId];
-      await sheetsRequest(cfg, 'post', `/values/${encodeURIComponent(tabRange(tabTitle(tabId), 'A:N'))}:append`, {
+      await sheetsRequest(cfg, 'post', `/values/${encodeURIComponent(tabRange(tabTitle(tabId), `A:${LAST_COL}`))}:append`, {
         params: { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' },
         data: { values: items.map(it => sheetRow(it.lead, summary[it.lead.id])) }
       });
