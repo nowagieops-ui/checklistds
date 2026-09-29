@@ -536,7 +536,7 @@ app.get('/training', requireAuth, async (req, res) => {
 
 // Figures out which week (2-12) a telemarketer should be working on right
 // now: the week after their last completed one, but only once BOTH that
-// prior week is done AND the next Monday has arrived — never both at once,
+// prior week is done AND the Monday after it has arrived — never both at once,
 // and never skipping ahead just because time passed on an unfinished week.
 async function getWeeklyTrainingState(marketerId) {
   const week1Progress = await db.getTrainingProgress(marketerId);

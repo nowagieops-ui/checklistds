@@ -92,24 +92,25 @@ function loadWeek(weekNumber, track) {
   };
 }
 
-// Ceilings a 'YYYY-MM-DD' date to the same date if it's already a Monday,
-// otherwise the next Monday after it. Pure UTC arithmetic — matches the
+// Returns the first Monday strictly AFTER a 'YYYY-MM-DD' date — a week
+// finished on a Monday unlocks the next one the following Monday, never the
+// same day (one module per Monday). Pure UTC arithmetic — matches the
 // convention used elsewhere in this app for date-only calculations.
 function ceilToMonday(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const dow = date.getUTCDay(); // 0=Sun..6=Sat
-  const daysUntilMonday = (1 - dow + 7) % 7;
+  const daysUntilMonday = (1 - dow + 7) % 7 || 7;
   date.setUTCDate(date.getUTCDate() + daysUntilMonday);
   return date.toISOString().split('T')[0];
 }
 
-// Same idea as ceilToMonday, for NowagieOps's Friday-unlock cadence.
+// Same idea as ceilToMonday (strictly after), for NowagieOps's Friday cadence.
 function ceilToFriday(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const dow = date.getUTCDay(); // 0=Sun..6=Sat
-  const daysUntilFriday = (5 - dow + 7) % 7;
+  const daysUntilFriday = (5 - dow + 7) % 7 || 7;
   date.setUTCDate(date.getUTCDate() + daysUntilFriday);
   return date.toISOString().split('T')[0];
 }
