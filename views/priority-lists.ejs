@@ -96,5 +96,8 @@
   </div>
 
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+  <% if (!viewerIsManagement && role === 'telemarketer') { %>
+    <script src="/goal-reminder.js?v=<%= assetVersion %>"></script>
+  <% } %>
 </body>
 </html>

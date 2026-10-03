@@ -51,6 +51,20 @@
     </div>
 
     <div class="card">
+      <div class="card-title" style="font-size:16px;">Call Reviews</div>
+      <% if (callUploadsToday > 0) { %>
+        <div class="note-box">
+          <div class="note-box-body">✅ <%= callUploadsToday %> call<%= callUploadsToday === 1 ? '' : 's' %> uploaded to Call Reviews today.</div>
+        </div>
+      <% } else { %>
+        <div class="note-box">
+          <div class="note-box-body">⚠️ Have you uploaded today's call recordings to Call Reviews yet? Nothing's been uploaded today.</div>
+        </div>
+        <a href="/call-reviews" class="btn btn-outline">Upload Call Recordings →</a>
+      <% } %>
+    </div>
+
+    <div class="card">
       <div class="error" id="logoutError" style="display:none;margin-bottom:12px;"></div>
 
       <button type="button" class="btn" id="confirmLogoutBtn">Confirm Checkout →</button>

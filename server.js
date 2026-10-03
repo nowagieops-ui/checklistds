@@ -916,6 +916,7 @@ app.get('/priority-lists', requireAuth, async (req, res) => {
 
   res.render('priority-lists', {
     heading: role === 'telemarketer' ? "Today's Call Queue" : 'My Priority Lists',
+    role,
     baseUrl: '/priority-lists',
     riderBaseUrl: '/riders',
     backHref: '/home',
@@ -1354,6 +1355,7 @@ app.get('/nowagie-queue', requireAuth, async (req, res) => {
 
   res.render('priority-lists', {
     heading: "NowagieOps Call Queue",
+    role: 'telemarketer',
     baseUrl: '/nowagie-queue',
     riderBaseUrl: '/nowagie-leads',
     backHref: '/home',
@@ -1475,10 +1477,12 @@ app.get('/logout', requireAuth, async (req, res) => {
   if (req.session.marketerRole === 'telemarketer') {
     const sub = await db.getSubmissionByMarketerToday(req.session.marketerId, today());
     const callSummary = await performance.getTodayCallSummary(req.session.marketerId, today());
+    const uploadsToday = await db.getCallReviewsForStaff(req.session.marketerId, { fromDate: today(), toDate: today() });
     return res.render('logout-telemarketer', {
       name: req.session.marketerName,
       target: sub ? parseInt(sub.targets, 10) || 0 : 0,
-      actualCalls: callSummary.total_calls
+      actualCalls: callSummary.total_calls,
+      callUploadsToday: uploadsToday.length
     });
   }
   const ridersToday = (await db.getRidersAddedByOnDate(req.session.marketerId, today())).length;

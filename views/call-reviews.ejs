@@ -167,5 +167,8 @@
     </script>
   <% } %>
   <script src="/install-prompt.js?v=<%= assetVersion %>"></script>
+  <% if (!viewerIsManagement) { %>
+    <script src="/goal-reminder.js?v=<%= assetVersion %>"></script>
+  <% } %>
 </body>
 </html>

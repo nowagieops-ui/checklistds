@@ -409,6 +409,29 @@ a.app-header-brand { cursor: pointer; }
   max-width: 280px;
 }
 
+/* ── GOAL REMINDER POPUP (telemarketer workday nudge) ── */
+.goal-reminder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(10, 10, 20, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: fadeUp .2s ease;
+}
+.goal-reminder-box {
+  background: #fff;
+  border-radius: 20px;
+  padding: 1.5rem 1.35rem;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+}
+.goal-reminder-title { font-size: 17px; font-weight: 800; color: var(--dark); margin-bottom: 8px; }
+.goal-reminder-body { font-size: 14px; color: var(--gray); line-height: 1.6; margin-bottom: 18px; }
+
 /* ── FORM FIELDS (light pages) ── */
 label {
   display: block;
