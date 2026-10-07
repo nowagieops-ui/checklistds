@@ -327,6 +327,16 @@ app.post(COMPANY_CHOICE_PATH, requireAuth, async (req, res) => {
   res.redirect(req.session.trainingCompleted ? '/home' : trainingPath);
 });
 
+// Telemarketers work from home and start a few minutes later than the
+// field team — a separate, later grace cutoff for them, so an on-time
+// telemarketer login (around 9:10) isn't flagged "late" against the
+// field team's 9:00 standard.
+function checkinCutoffFor(isTelemarketer) {
+  return isTelemarketer
+    ? (process.env.TELEMARKETER_CHECKIN_CUTOFF || '09:10')
+    : (process.env.CHECKIN_CUTOFF || '09:00');
+}
+
 // A day counts green only once BOTH a login and a logout event exist for it
 // AND the login happened before the cutoff — a late-but-complete day shows
 // amber instead, not green. Today is never marked missed — it's still
@@ -386,7 +396,7 @@ app.get('/home', requireAuth, async (req, res) => {
   const fromDate = !earliestDate ? toDate : (earliestDate > maxLookback ? earliestDate : maxLookback);
 
   const events = await db.getAttendanceForMarketerInRange(req.session.marketerId, fromDate, toDate);
-  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
+  const cutoff = checkinCutoffFor(role === 'telemarketer');
   const attendanceCalendar = buildAttendanceCalendar(events, fromDate, toDate, cutoff);
   const canCheckin = !submittedToday && !isPastCheckinDeadline();
   const missedCheckin = !submittedToday && isPastCheckinDeadline();
@@ -500,7 +510,7 @@ app.post('/submit', requireAuth, async (req, res) => {
   });
 
   const time = formatTime(sub.submitted_at);
-  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
+  const cutoff = checkinCutoffFor(isTelemarketer);
   const isLate = time > cutoff;
   const status = isLate ? 'LATE' : 'ON TIME';
 
@@ -1687,7 +1697,8 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const statusDate = isValidDateParam(req.query.date) ? req.query.date : today();
   const statusSubs = await db.getSubmissionsToday(statusDate);
   const statusAttendance = await db.getAttendanceToday(statusDate);
-  const cutoff = process.env.CHECKIN_CUTOFF || '09:00';
+  const fieldCutoff = checkinCutoffFor(false);
+  const telemarketerCutoff = checkinCutoffFor(true);
 
   const defaultTo = today();
   const defaultFrom = addDaysUTC(defaultTo, -6);
@@ -1698,7 +1709,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
   const status = marketers.map(m => {
     const sub = statusSubs.find(s => s.marketer_id === m.id);
     const checkIn = sub ? formatTime(sub.submitted_at) : null;
-    const isLate = checkIn ? checkIn > cutoff : false;
+    const isLate = checkIn ? checkIn > checkinCutoffFor(m.role === 'telemarketer') : false;
 
     const events = statusAttendance
       .filter(a => a.marketer_id === m.id)
@@ -1738,12 +1749,13 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     logoutFormatted: g.logout ? formatTime(g.logout) : '—'
   }));
 
+  const roleById = new Map(marketers.map(m => [m.id, m.role]));
   const submissionsInRange = await db.getSubmissionsInRange(from, to);
   const history = submissionsInRange.map(h => ({
     ...h,
     dateFormatted: formatDateShort(h.date),
     timeFormatted: formatTime(h.submitted_at),
-    isLate: formatTime(h.submitted_at) > cutoff
+    isLate: formatTime(h.submitted_at) > checkinCutoffFor(roleById.get(h.marketer_id) === 'telemarketer')
   }));
 
   const ridersInRange = await db.getRidersInRange(from, to);
@@ -1759,7 +1771,7 @@ app.get('/dashboard', requireManagement, async (req, res) => {
     status, history, flaggedEvents, attendanceHistory, riders,
     from, to,
     statusDate, statusDateFormatted: formatDateLong(statusDate), todayDateStr: today(),
-    cutoff,
+    fieldCutoff, telemarketerCutoff,
     formatTime, formatDateShort,
     companyOverview, cohortOverview, cohortByChannel, overviewPeriod, usageSummary, checklistAccuracy
   });
