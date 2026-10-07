@@ -36,17 +36,17 @@ const TOTAL_COLS = HEADERS.length; // A-O
 // Titled by who's in it and what the call is trying to achieve. The id ties a
 // tab to the app's priority lists (services/priorityLists.js). `script` is a
 // suggested WhatsApp follow-up message for whoever's nurturing this stage —
-// "Joseph/Chiamaka" is a placeholder naming the two actual field marketers
-// (db/schema.sql's seeded "Etuka Joseph" and "Chiamaka Nwoke"), to swap for
-// whichever one is in that row's "Assigned To" column, since it's per-lead,
-// not per-tab.
+// "Joseph and Chiamaka" names the two actual field marketers (db/schema.sql's
+// seeded "Etuka Joseph" and "Chiamaka Nwoke"), who visit every rider
+// together, not separately — so both names always appear together here,
+// never as a pick-one choice.
 const TABS = [
   { id: 'P6', title: 'P6 New - Register', goal: 'Goal: get them to register a free DashSpid account.',
-    script: "Hi, this is Ruth from DashSpid. I'm following up on your meeting with our field marketer, Joseph/Chiamaka, a few days ago — they would have talked to you about DashSpid and how it helps you sell to more customers online, with no upfront cost to get started. I just wanted to check in and see if you've had a chance to register your free account yet. It only takes a couple of minutes, and I'm happy to walk you through it step by step on a call or right here on WhatsApp if that's easier — whatever works best for you. Looking forward to hearing from you!" },
+    script: "Hi, this is Ruth from DashSpid. I'm following up on your meeting with our field marketers, Joseph and Chiamaka, a few days ago — they would have talked to you about DashSpid and how it helps you sell to more customers online, with no upfront cost to get started. I just wanted to check in and see if you've had a chance to register your free account yet. It only takes a couple of minutes, and I'm happy to walk you through it step by step on a call or right here on WhatsApp if that's easier — whatever works best for you. Looking forward to hearing from you!" },
   { id: 'P1', title: 'P1 Registered - Activate', goal: 'Goal: get them to activate — set up their storefront (pricing + payout).',
-    script: "Hi, this is Ruth from DashSpid, following up after Joseph/Chiamaka's visit. Good news — I can see you're registered! The next step is to activate your storefront by setting your prices and your payout details, so customers can actually place and pay for orders with you. Have you had a chance to do that yet? If you're stuck on anything at all — how pricing works, setting up payouts, anything — just let me know and I'll talk you through it, no stress." },
+    script: "Hi, this is Ruth from DashSpid, following up after Joseph and Chiamaka's visit. Good news — I can see you're registered! The next step is to activate your storefront by setting your prices and your payout details, so customers can actually place and pay for orders with you. Have you had a chance to do that yet? If you're stuck on anything at all — how pricing works, setting up payouts, anything — just let me know and I'll talk you through it, no stress." },
   { id: 'P2', title: 'P2 Activated - Share Link', goal: 'Goal: get them to share their storefront link with customers.',
-    script: "Hi, this is Ruth from DashSpid, following up on Joseph/Chiamaka's visit. Your storefront is all set up and ready to take orders — nice work! The next step is getting your store link out to your customers, whether that's on your WhatsApp status, Instagram, or just sending it directly to people who ask about your products. Have you shared it yet? Let me know if you'd like a few ideas on where to share it to get the most eyes on it." },
+    script: "Hi, this is Ruth from DashSpid, following up on Joseph and Chiamaka's visit. Your storefront is all set up and ready to take orders — nice work! The next step is getting your store link out to your customers, whether that's on your WhatsApp status, Instagram, or just sending it directly to people who ask about your products. Have you shared it yet? Let me know if you'd like a few ideas on where to share it to get the most eyes on it." },
   { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit', goal: 'Goal: get a customer to actually open their shared link.',
     script: "Hi, this is Ruth from DashSpid. Just checking in on how things are going — are customers visiting your storefront link yet? If it's been a bit quiet, that's completely normal at this stage, and we can figure out together what might help, whether that's sharing it in a few more places or changing how you're presenting it to people. I'm here to help however I can, so tell me how it's going." },
   { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order', goal: 'Goal: get a visitor to place their first order.',
