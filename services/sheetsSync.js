@@ -23,7 +23,7 @@
 const crypto = require('crypto');
 const axios = require('axios');
 const db = require('../db/database');
-const { nowLagos } = require('../utils/time');
+const { nowLagos, today, addDaysUTC } = require('../utils/time');
 
 const HEADERS = [
   'App ID', 'Name', 'Phone', 'Area / Notes', 'Assigned To',
@@ -382,20 +382,40 @@ function columnRuleRequests(sheetId, reasonLabels) {
   ];
 }
 
-// A banner in the top-right, clear of the A-O headers and dropdowns, so she
-// sees what this tab is trying to achieve the moment she opens it — without
-// disturbing row 1's actual column headers or the frozen-row/row-number math
-// the rest of the sync relies on.
-const GOAL_COL_START = 16; // Q
-const GOAL_COL_END = 26;   // through Z, merged into one banner cell
+// A WhatsApp nurture tracker, right after the A-O call-log block so she
+// sees it without scrolling. The app never reads or writes these two
+// cells — they're pure manual bookkeeping for whoever's WhatsApping leads,
+// same as her filling in "Call Outcome" by hand, just not fed back into
+// the DB.
+const WHATSAPP_COL_START = TOTAL_COLS; // P — immediately after Sync Status (O)
+const WHATSAPP_HEADERS = ['Reached on WhatsApp?', 'Last Message Sent'];
+
+// Weekly follow-up columns start right after that, one per week — see
+// weeklyColumnInsertRequests below for how they grow. weekColumns is how
+// many exist on a given tab right now (from sheet_weekly_tracker), so
+// everything past them — the one-column gap, then the goal banner — is
+// computed relative to it instead of a fixed position. Nothing here
+// "moves" the banner directly: inserting a column at WEEKLY_COL_START
+// shifts the live sheet's existing banner cell along with it automatically
+// (the same as a person right-clicking "Insert column left" would), so
+// this math only has to describe where things end up, never relocate them.
+const WEEKLY_COL_START = WHATSAPP_COL_START + WHATSAPP_HEADERS.length; // R
+function goalColumnsFor(weekColumns) {
+  const start = WEEKLY_COL_START + weekColumns + 1; // +1 gap column
+  return { start, end: start + 10 }; // same 10-column-wide banner as before
+}
 
 // goalText and scriptText are shown as two lines in one wrapped banner cell
 // — the script is just a suggestion for whoever's nurturing the lead over
-// WhatsApp, not something she has to read verbatim.
-function goalBannerRequests(sheetId, goalText, scriptText) {
+// WhatsApp, not something she has to read verbatim. Only called for a tab
+// that doesn't have a banner yet (new tab, or healing an old one) — once
+// placed, a weekly insert carries it along on its own; see the comment
+// above goalColumnsFor.
+function goalBannerRequests(sheetId, goalText, scriptText, weekColumns) {
   if (!goalText) return [];
   const bannerText = scriptText ? `${goalText}\n\nSuggested WhatsApp: "${scriptText}"` : goalText;
-  const range = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: GOAL_COL_START, endColumnIndex: GOAL_COL_END };
+  const { start, end } = goalColumnsFor(weekColumns);
+  const range = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: start, endColumnIndex: end };
   return [
     { mergeCells: { range, mergeType: 'MERGE_ALL' } },
     { updateCells: {
@@ -414,37 +434,26 @@ function goalBannerRequests(sheetId, goalText, scriptText) {
   ];
 }
 
-// A WhatsApp nurture tracker, well clear of both the A-O call-log sync and
-// the Q-Z goal banner. The app never reads or writes these three cells —
-// they're pure manual bookkeeping for whoever's WhatsApping leads, same as
-// her filling in "Call Outcome" by hand, just not fed back into the DB.
-const WHATSAPP_COL_START = 27; // AB (0-based: Z=25, AA=26, AB=27) — one free column past the banner
-const WHATSAPP_HEADERS = ['Reached on WhatsApp?', 'Last Message Sent', 'Followed Up This Week?'];
-const WHATSAPP_COLS_NEEDED = WHATSAPP_COL_START + WHATSAPP_HEADERS.length; // 30 — past the Q-Z banner's default 26-column grid
-
-// The banner above already fills a sheet's default 26 columns (A-Z), so an
-// existing tab must be widened before these columns can be written to —
+// Total grid width the tab needs for the WhatsApp tracker, however many
+// weekly columns it currently has, and the banner past them — all beyond a
+// sheet's default 26 columns (A-Z), so an existing tab must be widened
+// before any of it can be written with updateCells/setDataValidation (unlike
+// insertDimension below, those require the target column to already exist).
 // appendDimension only ever grows a sheet, never truncates it, so a tab
-// that's already wide enough (or was widened by a previous run) is a no-op.
-function ensureColumnCapacityRequests(sheetId, currentColumnCount) {
-  if (currentColumnCount >= WHATSAPP_COLS_NEEDED) return [];
-  return [{ appendDimension: { sheetId, dimension: 'COLUMNS', length: WHATSAPP_COLS_NEEDED - currentColumnCount } }];
+// that's already wide enough is a no-op.
+function ensureColumnCapacityRequests(sheetId, currentColumnCount, weekColumns) {
+  const needed = goalColumnsFor(weekColumns).end;
+  if (currentColumnCount >= needed) return [];
+  return [{ appendDimension: { sheetId, dimension: 'COLUMNS', length: needed - currentColumnCount } }];
 }
 
-function whatsappColumnRequests(sheetId, currentColumnCount) {
+// Assumes the grid is already wide enough (the caller's job — see
+// ensureColumnCapacityRequests — so this never has to be called twice in
+// the same batch with the same stale "before" width, which would double
+// the appendDimension and over-widen the sheet).
+function whatsappColumnRequests(sheetId) {
   const headerRange = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: WHATSAPP_COL_START, endColumnIndex: WHATSAPP_COL_START + WHATSAPP_HEADERS.length };
-  const listRule = (col, values) => ({
-    setDataValidation: {
-      range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
-      rule: {
-        condition: { type: 'ONE_OF_LIST', values: values.map(v => ({ userEnteredValue: v })) },
-        showCustomUi: true,
-        strict: false
-      }
-    }
-  });
   return [
-    ...ensureColumnCapacityRequests(sheetId, currentColumnCount),
     { updateCells: {
         range: headerRange,
         rows: [{ values: WHATSAPP_HEADERS.map(h => ({
@@ -454,18 +463,64 @@ function whatsappColumnRequests(sheetId, currentColumnCount) {
         fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
     } },
     { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: WHATSAPP_COL_START + 1, endColumnIndex: WHATSAPP_COL_START + 2 }, cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'yyyy-mm-dd' } } }, fields: 'userEnteredFormat.numberFormat' } },
-    listRule(WHATSAPP_COL_START, ['Yes', 'No']),
-    listRule(WHATSAPP_COL_START + 2, ['Yes', 'No'])
+    { setDataValidation: {
+        range: { sheetId, startRowIndex: 1, startColumnIndex: WHATSAPP_COL_START, endColumnIndex: WHATSAPP_COL_START + 1 },
+        rule: { condition: { type: 'ONE_OF_LIST', values: [{ userEnteredValue: 'Yes' }, { userEnteredValue: 'No' }] }, showCustomUi: true, strict: false }
+    } }
   ];
 }
 
-function formatRequests(sheetId, reasonLabels, goalText, scriptText, currentColumnCount) {
+// The Monday on or before dateStr — a stable, unambiguous label for "which
+// week is this" regardless of which day of the week the sync happens to
+// run on.
+function weekStartDate(dateStr) {
+  const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 0=Sun..6=Sat
+  return addDaysUTC(dateStr, dow === 0 ? -6 : -(dow - 1));
+}
+
+function weekColumnLabel(weekStart) {
+  return `Follow-up: wk of ${weekStart}`;
+}
+
+// Inserts ONE new, blank column at WEEKLY_COL_START — pushing every older
+// weekly column, the gap, and the goal banner one step to the right, which
+// Sheets does natively (same mechanics as the UI's "Insert column left"),
+// carrying their content and formatting along untouched. This is the only
+// place a weekly column is created, and it's only ever called once a week
+// per tab — see the last_week_start check in runSync.
+function weeklyColumnInsertRequests(sheetId, weekStart) {
+  const range = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: WEEKLY_COL_START, endColumnIndex: WEEKLY_COL_START + 1 };
+  return [
+    { insertDimension: { range: { sheetId, dimension: 'COLUMNS', startIndex: WEEKLY_COL_START, endIndex: WEEKLY_COL_START + 1 }, inheritFromBefore: false } },
+    { updateCells: {
+        range,
+        rows: [{ values: [{
+          userEnteredValue: { stringValue: weekColumnLabel(weekStart) },
+          userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } }
+        }] }],
+        fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
+    } },
+    { setDataValidation: {
+        range: { sheetId, startRowIndex: 1, startColumnIndex: WEEKLY_COL_START, endColumnIndex: WEEKLY_COL_START + 1 },
+        rule: { condition: { type: 'ONE_OF_LIST', values: [{ userEnteredValue: 'Yes' }, { userEnteredValue: 'No' }] }, showCustomUi: true, strict: false }
+    } }
+  ];
+}
+
+// The P/Q WhatsApp columns and the goal banner are deliberately left out
+// here — healWhatsappAndBanner places both, for every tab (brand new or
+// not) on every run, right after this. A brand-new tab is just as capable
+// of having a stale/misplaced banner as an old one the very first time
+// this code meets it (its "stale" position is wherever goalBannerRequests
+// last put it for weekColumns=0), so routing both through the one healing
+// path — instead of this also writing them once at creation — means
+// there's only ever one place that does it, and one invariant to reason
+// about instead of two slightly-different ones.
+function formatRequests(sheetId, reasonLabels) {
   return [
     { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
     { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
     ...columnRuleRequests(sheetId, reasonLabels),
-    ...goalBannerRequests(sheetId, goalText, scriptText),
-    ...whatsappColumnRequests(sheetId, currentColumnCount),
     { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: TOTAL_COLS } } } }
   ];
 }
@@ -476,25 +531,103 @@ function formatRequests(sheetId, reasonLabels, goalText, scriptText, currentColu
 let rulesHealed = false;
 
 // Cosmetic, so a failure only logs — it must never stop a sync. Returns
-// whether it worked, so a failed heal is retried on the next run.
-async function reapplyColumnRules(cfg, sheetIds, columnCounts, reasonCodes, tabIds) {
+// whether it worked, so a failed heal is retried on the next run. Only
+// handles the A-J per-row dropdowns now — the P/Q WhatsApp columns and the
+// goal banner are healed unconditionally by healWhatsappAndBanner instead
+// (see its comment for why that one can't be "only sometimes").
+async function reapplyColumnRules(cfg, sheetIds, reasonCodes, tabIds) {
   try {
     const reasonLabels = reasonCodes.map(r => r.label);
-    const requests = tabIds.flatMap(id => {
-      const tab = TABS.find(t => t.id === id);
-      const title = tabTitle(id);
-      return [
-        ...columnRuleRequests(sheetIds[title], reasonLabels),
-        ...goalBannerRequests(sheetIds[title], tab.goal, tab.script),
-        ...whatsappColumnRequests(sheetIds[title], columnCounts[title] || 26)
-      ];
-    });
+    const requests = tabIds.flatMap(id => columnRuleRequests(sheetIds[tabTitle(id)], reasonLabels));
     await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     return true;
   } catch (err) {
     console.error('sheetsSync: re-applying column rules failed:', err.message);
     return false;
   }
+}
+
+// Makes sure the P/Q WhatsApp columns and the goal banner are both present
+// and sitting where weekColumns says they should be, for EVERY stage tab,
+// EVERY run — not just occasionally like reapplyColumnRules. That's what
+// makes ensureWeeklyColumns' insert safe: it can only assume the sheet's
+// actual layout already matches goalColumnsFor(weekColumns) if something
+// re-confirms that every single time, including the very first time this
+// code meets a tab that's never seen it before and still has its original
+// banner sitting at the old Q-Z position (the only position this code has
+// ever actually put a live banner at). The sequence matters: widen the
+// grid to this run's target width FIRST (so the unmerge below never
+// targets a range past the sheet's actual bounds — the old Q-Z banner is
+// always a subset of goalColumnsFor(weekColumns), however many weeks have
+// passed), THEN unmerge that whole span (a no-op if nothing stale is
+// there), THEN write — so there's no stale merge left for
+// insertDimension to collide with later. ensureColumnCapacityRequests
+// only ever runs once per tab here, never also inside whatsappColumnRequests,
+// so the same stale "before" width can't get double-counted into twice the
+// intended appendDimension.
+// Returns the set of tab titles that healed successfully this run — the
+// only ones ensureWeeklyColumns is allowed to touch, since inserting a
+// column relative to a layout that failed to heal is exactly the unsafe
+// case this whole function exists to rule out. Isolated per tab so one
+// tab's failure can't block another's.
+async function healWhatsappAndBanner(cfg, sheetIds, columnCounts, weekColumnsByTitle) {
+  const healed = new Set();
+  for (const t of TABS) {
+    const title = tabTitle(t.id);
+    const sheetId = sheetIds[title];
+    const weekColumns = weekColumnsByTitle[title] || 0;
+    const currentWidth = columnCounts[title] || 26;
+    const neededWidth = goalColumnsFor(weekColumns).end;
+    try {
+      const requests = [
+        ...ensureColumnCapacityRequests(sheetId, currentWidth, weekColumns),
+        { unmergeCells: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: WHATSAPP_COL_START, endColumnIndex: neededWidth } } },
+        ...whatsappColumnRequests(sheetId),
+        ...goalBannerRequests(sheetId, t.goal, t.script, weekColumns)
+      ];
+      await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
+      healed.add(title);
+      if (columnCounts[title] !== undefined) columnCounts[title] = Math.max(currentWidth, neededWidth);
+    } catch (err) {
+      console.error(`sheetsSync: healing WhatsApp/banner columns failed for "${title}":`, err.message);
+    }
+  }
+  return healed;
+}
+
+// Inserts this week's follow-up column on every stage tab that doesn't
+// have one yet AND healed successfully just above, and returns a title ->
+// weekColumns map reflecting the result. sheet_weekly_tracker is the only
+// source of truth for "has this week's column already gone in" — never
+// re-derived from the sheet's own text — so a tab is touched at most once
+// per week no matter how often this runs, and a long outage just catches
+// up to the current week instead of trying to backfill every week that
+// was missed. Each tab is isolated in its own try/catch: a failure on one
+// (e.g. a transient API error) must never stop another tab's insert, and
+// must never update that tab's tracker row, so it's retried on the next
+// run instead of being silently skipped for the rest of the week.
+async function ensureWeeklyColumns(cfg, sheetIds, columnCounts, trackers, healedTitles) {
+  const thisWeek = weekStartDate(today());
+  const weekColumnsByTitle = {};
+  for (const t of TABS) {
+    const tracker = trackers[t.id] || { week_columns: 0, last_week_start: null };
+    const title = tabTitle(t.id);
+    weekColumnsByTitle[title] = tracker.week_columns;
+    if (tracker.last_week_start === thisWeek) continue; // already done this week
+    if (!healedTitles.has(title)) continue; // not confirmed safe to insert against yet
+    try {
+      await sheetsRequest(cfg, 'post', ':batchUpdate', {
+        data: { requests: weeklyColumnInsertRequests(sheetIds[title], thisWeek) }
+      });
+      const newCount = tracker.week_columns + 1;
+      await db.upsertSheetWeeklyTracker(t.id, newCount, thisWeek);
+      weekColumnsByTitle[title] = newCount;
+      if (columnCounts[title] !== undefined) columnCounts[title] += 1; // insertDimension grew the grid by one
+    } catch (err) {
+      console.error(`sheetsSync: weekly column insert failed for "${title}":`, err.message);
+    }
+  }
+  return weekColumnsByTitle;
 }
 
 function funnelFormatRequests(sheetId) {
@@ -549,31 +682,25 @@ async function ensureTabs(cfg, reasonCodes) {
     });
   }
 
-  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage', goal: t.goal, script: t.script })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
+  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage' })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
   const missing = wanted.filter(t => !(t.title in sheetIds));
   if (missing.length) {
-    // Stage tabs are created already wide enough for the Q-Z goal banner
-    // plus the WhatsApp tracker past it, so formatRequests below never
-    // needs a follow-up appendDimension for a brand-new tab.
+    // Created at Sheets' default width — healWhatsappAndBanner widens a
+    // stage tab as needed, same as it does for any existing tab, so there's
+    // no need to special-case a wider grid here just for being new.
     const res = await sheetsRequest(cfg, 'post', ':batchUpdate', {
-      data: {
-        requests: missing.map(t => ({
-          addSheet: { properties: t.kind === 'funnel'
-            ? { title: t.title }
-            : { title: t.title, gridProperties: { columnCount: WHATSAPP_COLS_NEEDED } } }
-        }))
-      }
+      data: { requests: missing.map(t => ({ addSheet: { properties: { title: t.title } } })) }
     });
     res.replies.forEach((rep, i) => {
       sheetIds[missing[i].title] = rep.addSheet.properties.sheetId;
-      columnCounts[missing[i].title] = missing[i].kind === 'funnel' ? 26 : WHATSAPP_COLS_NEEDED;
+      columnCounts[missing[i].title] = 26;
     });
     // Cosmetic only — a formatting failure must never stop the sync itself.
     try {
       const reasonLabels = reasonCodes.map(r => r.label);
       const requests = missing.flatMap(t => (t.kind === 'funnel'
         ? funnelFormatRequests(sheetIds[t.title])
-        : formatRequests(sheetIds[t.title], reasonLabels, t.goal, t.script, columnCounts[t.title])));
+        : formatRequests(sheetIds[t.title], reasonLabels)));
       await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     } catch (err) {
       console.error('sheetsSync: tab formatting failed:', err.message);
@@ -661,6 +788,15 @@ async function runSync() {
 
     const reasonCodes = await db.getReasonCodes();
     const { sheetIds, columnCounts } = await ensureTabs(cfg, reasonCodes);
+
+    // Heal the P/Q WhatsApp columns + goal banner for every tab first,
+    // unconditionally — only once that's confirmed is it safe to insert a
+    // weekly column relative to where they end up. See healWhatsappAndBanner.
+    const weeklyTrackers = await db.getSheetWeeklyTrackers();
+    const preWeekColumnsByTitle = {};
+    TABS.forEach(t => { preWeekColumnsByTitle[tabTitle(t.id)] = (weeklyTrackers[t.id] || {}).week_columns || 0; });
+    const healedTitles = await healWhatsappAndBanner(cfg, sheetIds, columnCounts, preWeekColumnsByTitle);
+    const weekColumnsByTitle = await ensureWeeklyColumns(cfg, sheetIds, columnCounts, weeklyTrackers, healedTitles);
 
     // Read every stage tab in one request.
     const read = await sheetsRequest(cfg, 'get', batchGetPath([
@@ -944,7 +1080,7 @@ async function runSync() {
     const tabsToFormat = rulesHealed
       ? Object.keys(appendsByTab).filter(id => tabData[id])
       : Object.keys(tabData);
-    if (tabsToFormat.length && await reapplyColumnRules(cfg, sheetIds, columnCounts, reasonCodes, tabsToFormat)) {
+    if (tabsToFormat.length && await reapplyColumnRules(cfg, sheetIds, reasonCodes, tabsToFormat)) {
       rulesHealed = true;
     }
 

@@ -777,6 +777,25 @@ const db = {
     );
   },
 
+  // tab_id -> { week_columns, last_week_start } for every stage tab that's
+  // ever had a weekly WhatsApp follow-up column inserted. A tab with no row
+  // yet has never had one, so the caller treats a missing entry as zero.
+  async getSheetWeeklyTrackers() {
+    const [rows] = await pool.execute('SELECT tab_id, week_columns, last_week_start FROM sheet_weekly_tracker');
+    const byTab = {};
+    rows.forEach(r => { byTab[r.tab_id] = r; });
+    return byTab;
+  },
+
+  async upsertSheetWeeklyTracker(tabId, weekColumns, lastWeekStart) {
+    await pool.execute(
+      `INSERT INTO sheet_weekly_tracker (tab_id, week_columns, last_week_start)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE week_columns = VALUES(week_columns), last_week_start = VALUES(last_week_start)`,
+      [tabId, weekColumns, lastWeekStart]
+    );
+  },
+
   // Every lead, whatever channel sourced it — the telemarketer works the whole
   // company-wide funnel, so the sheet's stage tabs cover all of it. Oldest
   // first, so first-time appends land in the same order the app's queues use.
