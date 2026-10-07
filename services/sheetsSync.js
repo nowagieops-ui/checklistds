@@ -34,15 +34,24 @@ const INPUT_COLS = 10; // A-J
 const TOTAL_COLS = HEADERS.length; // A-O
 
 // Titled by who's in it and what the call is trying to achieve. The id ties a
-// tab to the app's priority lists (services/priorityLists.js).
+// tab to the app's priority lists (services/priorityLists.js). `script` is a
+// suggested WhatsApp follow-up message for whoever's nurturing this stage —
+// "[field marketer]" is a placeholder for the name in that row's "Assigned
+// To" column, filled in by hand since it's per-lead, not per-tab.
 const TABS = [
-  { id: 'P6', title: 'P6 New - Register', goal: 'Goal: get them to register a free DashSpid account.' },
-  { id: 'P1', title: 'P1 Registered - Activate', goal: 'Goal: get them to activate — set up their storefront (pricing + payout).' },
-  { id: 'P2', title: 'P2 Activated - Share Link', goal: 'Goal: get them to share their storefront link with customers.' },
-  { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit', goal: 'Goal: get a customer to actually open their shared link.' },
-  { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order', goal: 'Goal: get a visitor to place their first order.' },
-  { id: 'P5', title: 'P5 Ordered - Repeat Order', goal: 'Goal: get them a repeat order from a customer.' },
-  { id: 'DONE', title: 'Graduated', goal: 'Fully onboarded with a repeat customer — no action needed, this is just a record.' }
+  { id: 'P6', title: 'P6 New - Register', goal: 'Goal: get them to register a free DashSpid account.',
+    script: "Hi, this is Ruth from DashSpid — following up on [field marketer]'s visit. Have you had a chance to register your free DashSpid account yet? Happy to help if anything's unclear!" },
+  { id: 'P1', title: 'P1 Registered - Activate', goal: 'Goal: get them to activate — set up their storefront (pricing + payout).',
+    script: "Hi, this is Ruth from DashSpid — following up on [field marketer]'s visit. You're registered — have you set up your storefront yet (pricing + payout)? I can walk you through it if you're stuck." },
+  { id: 'P2', title: 'P2 Activated - Share Link', goal: 'Goal: get them to share their storefront link with customers.',
+    script: "Hi, this is Ruth from DashSpid — following up on [field marketer]'s visit. Your storefront is live! Have you shared your link with customers yet? That's the next step to start getting orders." },
+  { id: 'P3', title: 'P3 Link Shared - Get Customers to Visit', goal: 'Goal: get a customer to actually open their shared link.',
+    script: "Hi, this is Ruth from DashSpid. Checking in — how's it going getting customers to visit your storefront link? Let me know if you're struggling with anything, happy to help." },
+  { id: 'P4', title: 'P4 Has Visitors - Get Customers to Order', goal: 'Goal: get a visitor to place their first order.',
+    script: "Hi, this is Ruth from DashSpid. Checking in — have you gotten your first order yet? If people are visiting but not ordering, let's figure out what's getting in the way." },
+  { id: 'P5', title: 'P5 Ordered - Repeat Order', goal: 'Goal: get them a repeat order from a customer.',
+    script: "Hi, this is Ruth from DashSpid. Congrats on your first order! Checking in to see how it's going — anything I can help with to get repeat customers?" },
+  { id: 'DONE', title: 'Graduated', goal: 'Fully onboarded with a repeat customer — no action needed, this is just a record.', script: null }
 ];
 
 // A read-only overview of every lead against every stage. Nobody types in it,
@@ -380,15 +389,19 @@ function columnRuleRequests(sheetId, reasonLabels) {
 const GOAL_COL_START = 16; // Q
 const GOAL_COL_END = 26;   // through Z, merged into one banner cell
 
-function goalBannerRequests(sheetId, goalText) {
+// goalText and scriptText are shown as two lines in one wrapped banner cell
+// — the script is just a suggestion for whoever's nurturing the lead over
+// WhatsApp, not something she has to read verbatim.
+function goalBannerRequests(sheetId, goalText, scriptText) {
   if (!goalText) return [];
+  const bannerText = scriptText ? `${goalText}\n\nSuggested WhatsApp: "${scriptText}"` : goalText;
   const range = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: GOAL_COL_START, endColumnIndex: GOAL_COL_END };
   return [
     { mergeCells: { range, mergeType: 'MERGE_ALL' } },
     { updateCells: {
         range,
         rows: [{ values: [{
-          userEnteredValue: { stringValue: goalText },
+          userEnteredValue: { stringValue: bannerText },
           userEnteredFormat: {
             textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
             backgroundColor: { red: 1, green: 0.36, blue: 0 },
@@ -401,12 +414,58 @@ function goalBannerRequests(sheetId, goalText) {
   ];
 }
 
-function formatRequests(sheetId, reasonLabels, goalText) {
+// A WhatsApp nurture tracker, well clear of both the A-O call-log sync and
+// the Q-Z goal banner. The app never reads or writes these three cells —
+// they're pure manual bookkeeping for whoever's WhatsApping leads, same as
+// her filling in "Call Outcome" by hand, just not fed back into the DB.
+const WHATSAPP_COL_START = 27; // AB (0-based: Z=25, AA=26, AB=27) — one free column past the banner
+const WHATSAPP_HEADERS = ['Reached on WhatsApp?', 'Last Message Sent', 'Followed Up This Week?'];
+const WHATSAPP_COLS_NEEDED = WHATSAPP_COL_START + WHATSAPP_HEADERS.length; // 30 — past the Q-Z banner's default 26-column grid
+
+// The banner above already fills a sheet's default 26 columns (A-Z), so an
+// existing tab must be widened before these columns can be written to —
+// appendDimension only ever grows a sheet, never truncates it, so a tab
+// that's already wide enough (or was widened by a previous run) is a no-op.
+function ensureColumnCapacityRequests(sheetId, currentColumnCount) {
+  if (currentColumnCount >= WHATSAPP_COLS_NEEDED) return [];
+  return [{ appendDimension: { sheetId, dimension: 'COLUMNS', length: WHATSAPP_COLS_NEEDED - currentColumnCount } }];
+}
+
+function whatsappColumnRequests(sheetId, currentColumnCount) {
+  const headerRange = { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: WHATSAPP_COL_START, endColumnIndex: WHATSAPP_COL_START + WHATSAPP_HEADERS.length };
+  const listRule = (col, values) => ({
+    setDataValidation: {
+      range: { sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 },
+      rule: {
+        condition: { type: 'ONE_OF_LIST', values: values.map(v => ({ userEnteredValue: v })) },
+        showCustomUi: true,
+        strict: false
+      }
+    }
+  });
+  return [
+    ...ensureColumnCapacityRequests(sheetId, currentColumnCount),
+    { updateCells: {
+        range: headerRange,
+        rows: [{ values: WHATSAPP_HEADERS.map(h => ({
+          userEnteredValue: { stringValue: h },
+          userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } }
+        })) }],
+        fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
+    } },
+    { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: WHATSAPP_COL_START + 1, endColumnIndex: WHATSAPP_COL_START + 2 }, cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'yyyy-mm-dd' } } }, fields: 'userEnteredFormat.numberFormat' } },
+    listRule(WHATSAPP_COL_START, ['Yes', 'No']),
+    listRule(WHATSAPP_COL_START + 2, ['Yes', 'No'])
+  ];
+}
+
+function formatRequests(sheetId, reasonLabels, goalText, scriptText, currentColumnCount) {
   return [
     { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
     { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: TOTAL_COLS }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.93, blue: 0.93 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
     ...columnRuleRequests(sheetId, reasonLabels),
-    ...goalBannerRequests(sheetId, goalText),
+    ...goalBannerRequests(sheetId, goalText, scriptText),
+    ...whatsappColumnRequests(sheetId, currentColumnCount),
     { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: TOTAL_COLS } } } }
   ];
 }
@@ -418,13 +477,18 @@ let rulesHealed = false;
 
 // Cosmetic, so a failure only logs — it must never stop a sync. Returns
 // whether it worked, so a failed heal is retried on the next run.
-async function reapplyColumnRules(cfg, sheetIds, reasonCodes, tabIds) {
+async function reapplyColumnRules(cfg, sheetIds, columnCounts, reasonCodes, tabIds) {
   try {
     const reasonLabels = reasonCodes.map(r => r.label);
-    const requests = tabIds.flatMap(id => [
-      ...columnRuleRequests(sheetIds[tabTitle(id)], reasonLabels),
-      ...goalBannerRequests(sheetIds[tabTitle(id)], TABS.find(t => t.id === id).goal)
-    ]);
+    const requests = tabIds.flatMap(id => {
+      const tab = TABS.find(t => t.id === id);
+      const title = tabTitle(id);
+      return [
+        ...columnRuleRequests(sheetIds[title], reasonLabels),
+        ...goalBannerRequests(sheetIds[title], tab.goal, tab.script),
+        ...whatsappColumnRequests(sheetIds[title], columnCounts[title] || 26)
+      ];
+    });
     await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     return true;
   } catch (err) {
@@ -459,11 +523,18 @@ function funnelFormatRequests(sheetId) {
 }
 
 // Makes sure every stage tab and the overview tab exist (creating and
-// formatting missing ones) and returns a title -> sheetId map.
+// formatting missing ones) and returns { sheetIds, columnCounts } — both
+// title -> value maps. columnCounts lets reapplyColumnRules later tell
+// whether an existing tab still needs widening for the WhatsApp columns
+// (see ensureColumnCapacityRequests) without re-fetching metadata.
 async function ensureTabs(cfg, reasonCodes) {
-  const meta = await sheetsRequest(cfg, 'get', '', { params: { fields: 'sheets.properties(sheetId,title)' } });
+  const meta = await sheetsRequest(cfg, 'get', '', { params: { fields: 'sheets.properties(sheetId,title,gridProperties.columnCount)' } });
   const sheetIds = {};
-  (meta.sheets || []).forEach(s => { sheetIds[s.properties.title] = s.properties.sheetId; });
+  const columnCounts = {};
+  (meta.sheets || []).forEach(s => {
+    sheetIds[s.properties.title] = s.properties.sheetId;
+    columnCounts[s.properties.title] = (s.properties.gridProperties && s.properties.gridProperties.columnCount) || 26;
+  });
 
   const renames = TABS
     .filter(t => RENAMED_TABS[t.title] && !(t.title in sheetIds) && (RENAMED_TABS[t.title] in sheetIds))
@@ -472,28 +543,43 @@ async function ensureTabs(cfg, reasonCodes) {
     await sheetsRequest(cfg, 'post', ':batchUpdate', {
       data: { requests: renames.map(r => ({ updateSheetProperties: { properties: { sheetId: sheetIds[r.from], title: r.to }, fields: 'title' } })) }
     });
-    renames.forEach(r => { sheetIds[r.to] = sheetIds[r.from]; delete sheetIds[r.from]; });
+    renames.forEach(r => {
+      sheetIds[r.to] = sheetIds[r.from]; delete sheetIds[r.from];
+      columnCounts[r.to] = columnCounts[r.from]; delete columnCounts[r.from];
+    });
   }
 
-  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage', goal: t.goal })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
+  const wanted = TABS.map(t => ({ title: t.title, kind: 'stage', goal: t.goal, script: t.script })).concat([{ title: FUNNEL_TITLE, kind: 'funnel' }]);
   const missing = wanted.filter(t => !(t.title in sheetIds));
   if (missing.length) {
+    // Stage tabs are created already wide enough for the Q-Z goal banner
+    // plus the WhatsApp tracker past it, so formatRequests below never
+    // needs a follow-up appendDimension for a brand-new tab.
     const res = await sheetsRequest(cfg, 'post', ':batchUpdate', {
-      data: { requests: missing.map(t => ({ addSheet: { properties: { title: t.title } } })) }
+      data: {
+        requests: missing.map(t => ({
+          addSheet: { properties: t.kind === 'funnel'
+            ? { title: t.title }
+            : { title: t.title, gridProperties: { columnCount: WHATSAPP_COLS_NEEDED } } }
+        }))
+      }
     });
-    res.replies.forEach((rep, i) => { sheetIds[missing[i].title] = rep.addSheet.properties.sheetId; });
+    res.replies.forEach((rep, i) => {
+      sheetIds[missing[i].title] = rep.addSheet.properties.sheetId;
+      columnCounts[missing[i].title] = missing[i].kind === 'funnel' ? 26 : WHATSAPP_COLS_NEEDED;
+    });
     // Cosmetic only — a formatting failure must never stop the sync itself.
     try {
       const reasonLabels = reasonCodes.map(r => r.label);
       const requests = missing.flatMap(t => (t.kind === 'funnel'
         ? funnelFormatRequests(sheetIds[t.title])
-        : formatRequests(sheetIds[t.title], reasonLabels, t.goal)));
+        : formatRequests(sheetIds[t.title], reasonLabels, t.goal, t.script, columnCounts[t.title])));
       await sheetsRequest(cfg, 'post', ':batchUpdate', { data: { requests } });
     } catch (err) {
       console.error('sheetsSync: tab formatting failed:', err.message);
     }
   }
-  return sheetIds;
+  return { sheetIds, columnCounts };
 }
 
 // ── SYNC ─────────────────────────────────────────────────────────────────────
@@ -574,7 +660,7 @@ async function runSync() {
     }
 
     const reasonCodes = await db.getReasonCodes();
-    const sheetIds = await ensureTabs(cfg, reasonCodes);
+    const { sheetIds, columnCounts } = await ensureTabs(cfg, reasonCodes);
 
     // Read every stage tab in one request.
     const read = await sheetsRequest(cfg, 'get', batchGetPath([
@@ -858,7 +944,7 @@ async function runSync() {
     const tabsToFormat = rulesHealed
       ? Object.keys(appendsByTab).filter(id => tabData[id])
       : Object.keys(tabData);
-    if (tabsToFormat.length && await reapplyColumnRules(cfg, sheetIds, reasonCodes, tabsToFormat)) {
+    if (tabsToFormat.length && await reapplyColumnRules(cfg, sheetIds, columnCounts, reasonCodes, tabsToFormat)) {
       rulesHealed = true;
     }
 
