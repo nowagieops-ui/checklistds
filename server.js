@@ -1607,10 +1607,18 @@ app.post('/management/staff', requireManagement, async (req, res) => {
     return res.render('staff-new', { error: 'Choose a role.', role });
   }
 
-  // Company assignment only matters for telemarketers — field marketers are
-  // DashSpid-only by definition (NowagieOps has no field/in-person role).
+  // Company assignment only matters for telemarketers. Field marketers remain
+  // DashSpid-only because NowagieOps has no field/in-person role.
+  const worksDashspid = role === 'telemarketer'
+    ? req.body.works_dashspid === '1'
+    : true;
   const worksNowagieops = role === 'telemarketer' && req.body.works_nowagieops === '1';
-  await db.addMarketer({ name: name.trim(), pin, role, worksDashspid: true, worksNowagieops });
+
+  if (role === 'telemarketer' && !worksDashspid && !worksNowagieops) {
+    return res.render('staff-new', { error: 'Select DashSpid, NowagieOps, or both.', role });
+  }
+
+  await db.addMarketer({ name: name.trim(), pin, role, worksDashspid, worksNowagieops });
   res.redirect('/dashboard');
 });
 

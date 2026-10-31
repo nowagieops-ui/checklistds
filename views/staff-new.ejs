@@ -46,10 +46,18 @@
         </div>
 
         <div id="companyBox" style="display:none;">
+          <label for="works_dashspid" style="margin-bottom:8px;">Business assignment <span style="color:var(--red)">*</span></label>
           <label class="check-item">
-            <input type="checkbox" name="works_nowagieops" value="1">
-            <span class="check-item-text">Also works NowagieOps cold calls (in addition to DashSpid) — she'll pick which one at login and complete both training academies separately.</span>
+            <input type="checkbox" name="works_dashspid" id="works_dashspid" value="1" checked>
+            <span class="check-item-text">DashSpid</span>
           </label>
+          <label class="check-item">
+            <input type="checkbox" name="works_nowagieops" id="works_nowagieops" value="1">
+            <span class="check-item-text">NowagieOps</span>
+          </label>
+          <div class="note-box" style="margin-top:12px;margin-bottom:20px;">
+            <div class="note-box-body">Select either business or both. Staff assigned to both will choose one at login and complete each training academy separately.</div>
+          </div>
         </div>
 
         <button type="submit" class="btn" id="submitBtn">Add Staff →</button>
@@ -75,7 +83,16 @@
     roleSelect.addEventListener('change', toggleCompanyBox);
     toggleCompanyBox();
 
-    document.getElementById('staffForm').addEventListener('submit', function() {
+    document.getElementById('staffForm').addEventListener('submit', function(event) {
+      if (roleSelect.value === 'telemarketer') {
+        var worksDashspid = document.getElementById('works_dashspid').checked;
+        var worksNowagieops = document.getElementById('works_nowagieops').checked;
+        if (!worksDashspid && !worksNowagieops) {
+          event.preventDefault();
+          window.alert('Select DashSpid, NowagieOps, or both.');
+          return;
+        }
+      }
       document.getElementById('submitBtn').disabled = true;
       document.getElementById('submitBtn').textContent = 'Please wait...';
       document.getElementById('loaderOverlay').classList.add('active');
