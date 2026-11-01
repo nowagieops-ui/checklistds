@@ -346,9 +346,9 @@ app.post(COMPANY_CHOICE_PATH, requireAuth, async (req, res) => {
 app.get(NOWAGIE_ONBOARDING_PATH, requireAuth, (req, res) => {
   if (req.session.activeCompany !== 'nowagieops') return res.redirect('/home');
   if (req.session.nowagieOnboardingCompleted) return res.redirect('/nowagie-training');
-  const filePath = path.join(__dirname, 'Nowagie Ops — Suliyat Onboarding (1).html');
+  const filePath = path.join(__dirname, 'nowagie-onboarding.html');
   let html = fs.readFileSync(filePath, 'utf8');
-  html = html.replace('Welcome, Suliyat', `Welcome, ${req.session.marketerName}`);
+  html = html.replace('Welcome, New Starter', `Welcome, ${req.session.marketerName}`);
   res.type('html').send(html);
 });
 
