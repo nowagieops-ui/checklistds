@@ -1,0 +1,1250 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Nowagie Ops — Suliyat Onboarding</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg:#F7F6F3; --surface:#FFFFFF; --border:#E4E2DC; --fg:#1A1B2E;
+  --muted:#6B6B7A; --accent:#E8541E; --accent2:#0D9373; --warn:#C9961A;
+  --nav-bg:#1A1B2E; --nav-fg:#B8B9C8; --nav-act:#FFFFFF;
+  --tag-bg:#FFF0EB; --tag-fg:#E8541E; --tip-bg:#EDFAF4; --tip-fg:#0D7A5E;
+  --note-bg:#FFF8E6; --note-fg:#7A5C00; --quiz-bg:#F0EEF8; --quiz-fg:#3D2F7A;
+  --shadow:0 2px 12px rgba(26,27,46,.08); --radius:10px;
+  color-scheme:light;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1117;--surface:#1A1B2E;--border:#2A2B3E;--fg:#E8E9F0;--muted:#7A7B8E;
+  --nav-bg:#0A0B14;--nav-fg:#6B6B7A;--tag-bg:#2E1A0E;--tag-fg:#F07A50;
+  --tip-bg:#0A1E17;--tip-fg:#4ECBA0;--note-bg:#1E1800;--note-fg:#D4A840;
+  --quiz-bg:#160F2E;--quiz-fg:#9B8FE0;--shadow:0 2px 12px rgba(0,0,0,.3);color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0F1117;--surface:#1A1B2E;--border:#2A2B3E;--fg:#E8E9F0;--muted:#7A7B8E;
+  --nav-bg:#0A0B14;--nav-fg:#6B6B7A;--tag-bg:#2E1A0E;--tag-fg:#F07A50;
+  --tip-bg:#0A1E17;--tip-fg:#4ECBA0;--note-bg:#1E1800;--note-fg:#D4A840;
+  --quiz-bg:#160F2E;--quiz-fg:#9B8FE0;--shadow:0 2px 12px rgba(0,0,0,.3);color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--fg);font-family:'Inter',system-ui,sans-serif;font-size:15px;line-height:1.65;min-height:100%;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px));}
+.shell{display:flex;min-height:100vh;}
+.nav{width:268px;flex-shrink:0;background:var(--nav-bg);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.nav-logo{padding:24px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07);}
+.nav-logo .brand{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);}
+.nav-logo .sub{font-size:11px;color:var(--nav-fg);margin-top:3px;}
+.nav-progress-wrap{padding:14px 20px 0;}
+.nav-progress-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--nav-fg);margin-bottom:6px;}
+.progress-bar{height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease;}
+.nav-list{list-style:none;padding:14px 0 24px;flex:1;}
+.nav-item{padding:0 12px;}
+.nav-btn{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:none;background:none;color:var(--nav-fg);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;border-radius:7px;text-align:left;transition:background .15s,color .15s;}
+.nav-btn:hover{background:rgba(255,255,255,.06);color:#d0d1e0;}
+.nav-btn.active{background:rgba(232,84,30,.18);color:var(--nav-act);}
+.nav-btn.done{color:#4ECBA0;}
+.nav-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;background:rgba(255,255,255,.08);}
+.nav-btn.active .nav-icon{background:var(--accent);color:#fff;}
+.nav-btn.done .nav-icon{background:rgba(78,203,160,.2);color:#4ECBA0;}
+.nav-section-label{padding:14px 22px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.25);}
+.main{flex:1;min-width:0;padding:40px max(24px,env(safe-area-inset-right,0px)) 60px max(24px,env(safe-area-inset-left,0px));max-width:780px;}
+.module{display:none;}
+.module.active{display:block;}
+.mod-eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:600;margin-bottom:8px;}
+.mod-title{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:var(--fg);text-wrap:balance;line-height:1.15;margin-bottom:14px;}
+.mod-intro{font-size:16px;color:var(--muted);max-width:62ch;margin-bottom:36px;line-height:1.7;}
+.section{margin-bottom:36px;}
+.section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:12px;color:var(--fg);}
+p{margin-bottom:14px;color:var(--fg);}p:last-child{margin-bottom:0;}
+.callout{border-radius:var(--radius);padding:16px 18px;margin:20px 0;font-size:14px;line-height:1.6;}
+.callout.tip{background:var(--tip-bg);color:var(--tip-fg);border-left:3px solid var(--accent2);}
+.callout.note{background:var(--note-bg);color:var(--note-fg);border-left:3px solid var(--warn);}
+.callout.accent{background:var(--tag-bg);color:var(--tag-fg);border-left:3px solid var(--accent);}
+.callout.mindset{background:linear-gradient(135deg,rgba(232,84,30,.12),rgba(61,47,122,.1));border-left:3px solid var(--accent);border-radius:var(--radius);}
+.callout-title{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;opacity:.8;}
+.scenario-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin:20px 0;box-shadow:var(--shadow);}
+.scenario-label{background:var(--nav-bg);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:8px 16px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.scenario-body{padding:18px;font-size:14px;line-height:1.72;color:var(--fg);}
+.scenario-body p{font-size:14px;}
+.term-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:20px 0;}
+.term-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
+.term-word{font-weight:600;font-size:13px;color:var(--accent);margin-bottom:4px;}
+.term-def{font-size:13px;color:var(--muted);line-height:1.5;}
+.script-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin:20px 0;box-shadow:var(--shadow);}
+.script-label{background:var(--nav-bg);color:var(--nav-fg);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:8px 16px;font-weight:600;}
+.script-body{padding:16px;font-size:14px;line-height:1.7;color:var(--fg);font-style:italic;}
+.script-body strong{font-style:normal;color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em;display:block;margin:10px 0 4px;}
+.script-body strong:first-child{margin-top:0;}
+.niche-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin:20px 0;}
+.niche-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.niche-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);}
+.niche-emoji{font-size:22px;margin-bottom:8px;}
+.niche-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+.niche-why{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;}
+.niche-tag{display:inline-block;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:var(--tag-bg);color:var(--tag-fg);text-transform:uppercase;letter-spacing:.04em;}
+.step-list{list-style:none;padding:0;margin:20px 0;}
+.step-item{display:flex;gap:16px;margin-bottom:18px;}
+.step-num{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.step-num.no{background:#d4535b;}
+.step-num.yes{background:var(--accent2);}
+.step-content{flex:1;min-width:0;}
+.step-title{font-weight:600;font-size:15px;margin-bottom:4px;}
+.step-desc{font-size:14px;color:var(--muted);line-height:1.6;}
+.compare-table{width:100%;border-collapse:collapse;font-size:14px;margin:20px 0;overflow-x:auto;display:block;}
+.compare-table th{background:var(--nav-bg);color:var(--nav-act);padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+.compare-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--fg);}
+.compare-table tr:nth-child(even) td{background:var(--bg);}
+.compare-table tr:last-child td{border-bottom:none;}
+.obj-block{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin:14px 0;background:var(--surface);box-shadow:var(--shadow);}
+.obj-q{padding:12px 16px;background:var(--quiz-bg);color:var(--quiz-fg);font-weight:600;font-size:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;}
+.obj-q::after{content:'▼';font-size:11px;transition:transform .2s;}
+.obj-block.open .obj-q::after{transform:rotate(180deg);}
+.obj-a{padding:0 16px;max-height:0;overflow:hidden;transition:max-height .25s ease,padding .25s ease;font-size:14px;color:var(--fg);line-height:1.65;}
+.obj-block.open .obj-a{max-height:600px;padding:14px 16px;}
+.quiz-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-top:32px;box-shadow:var(--shadow);}
+.quiz-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:4px;}
+.quiz-subtitle{font-size:13px;color:var(--muted);margin-bottom:24px;}
+.quiz-q{margin-bottom:22px;}
+.quiz-q-text{font-weight:600;font-size:14px;margin-bottom:12px;}
+.quiz-options{display:flex;flex-direction:column;gap:8px;}
+.quiz-opt{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;font-size:14px;transition:border-color .15s,background .15s;background:var(--bg);}
+.quiz-opt:hover{border-color:var(--accent);}
+.quiz-opt.selected{border-color:var(--accent);background:var(--tag-bg);color:var(--accent);font-weight:500;}
+.quiz-opt.correct{border-color:var(--accent2);background:var(--tip-bg);color:var(--tip-fg);}
+.quiz-opt.wrong{border-color:#d4535b;background:#fff0f1;color:#a83040;}
+.quiz-feedback{font-size:13px;margin-top:8px;font-weight:500;min-height:18px;}
+.quiz-feedback.ok{color:var(--accent2);}
+.quiz-feedback.err{color:#c0334d;}
+.quiz-submit{display:inline-flex;align-items:center;gap:8px;margin-top:20px;padding:11px 24px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+.quiz-submit:hover{opacity:.88;}
+.quiz-submit:disabled{opacity:.4;cursor:not-allowed;}
+.quiz-score{margin-top:16px;padding:14px 18px;border-radius:8px;font-weight:600;font-size:15px;display:none;}
+.quiz-score.pass{background:var(--tip-bg);color:var(--tip-fg);}
+.quiz-score.fail{background:var(--note-bg);color:var(--note-fg);}
+.mod-nav{display:flex;gap:12px;margin-top:40px;padding-top:28px;border-top:1px solid var(--border);}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:7px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;}
+.btn:hover{opacity:.85;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-ghost{background:var(--surface);border:1.5px solid var(--border);color:var(--fg);}
+.welcome-hero{background:linear-gradient(135deg,var(--nav-bg) 0%,#2D1A40 100%);border-radius:14px;padding:36px 32px;margin-bottom:32px;position:relative;overflow:hidden;}
+.welcome-hero::after{content:'N';position:absolute;right:-10px;top:-20px;font-family:'Syne',sans-serif;font-size:180px;font-weight:800;color:rgba(232,84,30,.12);line-height:1;}
+.welcome-name{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:600;margin-bottom:10px;}
+.welcome-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#fff;text-wrap:balance;margin-bottom:14px;line-height:1.2;}
+.welcome-body{font-size:15px;color:rgba(255,255,255,.7);max-width:50ch;line-height:1.65;margin-bottom:24px;}
+.module-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);}
+.metrics{display:flex;flex-wrap:wrap;gap:14px;margin:20px 0;}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;flex:1;min-width:130px;box-shadow:var(--shadow);}
+.metric-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+.metric-label{font-size:12px;color:var(--muted);}
+/* cascade chain */
+.cascade{margin:20px 0;}
+.cascade-item{display:flex;gap:0;position:relative;}
+.cascade-item:not(:last-child)::after{content:'';position:absolute;left:20px;top:44px;bottom:-14px;width:2px;background:var(--border);}
+.cascade-dot{width:40px;height:40px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--surface);border:2px solid var(--border);box-shadow:var(--shadow);position:relative;z-index:1;}
+.cascade-dot.bad{border-color:#d4535b;background:#fff0f1;}
+.cascade-dot.good{border-color:var(--accent2);background:var(--tip-bg);}
+.cascade-content{flex:1;min-width:0;padding:9px 0 22px 16px;}
+.cascade-title{font-weight:600;font-size:14px;margin-bottom:3px;}
+.cascade-desc{font-size:13px;color:var(--muted);line-height:1.55;}
+/* youtube list */
+.yt-list{list-style:none;padding:0;margin:16px 0;display:flex;flex-direction:column;gap:10px;}
+.yt-item{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow);}
+a.yt-item{text-decoration:none;color:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+a.yt-item:hover{border-color:var(--accent);box-shadow:0 4px 18px rgba(232,84,30,.2);}
+.yt-hours{display:inline-block;background:var(--nav-bg);color:var(--accent);font-size:11px;font-weight:700;padding:3px 9px;border-radius:4px;margin-bottom:10px;letter-spacing:.04em;}
+/* Practical exercise blocks */
+.practical{background:var(--surface);border:2px solid var(--accent2);border-radius:var(--radius);overflow:hidden;margin:28px 0;box-shadow:var(--shadow);}
+.practical-header{background:var(--accent2);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px;}
+.practical-icon{font-size:18px;}
+.practical-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;opacity:.85;}
+.practical-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.practical-body{padding:20px 20px 22px;}
+.practical-body p{font-size:14px;margin-bottom:12px;}
+.practical-steps{list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:10px;}
+.practical-step{display:flex;gap:12px;align-items:flex-start;}
+.ps-num{width:26px;height:26px;border-radius:50%;background:var(--accent2);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.ps-content{flex:1;font-size:14px;line-height:1.6;color:var(--fg);}
+.ps-content strong{display:block;font-size:13px;font-weight:600;margin-bottom:3px;}
+.audit-table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;border-radius:8px;overflow:hidden;}
+.audit-table th{background:rgba(13,147,115,.15);color:var(--tip-fg);padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+.audit-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);}
+.audit-table td:first-child{color:var(--fg);font-weight:500;}
+.audit-table tr:last-child td{border-bottom:none;}
+.practical-link{display:inline-flex;align-items:center;gap:6px;background:var(--accent2);color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:8px 14px;border-radius:6px;margin-top:12px;}
+.practical-link:hover{opacity:.88;}
+.practical-note{margin-top:14px;background:rgba(13,147,115,.08);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:10px 14px;font-size:13px;color:var(--tip-fg);line-height:1.6;}
+.upload-block{margin-top:18px;padding:14px 16px;background:rgba(13,147,115,.05);border:1.5px dashed var(--accent2);border-radius:8px;}
+.upload-title{font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:5px;}
+.upload-note{font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.6;}
+.upload-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+.upload-label{display:inline-flex;align-items:center;gap:7px;background:var(--accent2);color:#fff;font-size:13px;font-weight:600;padding:8px 16px;border-radius:6px;cursor:pointer;transition:opacity .15s;}
+.upload-label:hover{opacity:.85;}
+.upload-label input[type=file]{display:none;}
+.upload-status{font-size:12px;color:var(--tip-fg);font-weight:500;}
+.upload-send{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5;}
+/* Lead sheet */
+.ls-form{display:flex;flex-direction:column;gap:18px;margin:20px 0;}
+.ls-group{display:flex;flex-direction:column;gap:6px;}
+.ls-group label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted);}
+.ls-input,.ls-textarea{width:100%;border:1.5px solid var(--border);border-radius:7px;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;background:var(--surface);color:var(--fg);transition:border-color .15s;resize:vertical;}
+.ls-input:focus,.ls-textarea:focus{outline:none;border-color:var(--accent);}
+.ls-textarea{min-height:68px;}
+.ls-row{display:flex;gap:12px;flex-wrap:wrap;}
+.ls-row .ls-group{flex:1;min-width:160px;}
+.ls-outcome{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.ls-outcome label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--fg);cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:6px;transition:border-color .15s,background .15s;}
+.ls-outcome label:has(input:checked){border-color:var(--accent2);background:var(--tip-bg);color:var(--tip-fg);}
+.ls-outcome input[type=radio]{accent-color:var(--accent2);}
+.ls-print{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:7px;cursor:pointer;transition:opacity .15s;margin-top:8px;}
+.ls-print:hover{opacity:.85;}
+.ls-reset{display:inline-flex;align-items:center;gap:6px;background:none;border:1.5px solid var(--border);color:var(--muted);font-size:13px;font-weight:500;padding:9px 16px;border-radius:7px;cursor:pointer;margin-top:8px;margin-left:8px;}
+.ls-reset:hover{border-color:var(--fg);color:var(--fg);}
+@media print{.nav,.ls-print,.ls-reset,.upload-block{display:none!important;}.module{display:block!important;}.main{padding:0;max-width:100%;}}
+.yt-icon{width:34px;height:34px;border-radius:6px;background:#FF0000;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:13px;}
+.yt-content{flex:1;min-width:0;}
+.yt-title{font-weight:600;font-size:13px;margin-bottom:2px;}
+.yt-meta{font-size:12px;color:var(--muted);}
+.yt-duration{display:inline-block;background:var(--tag-bg);color:var(--tag-fg);font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;margin-left:6px;}
+@media(max-width:700px){
+  .shell{flex-direction:column;}
+  .nav{width:100%;height:auto;position:static;overflow-x:auto;}
+  .nav-list{display:flex;flex-direction:row;overflow-x:auto;padding:8px 12px;white-space:nowrap;}
+  .nav-item{padding:0 4px;}
+  .nav-btn{padding:7px 12px;font-size:12px;}
+  .nav-section-label{display:none;}
+  .nav-progress-wrap{display:none;}
+  .main{padding:24px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px));}
+  .mod-title{font-size:24px;}
+  .niche-grid{grid-template-columns:1fr 1fr;}
+  .welcome-hero{padding:24px 20px;}
+}
+</style>
+
+<div class="shell">
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="brand">Nowagie Ops</div>
+    <div class="sub">Suliyat — New Starter Guide</div>
+  </div>
+  <div class="nav-progress-wrap">
+    <div class="nav-progress-label">Your Progress</div>
+    <div class="progress-bar"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+  </div>
+  <ul class="nav-list" id="navList">
+    <li class="nav-item"><button class="nav-btn active" onclick="go(0)" data-m="0"><span class="nav-icon">👋</span>Welcome</button></li>
+    <li class="nav-section-label">Mindset First</li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(1)" data-m="1"><span class="nav-icon">🔥</span>Why They Need You</button></li>
+    <li class="nav-section-label">The Services</li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(2)" data-m="2"><span class="nav-icon">2</span>Web Dev</button></li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(3)" data-m="3"><span class="nav-icon">3</span>Social Media</button></li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(4)" data-m="4"><span class="nav-icon">4</span>Paid Ads</button></li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(5)" data-m="5"><span class="nav-icon">5</span>Email Marketing</button></li>
+    <li class="nav-section-label">The Role</li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(6)" data-m="6"><span class="nav-icon">6</span>Target Niches</button></li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(7)" data-m="7"><span class="nav-icon">7</span>Your Role</button></li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(8)" data-m="8"><span class="nav-icon">8</span>Objections</button></li>
+    <li class="nav-section-label">Assessment</li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(9)" data-m="9"><span class="nav-icon">✓</span>Final Quiz</button></li>
+    <li class="nav-section-label">Your Tools</li>
+    <li class="nav-item"><button class="nav-btn" onclick="go(10)" data-m="10"><span class="nav-icon">📋</span>Lead Sheet</button></li>
+  </ul>
+</nav>
+
+<main class="main">
+
+<!-- ══ MODULE 0: WELCOME ══════════════════════════════════════ -->
+<div class="module active" id="mod0">
+  <div class="welcome-hero">
+    <div class="welcome-name">Welcome, Suliyat</div>
+    <div class="welcome-title">From Day One to Genuinely Good</div>
+    <div class="welcome-body">This guide takes you from knowing nothing about digital marketing to being able to have a smart, confident conversation with any UK business owner. Work through every module in order — watch every video — each one builds on the last.</div>
+    <div class="module-chips">
+      <span class="chip">🔥 Mindset</span>
+      <span class="chip">🌐 Web Dev</span>
+      <span class="chip">📱 Social Media</span>
+      <span class="chip">📣 Paid Ads</span>
+      <span class="chip">📧 Email</span>
+      <span class="chip">📞 Cold Calling</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">What Nowagie Ops does</div>
+    <p>Nowagie Ops is a brand growth agency. We help UK businesses attract more customers online through websites, paid advertising, social media, and email marketing. Our model is simple: sales happens in the UK (that's you), delivery happens in Nigeria — which means our clients get UK-quality results at competitive prices.</p>
+    <p>Our pitch is not "we do marketing." It's: <strong>we build a client acquisition system for your business</strong> — a connected set of tools (website, ads, emails) designed to bring in new paying customers every single month, predictably.</p>
+  </div>
+
+  <div class="callout accent">
+    <div class="callout-title">Your role in one sentence</div>
+    You research UK businesses, spot a real opportunity in their online presence, call them, deliver that observation, and book them into a free 20-minute Growth Opportunity Review with our growth consultant. You do not close sales — you open doors.
+  </div>
+
+  <div class="section">
+    <div class="section-title">The two-person model</div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-val">You</div><div class="metric-label">Setter — research, call, qualify, book the meeting</div></div>
+      <div class="metric"><div class="metric-val">Growth Consultant</div><div class="metric-label">Closer — growth review, strategy, sell the service</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">How to use this guide</div>
+    <ol class="step-list">
+      <li class="step-item"><span class="step-num">1</span><div class="step-content"><div class="step-title">Start with the Mindset module</div><div class="step-desc">Before anything else. This shapes how you approach every call.</div></div></li>
+      <li class="step-item"><span class="step-num">2</span><div class="step-content"><div class="step-title">Watch every YouTube video listed</div><div class="step-desc">This guide includes around 8 hours of video. Watch them. There's no shortcut. The videos make the concepts click in a way text alone can't.</div></div></li>
+      <li class="step-item"><span class="step-num">3</span><div class="step-content"><div class="step-title">Read each module carefully</div><div class="step-desc">Simple examples and real scenarios throughout. Take notes.</div></div></li>
+      <li class="step-item"><span class="step-num">4</span><div class="step-content"><div class="step-title">Pass the Final Quiz — 8/10 minimum</div><div class="step-desc">Only then should you start making calls.</div></div></li>
+    </ol>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-primary" onclick="go(1)">Start: Why They Need You →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 1: WHY THEY NEED YOU ═══════════════════════════ -->
+<div class="module" id="mod1">
+  <div class="mod-eyebrow">Mindset Module</div>
+  <div class="mod-title">Why They Need You</div>
+  <div class="mod-intro">Before you learn a single marketing term, you need to understand something that will change how you approach every call. These businesses don't just want our help. They need it. And you are doing them a favour by calling.</div>
+
+  <div class="section">
+    <div class="section-title">The plumber scenario — read this slowly</div>
+    <p>Imagine a plumber in Manchester. His name is Dave. Dave is really good at his job — 15 years of experience, fair prices, honest work. But Dave gets almost all his customers from word of mouth. Someone tells a friend, that friend calls Dave. That's it.</p>
+    <p>The problem with that model? When referrals slow down — Dave has no work. And when Dave has no work, this is what happens:</p>
+
+    <div class="cascade">
+      <div class="cascade-item">
+        <div class="cascade-dot bad">💧</div>
+        <div class="cascade-content"><div class="cascade-title">Dave's phone stops ringing</div><div class="cascade-desc">No new jobs coming in this week. Just silence.</div></div>
+      </div>
+      <div class="cascade-item">
+        <div class="cascade-dot bad">💸</div>
+        <div class="cascade-content"><div class="cascade-title">Dave can't pay his one employee, James</div><div class="cascade-desc">James has been with Dave for 3 years. He relies on this job.</div></div>
+      </div>
+      <div class="cascade-item">
+        <div class="cascade-dot bad">🏠</div>
+        <div class="cascade-content"><div class="cascade-title">James can't pay his rent</div><div class="cascade-desc">He's already two weeks behind. He starts to panic.</div></div>
+      </div>
+      <div class="cascade-item">
+        <div class="cascade-dot bad">👨‍👩‍👧</div>
+        <div class="cascade-content"><div class="cascade-title">James's family starts to feel it</div><div class="cascade-desc">Less food on the table. Stress in the house. Kids asking questions James doesn't know how to answer.</div></div>
+      </div>
+      <div class="cascade-item">
+        <div class="cascade-dot bad">📉</div>
+        <div class="cascade-content"><div class="cascade-title">Dave considers closing the business</div><div class="cascade-desc">15 years of work. Gone. Because he had no system for bringing in new customers.</div></div>
+      </div>
+    </div>
+
+    <div class="callout mindset">
+      <div class="callout-title">Now here's the thing</div>
+      Right now, there are thousands of Daves across the UK. Good at what they do. But invisible online. No ads. No landing page. No email follow-up. Just waiting for their phone to ring.<br><br>
+      <strong>You are not cold calling them to sell them something they don't need. You are calling to show Dave that there is a predictable way to keep his phone ringing — every single month, regardless of referrals.</strong><br><br>
+      When Dave has a steady flow of leads, James gets paid. James can feed his family. Dave can grow, hire more people, and build something real. All of that starts with your call.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">This isn't just about plumbers</div>
+    <p>Let's go through the chain for a few of the niches you'll be calling:</p>
+
+    <div class="scenario-box">
+      <div class="scenario-label">🦷 Scenario: The dental clinic</div>
+      <div class="scenario-body">
+        <p>Dr. Patel opened his dental practice in Leeds three years ago. He spent £80,000 fitting out the clinic. But his new patient bookings are inconsistent — some months are full, some are half-empty. He's paying rent, paying his two dental nurses, paying a receptionist. When the diary is half-empty, he's still paying everyone the same wage. He lies awake wondering if he made a mistake.</p>
+        <p>He doesn't know that 1,000 people in his postcode searched "dentist near me" last month — and clicked on his competitor instead, because that competitor has a professional landing page with before-and-afters, 200 Google reviews, and a "book online" button. Dr. Patel's website looks like it was built in 2009 and has no reviews, no clear CTA, and doesn't even load properly on a phone.</p>
+        <p><strong>Your call is the moment someone tells him this — and offers to fix it.</strong></p>
+      </div>
+    </div>
+
+    <div class="scenario-box">
+      <div class="scenario-label">🏠 Scenario: The roofer</div>
+      <div class="scenario-body">
+        <p>Kevin runs a roofing company in Birmingham with four staff. In summer, he's slammed with work. But every winter, three of his four guys are on reduced hours. Kevin dreads January every year. He's tried putting a few Facebook posts up himself. He got 4 likes and 0 calls. He concluded "social media doesn't work." What he doesn't know is that his posts were seen by maybe 40 people — all of whom were already his friends.</p>
+        <p>He doesn't know that a properly targeted Facebook ad showing a completed roof job in his local area, with a "get a free quote" button, could bring him 15 qualified enquiries per month at £8 per enquiry. That's the equivalent of hundreds of word-of-mouth referrals he'll never get on his own.</p>
+        <p><strong>Kevin isn't against marketing. He just tried the wrong thing with no system behind it. You're calling with the right thing.</strong></p>
+      </div>
+    </div>
+
+    <div class="scenario-box">
+      <div class="scenario-label">💪 Scenario: The fitness studio</div>
+      <div class="scenario-body">
+        <p>Fiona opened a CrossFit gym in Manchester two years ago. She posts on Instagram three times a week — great content, real effort. She has 1,400 followers. But her 7am class has 4 people in it. Her 6pm class has 6. Her rent is £3,200 per month. She needs at least 40 active members to break even. She has 27.</p>
+        <p>Here's the frustrating part: she's genuinely one of the best coaches in her area. Her members love her. Her content is solid. But content alone doesn't fill classes — because organic reach on Instagram means her posts are seen by maybe 200 of her 1,400 followers. The 800 fitness-focused people in her local area who would love her gym have never even seen her name.</p>
+        <p><strong>A targeted ad campaign to those 800 people would solve Fiona's problem in weeks. You're the call that starts that process.</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">The mindset shift that changes everything</div>
+    <p>Most people who do cold calling approach it from a position of apologising for calling. They start quietly, they rush through the pitch, they give up at the first hesitation. That energy comes through. People feel it.</p>
+    <p>The moment you genuinely understand that these businesses need what we do — that a dentist with an empty diary is a real problem that affects real people, that a roofer who can't pay his staff in January is suffering — everything changes.</p>
+    <p>You stop apologising for calling. You call like someone who has something valuable to give.</p>
+
+    <div class="callout mindset">
+      <div class="callout-title">Say this to yourself before every call session</div>
+      "I'm not interrupting this person. I'm reaching them before things get worse. I have something that could genuinely change their business. My job is to make sure they at least hear about it."
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these first — Mindset</div>
+    <div class="yt-hours">~1 hr 45 min total</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=alex+hormozi+why+businesses+fail+without+leads+getting+customers" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Alex Hormozi — Why businesses die without a lead system <span class="yt-duration">~45 min</span></div><div class="yt-meta">His framing of why every business without a lead pipeline is eventually doomed is exactly the mindset you need before your first call. Watch the longest result.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=why+small+business+marketing+fails+digital+marketing+mistakes" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Why small business marketing fails — the real reasons <span class="yt-duration">~20 min</span></div><div class="yt-meta">Context for why every business you call has this problem, even if they've "tried marketing before." Gives you empathy and understanding in one video.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=cold+calling+mindset+fear+confidence+how+to+not+be+afraid+sales" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Cold calling mindset — from fear to confidence <span class="yt-duration">~22 min</span></div><div class="yt-meta">Pick a result with 100k+ views. The mental approach matters as much as the script. Watch this before you make a single call.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=value+based+selling+not+features+sales+training+how+to" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Value-based selling — sell the outcome, not the service <span class="yt-duration">~18 min</span></div><div class="yt-meta">You're not selling "a website" or "ads" — you're selling new customers, a full diary, and peace of mind. This video shows you how to frame it that way.</div></div></a>
+    </div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(0)">← Back</button>
+    <button class="btn btn-primary" onclick="go(2)">Next: Web Development →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 2: WEB DEV ═══════════════════════════════════════ -->
+<div class="module" id="mod2">
+  <div class="mod-eyebrow">Service Module 1 of 4</div>
+  <div class="mod-title">Web Development & Landing Pages</div>
+  <div class="mod-intro">What websites actually are, why businesses need them, and what Nowagie Ops builds — explained simply enough that you can talk about it confidently on any call.</div>
+
+  <div class="section">
+    <div class="section-title">What is a website? (explain it like a 10-year-old)</div>
+    <p>Imagine you walk through a market. Every stall is trying to get your attention. One stall has a big, clean sign, organised products, a price list, and a friendly person who explains everything clearly. Another stall has a messy table, hand-written signs no one can read, and no one seems sure what they're selling. Which stall do you buy from?</p>
+    <p>A website is the online version of that stall. When someone hears about a business — from a friend, from an ad, from anywhere — the first thing they do is Google it. The website is what they see. If it looks bad, loads slowly, or doesn't tell them clearly what to do next — they click away and buy from someone else. Game over.</p>
+    <p>A business without a good website is like that messy stall in the corner that no one visits — even if what they're selling is actually good.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Website vs landing page — what's the difference?</div>
+    <p>A <strong>website</strong> is like a whole shop — multiple rooms, different sections, lots of information. Home page, about us, services, contact, blog. Good for credibility.</p>
+    <p>A <strong>landing page</strong> is like a single sign at the front of the shop that says: "Here's the one thing we're offering today. Click here to get it." One page. One goal. No distractions.</p>
+
+    <div class="scenario-box">
+      <div class="scenario-label">🧠 Real example — why a landing page beats a website for ads</div>
+      <div class="scenario-body">
+        <p>Let's say Kevin the roofer runs a Facebook ad. Someone clicks it, interested in a free quote. The ad sends them to Kevin's homepage. The homepage has a menu with 6 options, a "about us" section, a gallery, a blog from 2021, and somewhere buried at the bottom — a contact form.</p>
+        <p>The person gets confused. They're not sure where to go. They leave without filling in anything. Kevin just paid for a click and got nothing.</p>
+        <p>Now imagine the ad sends them to a single page that says: "Get a free roof inspection in Birmingham — 48 hours, no obligation. Here's what 3 of our recent customers said. [Book now]". Nothing else. No menu. No blog. No gallery. Just that one offer and one button.</p>
+        <p>That person fills in the form. Kevin gets a lead. <strong>Same ad spend. Completely different result.</strong> That's the power of a landing page.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">What makes a good landing page?</div>
+    <ol class="step-list">
+      <li class="step-item"><span class="step-num">1</span><div class="step-content"><div class="step-title">A clear headline — the "I'm in the right place" moment</div><div class="step-desc">"Award-winning Invisalign clinic in Manchester" tells you immediately what this is and where. "Welcome to our website" tells you nothing and makes people leave.</div></div></li>
+      <li class="step-item"><span class="step-num">2</span><div class="step-content"><div class="step-title">Social proof — "other people trust them"</div><div class="step-desc">Reviews, before-and-after photos, client testimonials. Think of it like this: if you're looking for a restaurant and you see one with a queue outside and one that's empty, which one seems better? Social proof is the online queue.</div></div></li>
+      <li class="step-item"><span class="step-num">3</span><div class="step-content"><div class="step-title">One clear action (CTA) — "book now" / "get a quote"</div><div class="step-desc">Not 5 buttons. Not a menu. One action. When you give people too many choices, they pick none. Ever been at a restaurant with a menu so long you just give up and order chips? Same thing.</div></div></li>
+      <li class="step-item"><span class="step-num">4</span><div class="step-content"><div class="step-title">Fast loading — every second costs money</div><div class="step-desc">Research shows: if a page takes more than 3 seconds to load, more than half the visitors leave. That's not an exaggeration. Speed is money.</div></div></li>
+      <li class="step-item"><span class="step-num">5</span><div class="step-content"><div class="step-title">Works on mobile — because everyone's on their phone</div><div class="step-desc">Over 60% of internet browsing is on phones. A website that looks broken on a phone is losing more than half its potential customers.</div></div></li>
+    </ol>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">On a call, this sounds like...</div>
+    "I was looking at your website before calling — I noticed there's no clear way for someone to book or get a quote directly from the page. If someone came from an ad and wanted to act immediately, they'd have to hunt around to find a way to contact you. That's something we could fix quickly."
+  </div>
+
+  <div class="section">
+    <div class="section-title">Key terms to know</div>
+    <div class="term-grid">
+      <div class="term-card"><div class="term-word">CTA</div><div class="term-def">Call to Action — the button that tells the visitor what to do. "Book now," "Get a free quote," "Claim your spot." Without one, people don't know what to do and leave.</div></div>
+      <div class="term-card"><div class="term-word">Conversion Rate</div><div class="term-def">Out of every 100 people who visit a page, how many actually fill in the form or click the button? 3% is decent. A badly built page might be under 1%.</div></div>
+      <div class="term-card"><div class="term-word">Above the Fold</div><div class="term-def">What you see before you have to scroll. Like the front page of a newspaper — the most important stuff goes here. If the CTA isn't above the fold, most people never see it.</div></div>
+      <div class="term-card"><div class="term-word">Responsive Design</div><div class="term-def">A website that automatically adjusts to look correct on any device — phone, tablet, laptop. Not optional in 2024.</div></div>
+      <div class="term-card"><div class="term-word">Lead</div><div class="term-def">Someone who's shown interest — filled in a form, clicked "get a quote," or called in. A lead is a potential customer who hasn't bought yet.</div></div>
+      <div class="term-card"><div class="term-word">Webflow / GoHighLevel</div><div class="term-def">Tools we use to build pages. GoHighLevel does everything — website, booking, emails, CRM. Think of it as the engine room behind a client's whole online system.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Web Development & Landing Pages</div>
+    <div class="yt-hours">~3 hours total</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+does+a+website+work+explained+simply+beginners" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How does a website actually work? Explained simply <span class="yt-duration">~12 min</span></div><div class="yt-meta">Watch the most-viewed beginner explanation. You need to understand the foundations before anything else — servers, domains, pages, hosting.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=neil+patel+what+is+a+landing+page+how+it+works" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">What is a landing page and why it matters — Neil Patel <span class="yt-duration">~15 min</span></div><div class="yt-meta">Neil Patel's explanation is the clearest on YouTube. After this you'll be able to explain landing pages to anyone confidently.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=landing+page+vs+website+difference+explained+which+is+better" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Landing page vs full website — what's the difference? <span class="yt-duration">~18 min</span></div><div class="yt-meta">This is a question you'll face on almost every call. Pick a result with 100k+ views. Know the answer cold.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=high+converting+landing+page+elements+what+to+include+tutorial" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">What makes a landing page high-converting? Full breakdown <span class="yt-duration">~35 min</span></div><div class="yt-meta">You don't need to build one — but understanding what goes into it makes you sound like an expert when you point out a prospect's missing CTA or weak headline.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=why+business+websites+fail+to+get+customers+leads+conversion" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Why most business websites fail to get customers <span class="yt-duration">~18 min</span></div><div class="yt-meta">This maps directly to the conversation you'll have on calls. Business owners immediately relate to this — it names their exact frustration.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=gohighlevel+tutorial+beginners+complete+guide+2024+overview" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">GoHighLevel — full beginner walkthrough <span class="yt-duration">~55 min</span></div><div class="yt-meta">GoHighLevel is the platform behind everything we build for clients. You won't use it yourself, but watching this means you understand exactly what you're selling — websites, booking, emails, all in one.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+audit+review+business+website+what+to+look+for" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to audit a business website — what to look for <span class="yt-duration">~20 min</span></div><div class="yt-meta">This is your pre-call checklist in video form. Watch this and you'll know exactly what to look for and what to say when you open a prospect's website.</div></div></a>
+    </div>
+  </div>
+
+  <div class="practical">
+    <div class="practical-header">
+      <span class="practical-icon">🔍</span>
+      <div><div class="practical-label">Practical Exercise — Do This Before Moving On</div><div class="practical-title">Website Audit: 5 Real Businesses</div></div>
+    </div>
+    <div class="practical-body">
+      <p>Theory is done. Now go and look at real websites. Open the <strong>Nowagie Ops lead sheet</strong> (the Excel file shared with you) and pick 5 businesses from it. Open each website and answer the questions below for each one.</p>
+      <ol class="practical-steps">
+        <li class="practical-step"><span class="ps-num">1</span><div class="ps-content"><strong>Open the lead sheet and pick 5 businesses</strong>Any 5 from the list — aim for a mix of niches if you can. The lead sheet already has their names, websites, and contact details.</div></li>
+        <li class="practical-step"><span class="ps-num">2</span><div class="ps-content"><strong>For each website, answer these questions</strong>Write your answers down — in a notebook, on your phone, anywhere. The act of writing it makes it stick.</div></li>
+      </ol>
+      <table class="audit-table">
+        <thead><tr><th>Question to ask yourself</th><th>What you're looking for</th></tr></thead>
+        <tbody>
+          <tr><td>Is there a clear headline?</td><td>"Award-winning dentist in Leeds" ✓ — "Welcome to our website" ✗</td></tr>
+          <tr><td>Can I see a CTA without scrolling?</td><td>A "book now" or "get a quote" button visible immediately ✓</td></tr>
+          <tr><td>Does it work on my phone?</td><td>Open it on your phone. If it looks broken or tiny — that's a problem.</td></tr>
+          <tr><td>Is there a quote/booking form?</td><td>Can someone enquire directly from the site, or do they have to call?</td></tr>
+          <tr><td>Are there reviews or testimonials?</td><td>Real reviews with names/photos, or nothing?</td></tr>
+          <tr><td>What would I say to open a call?</td><td>Write one specific, genuine observation for each business.</td></tr>
+        </tbody>
+      </table>
+      <div class="practical-note">Most of the websites you find will have at least two problems from this list. That's not a coincidence — it's the gap our business fills. When you've audited 5 real sites, those problems feel real, not theoretical. And your opening line on a call becomes natural rather than scripted.</div>
+      <div class="upload-block">
+        <div class="upload-title">📎 Submit your notes</div>
+        <div class="upload-note">Write your findings in any format — typed, handwritten, a phone photo, a voice note screenshot — whatever works for you. We are <strong>not</strong> looking for perfect answers. We just want to see that you actually looked at 5 real websites. Don't overthink it. Don't spend an hour polishing it.</div>
+        <div class="upload-row">
+          <label class="upload-label">📁 Attach notes / photo<input type="file" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handleUpload(this,'up_web')"></label>
+          <span class="upload-status" id="up_web"></span>
+        </div>
+        <div class="upload-send">Once ready, send your notes to the team via WhatsApp or email.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quiz-section">
+    <div class="quiz-title">Module 2 Check</div>
+    <div class="quiz-subtitle">3 quick questions.</div>
+    <div id="q2"></div>
+    <button class="quiz-submit" id="sub2" onclick="checkQuiz('q2',sub2,[[1],[1],[2]],'score2')">Submit</button>
+    <div class="quiz-score" id="score2"></div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(1)">← Back</button>
+    <button class="btn btn-primary" onclick="go(3)">Next: Social Media →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 3: SOCIAL MEDIA ════════════════════════════════ -->
+<div class="module" id="mod3">
+  <div class="mod-eyebrow">Service Module 2 of 4</div>
+  <div class="mod-title">Social Media Marketing</div>
+  <div class="mod-intro">The difference between posting and marketing. Why most businesses are wasting their time on social media — and what actually drives results.</div>
+
+  <div class="section">
+    <div class="section-title">The megaphone in an empty field (understanding organic reach)</div>
+    <p>Imagine you have a megaphone and you're standing in an empty field shouting about your business. You're shouting loudly. You're saying the right things. But there's nobody there to hear you.</p>
+    <p>That's what organic social media posts are like in 2024. Facebook now shows an average organic post to about <strong>2–5% of a page's followers</strong>. So if a business has 1,000 followers and posts something, maybe 30–50 people see it. Of those 30–50, most are scrolling past. Maybe 5 actually read it.</p>
+    <p>This is why a business can post every day for a year and see no real growth in customers. It's not because their content is bad. It's because the field is empty — almost nobody is shown the post.</p>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">🧠 Real scenario — the fitness studio posting vs. paying</div>
+    <div class="scenario-body">
+      <p>Fiona the CrossFit coach posts 3 times a week on Instagram. She has 1,400 followers. With 3% organic reach, each post is seen by roughly 42 people — almost all of whom already know her. New people? Maybe 3 a week see her posts.</p>
+      <p>Now compare: she runs a £5/day Instagram ad targeting fitness-interested people within 5 miles of her gym. That £5 puts her post in front of 800 new people every day. Every day. 800 people who've never heard of her. Some of them are exactly the type of person who would love her gym.</p>
+      <p><strong>Same content. £5. 800 people vs. 42. That's why paid beats organic every time for getting new customers.</strong></p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Organic vs Paid — the clearest way to think about it</div>
+    <table class="compare-table">
+      <thead><tr><th>Organic (Free Posts)</th><th>Paid (Ads)</th></tr></thead>
+      <tbody>
+        <tr><td>Shown to 2–5% of your followers</td><td>Shown to thousands of new people you choose</td></tr>
+        <tr><td>Takes months or years to build reach</td><td>Results possible within 24 hours of launching</td></tr>
+        <tr><td>You have no control over who sees it</td><td>You pick the age, location, interests of who sees it</td></tr>
+        <tr><td>Good for nurturing existing followers</td><td>Good for getting brand new customers</td></tr>
+        <tr><td>Free in money, expensive in time</td><td>Costs money but produces measurable ROI</td></tr>
+      </tbody>
+    </table>
+    <p>We do both — but for getting results fast, paid ads are the engine. Organic content supports it.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">What actually makes content work</div>
+    <p>Think about how you use Instagram or TikTok yourself. You're scrolling fast. Something has to <em>stop your thumb</em> — or you're past it in 0.5 seconds. That's the hook.</p>
+    <ol class="step-list">
+      <li class="step-item"><span class="step-num">1</span><div class="step-content"><div class="step-title">The hook — "stop the scroll"</div><div class="step-desc">The first second of a video or first line of a caption. "3 mistakes Manchester homeowners make when choosing a roofer" stops the scroll. "Happy Monday from our team!" does not. One speaks to you. One speaks at you.</div></div></li>
+      <li class="step-item"><span class="step-num">2</span><div class="step-content"><div class="step-title">Relevance — "this is about me"</div><div class="step-desc">People scroll for themselves, not for businesses. "How to tell if your roof needs replacing before winter" — that's about the reader. "We've been roofing in Birmingham since 2004" — that's about the business. One performs 10x better than the other.</div></div></li>
+      <li class="step-item"><span class="step-num">3</span><div class="step-content"><div class="step-title">A next step — "what do I do now?"</div><div class="step-desc">Every post needs somewhere to go. "DM us for a free quote," "link in bio to book," "call us today." Without it, interest disappears the moment someone puts their phone down.</div></div></li>
+    </ol>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">Observation to use on calls</div>
+    Look at the prospect's Instagram or Facebook before calling. If they post regularly but get very little engagement (4 likes from 800 followers), and they have no "book" link or CTA anywhere — that's your opening. "I noticed you're posting consistently, which is great — but I couldn't find a way for someone to actually book or enquire from your profile. Is that something you've thought about?"
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Social Media Marketing</div>
+    <div class="yt-hours">~2 hr 30 min total</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=social+media+marketing+for+local+business+complete+guide+beginners+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Social media marketing for local businesses — complete guide <span class="yt-duration">~1 hr 10 min</span></div><div class="yt-meta">Pick one with 200k+ views. This is your full foundation for the module. Watch the whole thing — don't skip any sections.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=organic+social+media+reach+declining+dead+2024+what+to+do+instead" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Why organic reach is dying — and what to do instead <span class="yt-duration">~18 min</span></div><div class="yt-meta">Understanding this problem deeply is what makes you credible on calls. Business owners who post and see nothing need to hear this. You need to be the one who explains it.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=social+media+content+that+converts+customers+local+business+strategy" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to create content that actually brings in customers <span class="yt-duration">~25 min</span></div><div class="yt-meta">Look for a creator with a business/marketing focus, not a lifestyle account. You need to understand what makes content work commercially, not just go viral.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=instagram+vs+tiktok+for+local+business+which+is+better+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Instagram vs TikTok for local business — which one? <span class="yt-duration">~15 min</span></div><div class="yt-meta">You will face this question. Know the answer. Short version: both can work, but for local services the audience skews older on Facebook/Instagram — which is where the buying power is.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+write+social+media+captions+that+sell+business+strategy" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Writing captions and hooks that make people stop scrolling <span class="yt-duration">~20 min</span></div><div class="yt-meta">The hook is everything. This video explains why some posts stop the scroll and some don't — in a way you can explain simply to a business owner.</div></div></a>
+    </div>
+  </div>
+
+  <div class="practical">
+    <div class="practical-header">
+      <span class="practical-icon">📱</span>
+      <div><div class="practical-label">Practical Exercise — Do This Before Moving On</div><div class="practical-title">Social Media Audit: 4 Real Business Profiles</div></div>
+    </div>
+    <div class="practical-body">
+      <p>Open the <strong>Nowagie Ops lead sheet</strong> and pick 4 businesses from it. Find each one on Instagram or Facebook and audit their profile:</p>
+      <ol class="practical-steps">
+        <li class="practical-step"><span class="ps-num">1</span><div class="ps-content"><strong>Check their followers vs their engagement</strong>Count the likes on their last 5 posts. Divide the average likes by their follower count and multiply by 100. That's their engagement rate. Under 1%? Their content is barely being seen. This is your talking point.</div></li>
+        <li class="practical-step"><span class="ps-num">2</span><div class="ps-content"><strong>Check when they last posted</strong>A business that hasn't posted in 3+ weeks has gone quiet. That often means they tried, got no results, and gave up. That's a conversation starter.</div></li>
+        <li class="practical-step"><span class="ps-num">3</span><div class="ps-content"><strong>Look at their bio and posts for CTAs</strong>Is there a booking link in the bio? Do any of their posts tell people what to do next — "DM us to book", "link in bio for a free quote"? Or are they just posting photos with no direction?</div></li>
+        <li class="practical-step"><span class="ps-num">4</span><div class="ps-content"><strong>For each profile: write one observation</strong>Something specific and genuine. Not "your content could be better" — something like "You post regularly but I couldn't find a way to book or enquire from your profile." That's the kind of thing that makes someone on a call say "you're right, actually."</div></li>
+      </ol>
+      <div class="practical-note">You're training the research muscle here. Before every real call you make, you'll do exactly this — 5 minutes of research so the call feels personalised, not like a pitch. Do this 4 times now so it becomes second nature.</div>
+      <div class="upload-block">
+        <div class="upload-title">📎 Submit your notes</div>
+        <div class="upload-note">Jot down your findings for each of the 4 accounts — a quick note per business is enough. Phone photo of handwritten notes, a typed list, a voice note screenshot — any format is fine. We want familiarity, not a polished report. Don't outsource this or copy someone else's answers.</div>
+        <div class="upload-row">
+          <label class="upload-label">📁 Attach notes / photo<input type="file" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handleUpload(this,'up_social')"></label>
+          <span class="upload-status" id="up_social"></span>
+        </div>
+        <div class="upload-send">Once ready, send your notes to the team via WhatsApp or email.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quiz-section">
+    <div class="quiz-title">Module 3 Check</div>
+    <div class="quiz-subtitle">3 questions.</div>
+    <div id="q3"></div>
+    <button class="quiz-submit" id="sub3" onclick="checkQuiz('q3',sub3,[[0],[2],[1]],'score3')">Submit</button>
+    <div class="quiz-score" id="score3"></div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(2)">← Back</button>
+    <button class="btn btn-primary" onclick="go(4)">Next: Paid Ads →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 4: PAID ADS ════════════════════════════════════ -->
+<div class="module" id="mod4">
+  <div class="mod-eyebrow">Service Module 3 of 4</div>
+  <div class="mod-title">Paid Advertising</div>
+  <div class="mod-intro">The engine behind most of what Nowagie Ops sells. Understanding paid ads deeply is the most important technical knowledge you can have on calls.</div>
+
+  <div class="section">
+    <div class="section-title">What paid ads are — explained simply</div>
+    <p>Imagine you're selling suya in your neighbourhood. Normally you just shout and hope people nearby hear you. That's organic. But now imagine you could pay someone to go into every house within 5km, specifically knock on doors of people who have eaten suya before, and hand them a flyer that says "Fresh suya ready now, 5 minutes away." That's paid advertising.</p>
+    <p>You choose exactly who gets the flyer (location, age, interests), you pay per flyer delivered, and you can measure exactly how many people came to buy as a result. No guessing. Measurable, targetable, scalable.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">How Facebook/Meta Ads work — step by step</div>
+    <ol class="step-list">
+      <li class="step-item"><span class="step-num">1</span><div class="step-content"><div class="step-title">Choose what you want to happen</div><div class="step-desc">Do you want people to fill in a form? Visit your website? Call you? Message you? You tell Meta the goal, and it shows your ad to people most likely to do that specific thing. It's smarter than most people think.</div></div></li>
+      <li class="step-item"><span class="step-num">2</span><div class="step-content"><div class="step-title">Define exactly who sees it</div><div class="step-desc">This is the superpower. Target "homeowners aged 35–65 within 10 miles of Birmingham who have shown interest in home improvement." That's not a guess — Meta knows this from what people like, share, and click. You're not shouting in the street; you're walking up to the exact person who needs you.</div></div></li>
+      <li class="step-item"><span class="step-num">3</span><div class="step-content"><div class="step-title">Create the ad — the hook matters most</div><div class="step-desc">The ad needs to stop someone mid-scroll. A before-and-after photo of a roof. A video of a patient's first day with clear aligners. The first 2 seconds decide whether someone keeps watching or keeps scrolling. We build these for the client.</div></div></li>
+      <li class="step-item"><span class="step-num">4</span><div class="step-content"><div class="step-title">Send them to the landing page</div><div class="step-desc">The ad's only job is to get a click. The landing page's job is to turn that click into an enquiry. They're two halves of the same system — both must work or neither works. This is what most businesses miss when they "try ads" on their own.</div></div></li>
+      <li class="step-item"><span class="step-num">5</span><div class="step-content"><div class="step-title">Test, measure, improve</div><div class="step-desc">Run 3 versions of the ad. After 5 days, one is clearly doing better. Kill the other two. Spend all the budget on the winner. Keep improving. This is how costs go down and results go up over time.</div></div></li>
+    </ol>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">🧠 Real scenario — why Kevin's DIY ads failed</div>
+    <div class="scenario-body">
+      <p>Kevin the roofer boosted a Facebook post himself. He spent £50. He got 400 "reach" (people who saw it) and 2 link clicks. He thought "Facebook doesn't work" and gave up.</p>
+      <p>What actually happened: he boosted a post to his existing followers (people who already know him). He chose "Engagement" as his goal, which means Meta showed it to people likely to like it — not people likely to actually buy a roof. His landing link went to his homepage, which had no clear CTA. His photo was his team van, not a before-and-after that would make a homeowner stop.</p>
+      <p>Every step was wrong. But Kevin thought he "tried ads." He didn't try ads — he boosted a post badly with the wrong objective, wrong audience, wrong creative, and wrong destination. That's like concluding "cars don't work" after driving with no steering wheel.</p>
+      <p><strong>When he says "we tried ads and they didn't work" on your call — this is exactly what happened. And now you know how to respond.</strong></p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Key terms — memorise these</div>
+    <div class="term-grid">
+      <div class="term-card"><div class="term-word">CPM</div><div class="term-def">Cost Per Mille — what it costs to show your ad to 1,000 people. Lower is more efficient. Normal range: £3–£15 depending on audience and platform.</div></div>
+      <div class="term-card"><div class="term-word">CPC</div><div class="term-def">Cost Per Click — what each click to the landing page costs. For local services, £0.50–£3 is normal. Higher competition = higher cost.</div></div>
+      <div class="term-card"><div class="term-word">CTR</div><div class="term-def">Click-Through Rate — the % who click after seeing the ad. 1–3% is solid. Under 0.5% means the creative isn't working.</div></div>
+      <div class="term-card"><div class="term-word">ROAS</div><div class="term-def">Return On Ad Spend. If you spend £100 on ads and generate £400 in sales, ROAS = 4x. The higher the better.</div></div>
+      <div class="term-card"><div class="term-word">Retargeting</div><div class="term-def">Showing ads to people who already visited your website. Like when you look at trainers online and then see trainer ads everywhere. These audiences convert 3–5x better than cold audiences.</div></div>
+      <div class="term-card"><div class="term-word">Meta Pixel</div><div class="term-def">A small piece of code on a website that tells Meta who visited and what they did. Without it, you can't retarget and you can't fully optimise. Essential.</div></div>
+      <div class="term-card"><div class="term-word">Ad Spend</div><div class="term-def">The money paid directly to Meta or TikTok to run the ads. This is the client's cost, separate from Nowagie Ops fees for building and managing the campaign.</div></div>
+      <div class="term-card"><div class="term-word">Lead Form Ad</div><div class="term-def">An ad where the form appears inside Facebook — no click to a website required. Reduces friction. Great for getting phone number enquiries directly.</div></div>
+    </div>
+  </div>
+
+  <div class="callout note">
+    <div class="callout-title">When they ask "how much do I need to spend on ads?"</div>
+    Don't answer this. Say: "That really depends on the business, the service, and what results you're looking for — that's exactly what we'd work out together on the review call. We've seen good results at modest levels when the system is built correctly." Then redirect to booking.
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Paid Advertising</div>
+    <div class="yt-hours">~3 hr 45 min total — this is the most important module. Give it full attention.</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=ben+heath+facebook+ads+complete+beginner+tutorial+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Facebook Ads complete beginner tutorial — Ben Heath <span class="yt-duration">~1 hr</span></div><div class="yt-meta">Ben Heath is the best Facebook Ads educator on YouTube. Search his name specifically and watch his longest beginner tutorial. This one video is worth more than any other on this list.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=facebook+meta+ads+targeting+explained+how+it+works+audiences" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How Meta Ad targeting actually works — explained properly <span class="yt-duration">~25 min</span></div><div class="yt-meta">The targeting system is what makes ads powerful. Understanding this is what lets you tell a prospect exactly who will see their ads and why that's different from posting. Essential.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=why+facebook+ads+fail+common+mistakes+business+not+working" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Why Facebook Ads fail — the most common mistakes <span class="yt-duration">~30 min</span></div><div class="yt-meta">This maps perfectly to the "we tried ads before and they didn't work" objection. After this video, you can explain exactly what went wrong without guessing.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=facebook+ad+campaign+structure+explained+campaign+adset+ad" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Facebook Ads campaign structure — campaign, ad set, and ad explained <span class="yt-duration">~20 min</span></div><div class="yt-meta">If a prospect asks "how does this actually work?" you need to be able to give a confident 60-second overview. This video gives you that.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+read+facebook+ads+metrics+results+ROAS+CPC+CTR" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to read Facebook Ads results — ROAS, CPC, CTR explained <span class="yt-duration">~22 min</span></div><div class="yt-meta">You'll get asked "how do I measure results?" on calls. This video makes the key metrics click — you'll be able to explain what success looks like in plain numbers.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=tiktok+ads+local+business+beginners+tutorial+complete+guide+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">TikTok Ads for local businesses — complete beginner guide <span class="yt-duration">~35 min</span></div><div class="yt-meta">TikTok ads are growing fast, especially for younger-skewing niches like fitness and aesthetics. Watch this so you can speak to it when asked.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=google+ads+vs+facebook+ads+local+service+business+which+is+better" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Google Ads vs Facebook Ads — which is right for local businesses? <span class="yt-duration">~18 min</span></div><div class="yt-meta">A common question. Short answer: Google catches people already searching; Facebook creates demand in people who haven't searched yet. Both have their place. Know this.</div></div></a>
+    </div>
+  </div>
+
+  <div class="practical">
+    <div class="practical-header">
+      <span class="practical-icon">📣</span>
+      <div><div class="practical-label">Practical Exercise — Do This Before Moving On</div><div class="practical-title">Facebook Ad Library Hunt — Find Who's Running Ads and Who Isn't</div></div>
+    </div>
+    <div class="practical-body">
+      <p>Facebook has a public tool called the Ad Library. It shows every ad currently running on Facebook and Instagram — for any business, anywhere. It's completely free to use. This is one of the most powerful research tools you have, and you should use it before every call.</p>
+      <a class="practical-link" href="https://www.facebook.com/ads/library/" target="_blank" rel="noopener">→ Open Facebook Ad Library</a>
+      <ol class="practical-steps" style="margin-top:18px;">
+        <li class="practical-step"><span class="ps-num">1</span><div class="ps-content"><strong>Set it up: Country = United Kingdom, Category = All Ads</strong>Then search the businesses by name — use the <strong>lead sheet</strong> as your list. Pick 6 businesses from it to check.</div></li>
+        <li class="practical-step"><span class="ps-num">2</span><div class="ps-content"><strong>Find 3 from the lead sheet that ARE running ads</strong>Click on their ads. For each one, ask: Does the ad have a strong hook? Does it go to a landing page or just their homepage? Is the offer clear? Would you click it?</div></li>
+        <li class="practical-step"><span class="ps-num">3</span><div class="ps-content"><strong>Find 3 from the lead sheet with NO ads running</strong>They won't appear in the Ad Library at all. These are prime targets — when you call them you can say their competitor is advertising and they're not.</div></li>
+        <li class="practical-step"><span class="ps-num">4</span><div class="ps-content"><strong>For your best finding, write the call opener</strong>Example: "I was looking at the Facebook Ad Library and I can see that [Competitor nearby] is running ads actively right now — but I couldn't find your business in there at all. That means whenever someone in your area sees an ad for this service, it's your competitor getting that call, not you." Practice saying it out loud.</div></li>
+      </ol>
+      <div class="practical-note">The Ad Library is the single best prospecting tool for cold calling in our model. When you can tell a business owner "your competitor is running ads right now and you're not" — that lands differently than any generic pitch. Make this a habit before every call session.</div>
+      <div class="upload-block">
+        <div class="upload-title">📎 Submit your notes</div>
+        <div class="upload-note">Screenshot what you found, or just take a photo of your notes. Which niches were running ads? Which weren't? Did anything surprise you? A few sentences or bullet points is enough — we are looking for familiarity with the tool, not a market research report.</div>
+        <div class="upload-row">
+          <label class="upload-label">📁 Attach notes / screenshot<input type="file" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handleUpload(this,'up_ads')"></label>
+          <span class="upload-status" id="up_ads"></span>
+        </div>
+        <div class="upload-send">Once ready, send your notes to the team via WhatsApp or email.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quiz-section">
+    <div class="quiz-title">Module 4 Check</div>
+    <div class="quiz-subtitle">3 questions.</div>
+    <div id="q4"></div>
+    <button class="quiz-submit" id="sub4" onclick="checkQuiz('q4',sub4,[[2],[1],[0]],'score4')">Submit</button>
+    <div class="quiz-score" id="score4"></div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(3)">← Back</button>
+    <button class="btn btn-primary" onclick="go(5)">Next: Email Marketing →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 5: EMAIL ════════════════════════════════════════ -->
+<div class="module" id="mod5">
+  <div class="mod-eyebrow">Service Module 4 of 4</div>
+  <div class="mod-title">Email Marketing</div>
+  <div class="mod-intro">The most underrated tool in digital marketing — and the one most small businesses are completely ignoring. Email quietly generates more sales than social media for businesses that do it right.</div>
+
+  <div class="section">
+    <div class="section-title">Why email still wins — the leaking bucket analogy</div>
+    <p>Imagine a bucket with a hole in it. You're pouring water (money/ads) in from the top, but it's leaking from the bottom. You need to keep pouring to keep any water in the bucket.</p>
+    <p>Most businesses that run ads are like that. An interested person clicks the ad, visits the landing page, thinks "maybe later," and closes the tab. That person is gone. The money spent to bring them there is gone too. That's the leak.</p>
+    <p>Email marketing is what plugs the hole. Someone doesn't book immediately? Their email goes into an automated sequence that follows up over 14 days, keeping the business in their mind until they're ready. Instead of losing them after one visit, you stay in the conversation.</p>
+  </div>
+
+  <div class="scenario-box">
+    <div class="scenario-label">🧠 Real scenario — the dental clinic's leak</div>
+    <div class="scenario-body">
+      <p>Dr. Patel runs ads that send 100 people per month to his landing page. 8 of them book immediately. The other 92 think "I'll come back to this" and forget about it.</p>
+      <p>With a 5-email sequence that goes out automatically when someone fills in their details: Email 1 the same day ("Here's what to expect from your first visit"), Email 3 on Day 5 (a patient story about how Invisalign changed their confidence), Email 5 on Day 14 ("Two appointment slots left this month").</p>
+      <p>Of those 92 who didn't book immediately, maybe 15 more book over the following two weeks because the emails kept the conversation going. That's 15 extra patients per month from the same ad spend. At £3,000 average patient value over a year, that's £45,000 in additional revenue — from emails that cost almost nothing to send once they're set up.</p>
+      <p><strong>Most businesses have no follow-up system. That's the gap we fill.</strong></p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">The 5-email nurture sequence we build</div>
+    <table class="compare-table">
+      <thead><tr><th>Email</th><th>Timing</th><th>Purpose</th><th>Example subject line</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td>Immediately</td><td>Welcome, set expectations, give one piece of value</td><td>"Here's what to expect from us, [Name]"</td></tr>
+        <tr><td><strong>2</strong></td><td>Day 2</td><td>Address the most common hesitation</td><td>"The question most people ask before booking"</td></tr>
+        <tr><td><strong>3</strong></td><td>Day 5</td><td>Social proof — a story from a similar customer</td><td>"What happened when [Client] tried this"</td></tr>
+        <tr><td><strong>4</strong></td><td>Day 9</td><td>Urgency or scarcity — reason to act now</td><td>"2 consultation slots left this month"</td></tr>
+        <tr><td><strong>5</strong></td><td>Day 14</td><td>Final follow-up — make the next step easy</td><td>"Still thinking it over? Let me make this easy."</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">How to explain email marketing on a call</div>
+    "When someone fills in your enquiry form but doesn't book straight away, what happens? Do they get any follow-up?" [Most will say no.] "That's actually where most businesses lose a huge amount of revenue. We build an automated sequence that follows up with those people over two weeks with emails designed to bring them back. You set it up once, it runs forever. A lot of clients tell us it's the thing that changes their business the most."
+  </div>
+
+  <div class="section">
+    <div class="section-title">Key terms to know</div>
+    <div class="term-grid">
+      <div class="term-card"><div class="term-word">Open Rate</div><div class="term-def">The % of people who actually open an email. UK average is 20–25%. A strong subject line is everything — it's like the hook on a social post.</div></div>
+      <div class="term-card"><div class="term-word">Click Rate</div><div class="term-def">The % who click a link inside the email. 2–5% is good. The email must give them a clear reason to click.</div></div>
+      <div class="term-card"><div class="term-word">Nurture Sequence</div><div class="term-def">A series of pre-written automated emails designed to build trust and convert leads who didn't act immediately.</div></div>
+      <div class="term-card"><div class="term-word">Automation / Workflow</div><div class="term-def">Emails that send automatically based on what a lead does — fills in a form, clicks a link, etc. No manual work required after setup.</div></div>
+      <div class="term-card"><div class="term-word">CRM</div><div class="term-def">Customer Relationship Management — the system tracking every lead and where they are in the process. GoHighLevel is our CRM.</div></div>
+      <div class="term-card"><div class="term-word">Lead Magnet</div><div class="term-def">Something free that gets someone to give you their email — "download our free guide," "get a free quote," etc. Builds the list.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Email Marketing</div>
+    <div class="yt-hours">~2 hr 30 min total</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=email+marketing+for+beginners+full+course+2024+complete+guide" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Email marketing for beginners — full course <span class="yt-duration">~55 min</span></div><div class="yt-meta">Watch the top result — pick one that covers lists, automation, open rates, and writing emails. This is the foundation. Don't skip it.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=email+nurture+sequence+how+to+write+convert+leads+follow+up" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to write an email nurture sequence that converts leads <span class="yt-duration">~25 min</span></div><div class="yt-meta">Alex Cattoni does this well. Understanding what actually goes into a nurture sequence makes you far more convincing when you explain it to a prospect.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=gohighlevel+email+automation+workflow+tutorial+2024+setup" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">GoHighLevel email automation — setup and walkthrough <span class="yt-duration">~30 min</span></div><div class="yt-meta">Seeing how an automated sequence is actually built makes "automated email follow-up" feel real and credible when you say it on a call. This is what you're selling — see it in action.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=email+subject+lines+that+increase+open+rates+tips+examples" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Email subject lines that actually get opened <span class="yt-duration">~20 min</span></div><div class="yt-meta">The subject line is the hook of an email — if nobody opens it, nothing else matters. Understanding this helps you explain why email marketing done badly doesn't work.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=why+businesses+need+email+marketing+ROI+benefits+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Why email marketing ROI beats every other channel <span class="yt-duration">~18 min</span></div><div class="yt-meta">Email returns more per pound spent than social media or paid ads when done correctly. This video gives you the data and framing to explain that to a sceptical prospect.</div></div></a>
+    </div>
+  </div>
+
+  <div class="practical">
+    <div class="practical-header">
+      <span class="practical-icon">📧</span>
+      <div><div class="practical-label">Practical Exercise — Do This Before Moving On</div><div class="practical-title">Test the Follow-Up Gap — Fill In 4 Enquiry Forms and Watch What Happens</div></div>
+    </div>
+    <div class="practical-body">
+      <p>This exercise will prove the email marketing problem better than any explanation. You're going to act like a potential customer and fill in real enquiry forms — then see what those businesses actually do with your enquiry.</p>
+      <ol class="practical-steps">
+        <li class="practical-step"><span class="ps-num">1</span><div class="ps-content"><strong>Set up a free email just for this (optional but recommended)</strong>Create a free Gmail like suliyat.test@gmail.com — so you keep your real inbox clean. Takes 2 minutes.</div></li>
+        <li class="practical-step"><span class="ps-num">2</span><div class="ps-content"><strong>Pick 4 businesses from the lead sheet that have an enquiry or contact form on their website</strong>Go to each website, find the "contact us" or "get a quote" form, and fill it in. Write something realistic like "I'm interested in a consultation, could you let me know more about pricing and availability?"</div></li>
+        <li class="practical-step"><span class="ps-num">3</span><div class="ps-content"><strong>Over the next 48 hours, track what each business does</strong>Did they reply at all? Was it automated or manual? Was the reply helpful or just "we'll be in touch"? Did they follow up 2 days later? 5 days later? 14 days later?</div></li>
+        <li class="practical-step"><span class="ps-num">4</span><div class="ps-content"><strong>Record your findings in this simple table</strong></div></li>
+      </ol>
+      <table class="audit-table">
+        <thead><tr><th>Business</th><th>Replied?</th><th>Automated?</th><th>Follow-up after 5 days?</th><th>What you'd say on a call</th></tr></thead>
+        <tbody>
+          <tr><td>Business 1</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr><td>Business 2</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr><td>Business 3</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr><td>Business 4</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <div class="practical-note">Based on experience: at least 2 of the 4 businesses will not follow up at all after the initial reply. One may never reply at all. That silence IS what we sell. Once you've felt it firsthand — filled in a form as a genuine prospect and heard nothing back — the email marketing pitch becomes something you genuinely believe in. "You know, I actually tested this recently — I filled in an enquiry form on a business just like yours and got no follow-up for two weeks. That's the gap we close." That's not a script. That's the truth.</div>
+      <div class="upload-block">
+        <div class="upload-title">📎 Submit your findings</div>
+        <div class="upload-note">This one runs over 48 hours so come back to it. When you're done — take a screenshot of your inbox, or just write down what each business did or didn't do. One or two sentences per business is plenty. No formatting needed. We are not marking you on writing — we want to see that you actually did it and felt the silence.</div>
+        <div class="upload-row">
+          <label class="upload-label">📁 Attach notes / screenshot<input type="file" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handleUpload(this,'up_email')"></label>
+          <span class="upload-status" id="up_email"></span>
+        </div>
+        <div class="upload-send">Once ready, send your notes to the team via WhatsApp or email.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quiz-section">
+    <div class="quiz-title">Module 5 Check</div>
+    <div class="quiz-subtitle">3 questions.</div>
+    <div id="q5"></div>
+    <button class="quiz-submit" id="sub5" onclick="checkQuiz('q5',sub5,[[1],[0],[2]],'score5')">Submit</button>
+    <div class="quiz-score" id="score5"></div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(4)">← Back</button>
+    <button class="btn btn-primary" onclick="go(6)">Next: Target Niches →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 6: NICHES ═══════════════════════════════════════ -->
+<div class="module" id="mod6">
+  <div class="mod-eyebrow">The Role — Part 1</div>
+  <div class="mod-title">The Target Niches</div>
+  <div class="mod-intro">We focus on specific industries where our system delivers clear results and where the businesses can afford to invest. Know these — and know why each one needs us.</div>
+
+  <div class="section">
+    <div class="section-title">Why we focus on niches</div>
+    <p>"We help any business with marketing" sounds weak. "We've helped dental practices in Manchester add £15k in new patient revenue in 60 days" is specific, believable, and compelling. Niches make your pitch real.</p>
+    <p>The businesses below share two things: <strong>high transaction values</strong> (so marketing investment makes sense) and <strong>a clear, solvable visibility problem</strong> (so we can deliver results).</p>
+  </div>
+
+  <div class="niche-grid">
+    <div class="niche-card"><div class="niche-emoji">💉</div><div class="niche-name">Med Spas & Aesthetic Clinics</div><div class="niche-why">Botox, fillers, lasers. Highly visual — before-and-after content performs brilliantly. High repeat customer value.</div><span class="niche-tag">High LTV</span></div>
+    <div class="niche-card"><div class="niche-emoji">🦷</div><div class="niche-name">High-End Dental</div><div class="niche-why">Invisalign, implants, veneers — one patient can be worth £2,000–£8,000. Massive ROI potential on marketing spend.</div><span class="niche-tag">Big ticket</span></div>
+    <div class="niche-card"><div class="niche-emoji">🏠</div><div class="niche-name">Roofing Contractors</div><div class="niche-why">High-ticket jobs, very local, rely on word of mouth and weather. They desperately need a predictable lead pipeline.</div><span class="niche-tag">Easy pitch</span></div>
+    <div class="niche-card"><div class="niche-emoji">☀️</div><div class="niche-name">Solar Panel Installers</div><div class="niche-why">Government incentives = ready-made ad hooks. High job values. Strong demand with the right targeting.</div><span class="niche-tag">Strong hook</span></div>
+    <div class="niche-card"><div class="niche-emoji">🍳</div><div class="niche-name">Kitchen & Bath Remodelling</div><div class="niche-why">Before-and-after visuals work brilliantly on social. High project values. Homeowners are actively searching.</div><span class="niche-tag">Visual</span></div>
+    <div class="niche-card"><div class="niche-emoji">🏋️</div><div class="niche-name">Boutique Fitness Studios</div><div class="niche-why">Monthly memberships mean high lifetime value. Many struggle to fill classes without a proper lead system.</div><span class="niche-tag">High LTV</span></div>
+    <div class="niche-card"><div class="niche-emoji">❄️</div><div class="niche-name">HVAC (Heating & Air)</div><div class="niche-why">Boiler replacements can be £2,000–£5,000+. Seasonal demand creates urgency that works brilliantly in ads.</div><span class="niche-tag">Big ticket</span></div>
+    <div class="niche-card"><div class="niche-emoji">🌿</div><div class="niche-name">Landscaping / Hardscaping</div><div class="niche-why">Patios, pools, gardens — high-ticket residential projects with great visual content. Summer seasonality = strong timing.</div><span class="niche-tag">Visual</span></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">What to research before calling each one</div>
+    <table class="compare-table">
+      <thead><tr><th>Niche</th><th>What to check</th><th>Observation to open with</th></tr></thead>
+      <tbody>
+        <tr><td>Dental / Med Spa</td><td>Website, Instagram, Google reviews</td><td>"I noticed there's no 'book online' button — for a visual treatment business, that's a big missed opportunity."</td></tr>
+        <tr><td>Roofing / HVAC</td><td>Website age, Google Maps presence, Facebook</td><td>"Your website looks like it may not have been updated in a while — and I noticed it's quite hard to find on Google Maps."</td></tr>
+        <tr><td>Solar</td><td>Website, any running ads, local reviews</td><td>"I couldn't find a dedicated page for quote requests — most solar companies are getting enquiries entirely from that kind of page."</td></tr>
+        <tr><td>Fitness Studio</td><td>Instagram, website, online booking</td><td>"You post consistently, which is great — but there's no clear link for someone to actually sign up or try a class."</td></tr>
+        <tr><td>Kitchen / Landscaping</td><td>Instagram, portfolio, website enquiry form</td><td>"Your project photos are genuinely impressive — but I couldn't find a way to request a quote from your Instagram profile."</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(5)">← Back</button>
+    <button class="btn btn-primary" onclick="go(7)">Next: Your Role →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 7: YOUR ROLE ════════════════════════════════════ -->
+<div class="module" id="mod7">
+  <div class="mod-eyebrow">The Role — Part 2</div>
+  <div class="mod-title">Your Role & The Cold Call</div>
+  <div class="mod-intro">Everything before this was context. This is the job. Your role is to research, observe, call, and book — and this module tells you exactly how to do each step.</div>
+
+  <div class="section">
+    <div class="section-title">Your single measure of success</div>
+    <p>You are not closing deals. You are not explaining every service. You are not convincing anyone of anything in depth. Your one goal: <strong>get a qualified business owner to agree to a 20-minute Growth Opportunity Review with our growth consultant.</strong></p>
+    <p>The growth consultant handles everything after that — the strategy, the diagnosis, the proposal, the close. Your job ends when they say yes to the meeting.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Before every call — the 3-point research check</div>
+    <div class="callout accent">
+      <div class="callout-title">Always do this before picking up the phone</div>
+      <strong>1. Their website</strong> — Does it look professional? Is there a clear CTA? Does it work on mobile? Is there a booking or quote form?<br><br>
+      <strong>2. Their social media</strong> — Are they posting regularly? How much engagement? Do posts have a CTA? Is there a link to book or enquire?<br><br>
+      <strong>3. Their Google Maps listing</strong> — Are they on Google Maps? How many reviews? Are they responding to them?<br><br>
+      Log <strong>one specific, genuine observation</strong> before you call. Something you actually saw. This is what separates a credible opener from a generic pitch.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">The call framework</div>
+    <div class="script-box">
+      <div class="script-label">Growth Opportunity Review — Cold Call Framework</div>
+      <div class="script-body">
+        <strong>1. Opening — establish you're not wasting their time</strong>
+        "Hi, am I speaking with the person who handles the marketing for [Business Name]? My name is Suliyat — I'm calling because I was looking at your business online and noticed something I thought might be worth a quick mention. Have I caught you at a bad time?"
+        <strong>2. Specific observation — prove you actually looked</strong>
+        "I noticed that [genuine, specific thing you found — e.g., 'you have some great reviews on Google but I couldn't find a way to book an appointment directly from your website — someone coming from a search would have to call or email separately']. I might be missing something — is that something you've looked at?"
+        <strong>3. Listen and qualify — let them talk</strong>
+        Let them respond. Then ask: "How are you currently getting most of your new customers?" — and listen carefully. Their answer tells you everything about what they need.
+        <strong>4. Introduce the offer — one sentence, then stop</strong>
+        "That's helpful — the reason I ask is we help businesses in [their sector] build a proper system for attracting new customers through paid ads, a dedicated landing page, and automated email follow-up. We're offering a small number of free Growth Opportunity Reviews for businesses in your area at the moment."
+        <strong>5. Ask for the meeting — two options, no friction</strong>
+        "It would only be 20 minutes with our growth consultant — you'd walk away with two or three specific things you could act on, whether or not we work together. Would Tuesday at 11am or Wednesday at 2pm suit you better?"
+        <strong>6. Book it immediately — do not leave this open</strong>
+        "Perfect — I'll get that booked now and send you the details. Could I take your email?" [Book it while they're on the phone. Send confirmation before you hang up.]
+      </div>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">Why we offer two specific times</div>
+    "When are you free?" puts all the work on them and creates friction. Two specific times make the decision easy — A or B. Always book the meeting while still on the call. Not "I'll send you a link." Book it. Send the confirmation. Then end the call.
+  </div>
+
+  <div class="section">
+    <div class="section-title">The rules that matter more than any script</div>
+    <ol class="step-list">
+      <li class="step-item"><span class="step-num no">✗</span><div class="step-content"><div class="step-title">Never invent a problem</div><div class="step-desc">If their website is fine, say so. If they have a booking system, acknowledge it. Lying for a booking damages trust and the brand. Only work with what's genuinely there.</div></div></li>
+      <li class="step-item"><span class="step-num no">✗</span><div class="step-content"><div class="step-title">Never pretend to have done research you haven't</div><div class="step-desc">If you say "I looked at your Instagram" — you must have actually looked. They will sometimes ask a specific question about it. Be ready.</div></div></li>
+      <li class="step-item"><span class="step-num no">✗</span><div class="step-content"><div class="step-title">Never list every service</div><div class="step-desc">Don't say "we do websites, social media, ads, email, video, apps..." It sounds like a pitch and shuts people down. One observation, one offer, one meeting.</div></div></li>
+      <li class="step-item"><span class="step-num yes">✓</span><div class="step-content"><div class="step-title">Let them speak — silence is information</div><div class="step-desc">The more a prospect talks, the better. Their words tell you what problems they have, what they've tried, and what they care about. Ask and then be quiet.</div></div></li>
+      <li class="step-item"><span class="step-num yes">✓</span><div class="step-content"><div class="step-title">Call from a position of value</div><div class="step-desc">You've read this guide. You know what an empty dental diary means for that practice. Call like someone who has something genuinely important to share — because you do.</div></div></li>
+    </ol>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Cold Calling & Getting Meetings</div>
+    <div class="yt-hours">~4 hours total — this section is your job. Give it as much time as it takes.</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=cold+calling+live+calls+masterclass+real+examples+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Cold calling masterclass — live recorded calls with commentary <span class="yt-duration">~1 hr</span></div><div class="yt-meta">Find a channel that plays real calls and then breaks them down. Hearing how the conversation actually flows — the hesitation, the pauses, the redirects — prepares you for what it really sounds like. This is irreplaceable.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+open+a+cold+call+without+getting+hung+up+on+opener" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to open a cold call without getting hung up on <span class="yt-duration">~25 min</span></div><div class="yt-meta">The first 10 seconds make or break every call. This video focuses on exactly that — the opener, the pattern interrupt, how to get the person to actually listen.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+research+a+prospect+before+cold+calling+sales+prep" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to research a business before cold calling — step by step <span class="yt-duration">~20 min</span></div><div class="yt-meta">Finding the right specific observation before you call is half the work. This video shows you exactly what to look for and how to use it to open the conversation.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+book+meetings+over+phone+cold+calling+appointment+setting" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to book meetings over the phone — appointment setting <span class="yt-duration">~35 min</span></div><div class="yt-meta">Booking is your only goal. Not selling, not explaining everything — just getting a calendar slot. This video focuses specifically on that skill.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=cold+calling+local+business+real+examples+scripts+B2B" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Cold calling local businesses — real scripts and live examples <span class="yt-duration">~45 min</span></div><div class="yt-meta">Focus on channels where they call local service businesses specifically — roofers, dentists, contractors. The closer the niche to ours, the more directly useful the examples.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=voice+tonality+sales+confidence+cold+calling+how+to+sound" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Voice, tonality and confidence on sales calls <span class="yt-duration">~22 min</span></div><div class="yt-meta">How you say something matters as much as what you say. Pace, warmth, confidence, not rushing — this video is specifically about the voice side of calling. Underrated.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=how+to+follow+up+after+cold+call+no+response+strategy" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">How to follow up after a cold call — the right way <span class="yt-duration">~18 min</span></div><div class="yt-meta">Most leads need 3–7 touchpoints before they convert. This video shows you how to follow up without being annoying — and how to stay in control of the next step.</div></div></a>
+    </div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(6)">← Back</button>
+    <button class="btn btn-primary" onclick="go(8)">Next: Objections →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 8: OBJECTIONS ══════════════════════════════════ -->
+<div class="module" id="mod8">
+  <div class="mod-eyebrow">The Role — Part 3</div>
+  <div class="mod-title">Handling Objections</div>
+  <div class="mod-intro">Every call will have hesitation. Most of it is the same 7 objections. Know the response to each before you pick up the phone. Click each to reveal the response.</div>
+
+  <div class="callout mindset">
+    <div class="callout-title">The mindset for objections</div>
+    Remember: an objection is not a rejection. It's a question in disguise. "We already have someone doing this" means "convince me you're different." "We tried ads before" means "I got burned — can I trust you?" Your job isn't to steamroll objections. It's to acknowledge them honestly and redirect to the meeting.
+  </div>
+
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"We already have a marketing agency / someone doing this."</div>
+    <div class="obj-a"><strong>Response:</strong> "That's great — are they running paid ads for you, or more organic management?" [Let them answer.] "The reason I ask is most businesses we speak to have some marketing support but haven't built a dedicated system where ads, a landing page, and automated email follow-up all work together as one pipeline. It might be completely covered — that's exactly what we'd clarify on the review call. Worth 20 minutes to know for certain, either way?"</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"I'm not interested."</div>
+    <div class="obj-a"><strong>Response:</strong> "That's completely fair — can I ask, is it the timing, or is it more that you've tried marketing before and it hasn't delivered?" [If timing:] "Understood — when would be a better time to follow up, if at all?" [If bad experience:] "I hear that a lot actually. The most common thing we hear is that someone tried ads or a website and it just didn't bring in customers. Usually that's because the pieces weren't connected properly — but I won't push. If the timing isn't right, that's fine."</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"How much does it cost?"</div>
+    <div class="obj-a"><strong>Response:</strong> "It really depends on what the business needs — which is exactly what the review is for. What I can say is we're not a big agency with big agency fees. We work specifically with local businesses and we're built to prove value before asking for a commitment. The review itself is free and there's no obligation at the end of it."</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"How do I know you can actually deliver results?"</div>
+    <div class="obj-a"><strong>Response:</strong> "That's exactly the right question to ask — and I respect it. Honest answer: we're actively building case studies right now, which is why we're offering a limited number of free reviews — we want to prove the system with businesses in your sector before asking for full fees. We're not asking you to commit to anything. We're saying: let us show you, in 20 minutes, exactly what we'd do for your business. If it makes sense, great. If not, you've lost nothing."</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"I don't have time / I'm too busy right now."</div>
+    <div class="obj-a"><strong>Response:</strong> "I completely understand — when do things usually quieten down a bit for you? Is it after Christmas, or is there a better month?" [Get a timeframe.] "Can I follow up then? I'll make a note and reach out at a better time." [Log the date. Call exactly when you said.]</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"Send me an email first and I'll have a look."</div>
+    <div class="obj-a"><strong>Response:</strong> "Absolutely — what's the best address for you?" [Get it.] "I'll send that over today. One thing — emails do sometimes get buried. If I don't hear back in a couple of days, would it be okay if I gave you a quick follow-up call?" [Always stay in control of the next step.]</div>
+  </div>
+  <div class="obj-block" onclick="toggleObj(this)">
+    <div class="obj-q">"We tried Facebook Ads before and they didn't work."</div>
+    <div class="obj-a"><strong>Response:</strong> "That's actually the most common thing we hear — and the reason ads usually don't work isn't the ads themselves. It's that the ad and the landing page aren't built as a connected system. Most people boost a post to their existing followers with no dedicated page to send them to — and then wonder why nothing converts. That's not really running ads. Would you be open to hearing what we'd do differently? That's exactly what the 20-minute review covers."</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">After any objection — always redirect to the meeting</div>
+    You're not trying to win an argument. You're trying to lower the stakes enough that they agree to 20 minutes. "No obligation," "nothing to lose," "you'll walk away with something useful regardless" — these are your tools. Keep the ask small.
+  </div>
+
+  <div class="section">
+    <div class="section-title">📺 Watch these — Objection Handling</div>
+    <div class="yt-hours">~2 hr 30 min total</div>
+    <div class="yt-list">
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=cold+call+objection+handling+live+examples+real+calls+2024" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Objection handling on cold calls — live recorded examples <span class="yt-duration">~40 min</span></div><div class="yt-meta">Find one with real call recordings, not just roleplay. Seeing how it actually sounds when someone handles "we're not interested" without panicking is the whole point of this one.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=not+interested+cold+call+objection+how+to+respond+without+being+pushy" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">"Not interested" — how to respond without being pushy <span class="yt-duration">~15 min</span></div><div class="yt-meta">This will be your most common objection. You'll hear it 10 times a day. Know at least 3 genuine, non-pushy ways to respond before you make a single call.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=we+already+have+marketing+agency+cold+call+objection+response+sales" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">"We already have someone doing this" — what to say <span class="yt-duration">~12 min</span></div><div class="yt-meta">This objection doesn't mean they're happy with what they have. It means you need to ask the right questions. This video teaches you how to dig without pushing.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=send+me+an+email+cold+call+objection+handle+stall+tactic" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">"Send me an email" — is it a real request or a brush-off? <span class="yt-duration">~10 min</span></div><div class="yt-meta">Sometimes it's genuine. Sometimes it's a polite way to end the call. This video tells you how to tell the difference — and what to do in both cases.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=advanced+objection+handling+masterclass+cold+calling+sales+training" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">Advanced objection handling masterclass — full training <span class="yt-duration">~55 min</span></div><div class="yt-meta">Once you've got the basics, this takes you further. Watch this after you've done your first week of calls — you'll understand it at a completely different level once you've heard the objections for real.</div></div></a>
+      <a class="yt-item" href="https://www.youtube.com/results?search_query=we+tried+marketing+ads+before+didn't+work+sales+objection+response+overcome" target="_blank" rel="noopener"><div class="yt-icon">▶</div><div class="yt-content"><div class="yt-title">"We tried advertising before and it didn't work" — the response <span class="yt-duration">~15 min</span></div><div class="yt-meta">This objection will come up constantly in the niches we target. Businesses that have burned money on bad ads are cautious — understandably. This video shows you how to acknowledge that and reframe it with confidence.</div></div></a>
+    </div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(7)">← Back</button>
+    <button class="btn btn-primary" onclick="go(9)">Take the Final Quiz →</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 9: FINAL QUIZ ══════════════════════════════════ -->
+<div class="module" id="mod9">
+  <div class="mod-eyebrow">Final Assessment</div>
+  <div class="mod-title">Knowledge Check</div>
+  <div class="mod-intro">10 questions covering everything in this guide. You need 8/10 or higher before you start making calls. Take your time. Look back at modules if you need to.</div>
+
+  <div class="quiz-section">
+    <div class="quiz-title">Final Assessment — 10 Questions</div>
+    <div class="quiz-subtitle">All modules covered. Score 8/10 or above to pass.</div>
+    <div id="qfinal"></div>
+    <button class="quiz-submit" id="subfinal" onclick="checkFinal()">Submit for Score</button>
+    <div class="quiz-score" id="scorefinal"></div>
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(8)">← Back</button>
+  </div>
+</div>
+
+<!-- ══ MODULE 10: LEAD SHEET ══════════════════════════════════ -->
+<div class="module" id="mod10">
+  <div class="mod-eyebrow">Your Tools</div>
+  <div class="mod-title">The Lead Sheet</div>
+  <div class="mod-intro">The lead sheet is the Excel file the team shares with you. It's your list of businesses to research and call. Open it before every session — all your prospects are already in there. Below is a per-call notes form you can use alongside it.</div>
+
+  <div class="callout accent">
+    <div class="callout-title">How the lead sheet works</div>
+    The team maintains an Excel spreadsheet with businesses in our target niches — name, website, phone number, niche, and any notes. Before each practical exercise and before each real call session, open the sheet, pick your next business, and do your 3-point research (website → social media → Google Maps) before you dial. Do not call without researching first.
+  </div>
+
+  <div class="section">
+    <div class="section-title">Per-Call Notes (use alongside the sheet)</div>
+    <p style="font-size:14px;margin-bottom:16px;">Fill this in as you go — before the call (research + opening line) and during it (outcome + notes). You can print it or fill it in on screen.</p>
+    <form class="ls-form" onsubmit="return false">
+      <div class="ls-row">
+        <div class="ls-group"><label>Business name</label><input class="ls-input" type="text" placeholder="e.g. Bright Smiles Dental, Manchester"></div>
+        <div class="ls-group"><label>Owner / decision-maker</label><input class="ls-input" type="text" placeholder="Name if you can find it"></div>
+      </div>
+      <div class="ls-row">
+        <div class="ls-group"><label>Phone number</label><input class="ls-input" type="text" placeholder="The number you'll call"></div>
+        <div class="ls-group"><label>Website URL</label><input class="ls-input" type="text" placeholder="Their website address"></div>
+      </div>
+
+      <div class="ls-group"><label>Website — what did you notice?</label><textarea class="ls-textarea" placeholder="Does it have a clear CTA? Does it show up on mobile? Is there a quote or booking form? Does it look active and current?"></textarea></div>
+      <div class="ls-group"><label>Social media — what did you find?</label><textarea class="ls-textarea" placeholder="Last post date, engagement level, any CTA or booking link? What platform are they on?"></textarea></div>
+      <div class="ls-group"><label>Google Maps — what did you find?</label><textarea class="ls-textarea" placeholder="Rating, number of reviews, recent reviews? Are they verified? Any photos?"></textarea></div>
+
+      <div class="ls-group">
+        <label>One specific opening observation I'll use</label>
+        <textarea class="ls-textarea" placeholder="Write this out before you dial. Based on your research — what's the ONE genuine, specific thing you'll open with? Be specific. Not 'your website could be better' — something like 'I noticed you don't have a way for people to book directly from your website.'"></textarea>
+      </div>
+
+      <div class="ls-group">
+        <label>Call outcome</label>
+        <div class="ls-outcome">
+          <label><input type="radio" name="outcome"> ✅ Booked — Growth Opportunity Review</label>
+          <label><input type="radio" name="outcome"> 📅 Callback — follow up later</label>
+          <label><input type="radio" name="outcome"> 🕐 Not now — asked to try again in future</label>
+          <label><input type="radio" name="outcome"> ❌ Not interested</label>
+          <label><input type="radio" name="outcome"> 📵 No answer / gatekeeper</label>
+        </div>
+      </div>
+
+      <div class="ls-group"><label>Callback date / time (if applicable)</label><input class="ls-input" type="text" placeholder="e.g. Tuesday 14 Nov, 10am"></div>
+      <div class="ls-group"><label>Notes from the call</label><textarea class="ls-textarea" placeholder="Key things they said. Objections they raised. What worked, what didn't. Anything useful for next time."></textarea></div>
+      <div class="ls-group"><label>Follow-up action</label><textarea class="ls-textarea" placeholder="What happens next? Do you follow up? Did you book them? What did you promise to send or check?"></textarea></div>
+
+      <div>
+        <button class="ls-print" onclick="window.print()">🖨️ Print this sheet</button>
+        <button class="ls-reset" onclick="this.closest('form').reset()">↺ Clear for next call</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">Before every call</div>
+    Open the lead sheet → pick a business → research their website, social media, and Google Maps → write your opening observation in the box above <em>before</em> you dial. Not during. When the phone rings you should already know exactly what you're going to say.
+  </div>
+
+  <div class="mod-nav">
+    <button class="btn btn-ghost" onclick="go(9)">← Back to Final Quiz</button>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+let visited=new Set([0]);let current=0;const TOTAL=10;
+function go(n){
+  const prev=document.getElementById('mod'+current);if(prev)prev.classList.remove('active');
+  const next=document.getElementById('mod'+n);if(next)next.classList.add('active');
+  current=n;
+  if(n<=9)visited.add(n);
+  document.querySelectorAll('.nav-btn').forEach(b=>{const m=parseInt(b.dataset.m);b.classList.toggle('active',m===n);if(m!==n&&visited.has(m)&&m<=9)b.classList.add('done');if(m===n)b.classList.remove('done');});
+  document.getElementById('progFill').style.width=Math.min(100,Math.round((visited.size/TOTAL)*100))+'%';
+  window.scrollTo(0,0);
+}
+function handleUpload(inp,statusId){const el=document.getElementById(statusId);if(inp.files&&inp.files[0]){el.textContent='✓ '+inp.files[0].name+' — ready to send';el.style.color='var(--accent2)';}}
+function toggleObj(el){el.classList.toggle('open');}
+
+const quizData={
+  q2:[
+    {q:"A prospect says 'we already have a website.' What's the most useful follow-up question?",opts:["'When did you last update it — is everything still accurate and current?'","'Is it ranking well on Google? Are people actually finding you in local searches?'","'Does it actually bring in new enquiries, or is it more of an online brochure that people visit once and leave?'","'Have you thought about adding a blog section — that can really help with your online visibility?'"]},
+    {q:"What is the main advantage of a landing page over a full website when running paid ads?",opts:["A landing page ranks higher on Google because its focused, topic-specific structure is preferred by search algorithms","Landing pages build more trust with visitors because their clean, simple design signals a more professional business","A landing page has one clear goal with no distractions — so far more visitors take the specific action the ad was designed to produce","Landing pages are faster to update than full websites, so you can adjust your offer or pricing much more quickly"]},
+    {q:"Which of these best describes 'above the fold'?",opts:["The navigation bar and logo at the very top — the branding area every visitor sees as soon as they land","Content that is visible without scrolling — whatever someone sees the moment a page loads, before moving down at all","The most important section of the page, typically the third or fourth block where the main offer is explained in full","The headline and subheadline at the very top — the first actual words a visitor reads when they arrive on the page"]}
+  ],
+  q3:[
+    {q:"Fiona's CrossFit gym has 1,400 Instagram followers but her posts reach only about 42 people. What's most likely causing this?",opts:["Organic reach has dropped significantly — Instagram now shows posts to roughly 2–5% of your followers without paid promotion","Instagram's algorithm prioritises accounts that post Stories and Reels daily — static posts have almost zero organic reach now","Fitness content is specifically restricted on Instagram due to advertising and health guidelines, limiting how widely it distributes","Her followers are mostly from outside her local area, so the algorithm reduces how often her posts appear to nearby people"]},
+    {q:"What combination of things actually makes a social media post convert viewers into paying customers?",opts:["Posting consistently — at least five times a week so the algorithm picks up the account and increases reach over time","Using trending audio and relevant hashtags so the content is discovered by people who don't already follow the account","A strong opening that stops the scroll, content that addresses the viewer's actual problem, and one clear next step","Focusing on video — Reels and short-form video get at least three times more reach than photos on every major platform"]},
+    {q:"You check a prospect's Facebook before a call. They post three times a week but get 4–6 likes from 900 followers. What's the strongest opening observation?",opts:["'I saw you're posting consistently — but your engagement is quite low. Have you tested different types of content or posting times?'","'I noticed there's no way for someone visiting your page to actually book or enquire — no link, no CTA, nothing.'","'Your visuals look a bit informal compared to other businesses in your area — professional photography would make a real difference.'","'You're active on Facebook, but one of your competitors nearby is posting more and seems to be getting much stronger engagement.'"]}
+  ],
+  q4:[
+    {q:"Kevin the roofer spent £50 on Facebook Ads, got 400 reach and 2 clicks. What most likely went wrong?",opts:["Facebook Ads need a minimum of £500/month — below that, the algorithm doesn't have enough data to learn and optimise properly","He boosted a post to the wrong objective with no dedicated landing page and creative that didn't stop the scroll — several things failed at once","He targeted too broad an audience, which meant the ads appeared to people outside his service area with no interest in roofing","Facebook's ad review system likely flagged his content and restricted how widely it was shown during the campaign"]},
+    {q:"What is retargeting?",opts:["Running your ads across multiple platforms at once — Facebook, Instagram and TikTok — to reach as many different people as possible","Adjusting your targeting every week based on which audiences responded best, so your budget becomes more efficient over time","Showing ads to people who have already visited your website or interacted with your content — because they convert far better than cold audiences","Using a lookalike audience built from your existing customers to find new people who share similar characteristics and buying intent"]},
+    {q:"A prospect asks how much they need to spend on ads. What's the right response?",opts:["Give a realistic range for their niche — roofing typically runs £600–900/month in ad spend to generate consistent leads","Explain that £300/month is the minimum effective budget on Meta — below that, the algorithm can't optimise and results are unreliable","Redirect it to the review call — the answer depends entirely on their goals and setup, which is exactly what the review is designed to work out","Be transparent: clients in our niches typically see strong results at £500–800/month in ad spend, separate from our management fee"]}
+  ],
+  q5:[
+    {q:"A prospect fills in a landing page form but doesn't book. Without a follow-up email sequence, what typically happens?",opts:["Their details go into the CRM and an automatic task is created for the business to call them back within 48 hours","Most businesses do nothing — the lead goes cold and the money spent to bring that person to the page is simply lost","The prospect usually comes back on their own within a few days once they've compared other options and made their decision","The business owner or receptionist typically follows up by phone within a day or two using the contact details provided"]},
+    {q:"What does the 'leaking bucket' analogy describe in digital marketing?",opts:["A paid ad campaign that exhausts its budget before the month ends, cutting off lead flow mid-campaign","A website that drives high traffic but has a poor conversion rate — people arrive but leave without taking any action","Spending money to bring leads in while losing most of them because there's no follow-up system in place to convert them","Social media posts that reach fewer people over time as the algorithm gradually reduces their organic distribution"]},
+    {q:"How many emails are in the Nowagie Ops standard nurture sequence, and over how many days?",opts:["3 emails over 7 days","5 emails over 14 days","7 emails over 30 days","10 emails over 21 days"]}
+  ]
+};
+
+const finalQuestions=[
+  {q:"Before calling any business, what three things should you always check?",opts:["Their business size, how long they've been trading, and whether they currently run any paid advertising","Their website, social media presence, and Google Maps listing — so you have one specific, genuine observation ready before you dial","Their main services, approximate pricing, and what their target customer looks like — so you can position the pitch accurately","Their contact details, the name of the decision-maker, and their current opening hours — so you don't waste either person's time"],ans:1},
+  {q:"In the Nowagie Ops model, who is the 'growth consultant'?",opts:["The person who manages all the paid ad campaigns and reports back to clients on performance each month","The person who builds the landing pages, sets up the GoHighLevel workflows, and delivers the technical fulfilment","The person who takes the meeting after Suliyat books it, diagnoses the business, presents a strategy, and closes the deal","The person who trains new telemarketers and reviews call quality to improve the team's conversion rate"],ans:2},
+  {q:"A prospect says 'We tried Facebook Ads before and they didn't work.' What is the right response?",opts:["'That's fair — most agencies run ads without the right foundation. Our approach is different because we focus on the full funnel, not just the creative.'","Acknowledge it, explain that ads almost always fail when the ad, landing page, and follow-up aren't built as one connected system, and redirect to the review call","'Interesting — how much were you spending and what were they targeting? I'd like to understand exactly what went wrong so we can compare it to what we'd do.'","'A lot of businesses have that experience — that's actually why we focus heavily on email follow-up and landing pages rather than just running ads.'"],ans:1},
+  {q:"Why is a landing page more effective than a homepage when running paid ads?",opts:["A landing page builds more trust because its clean, focused design signals that the business is professional and serious","A landing page has one clear goal and no navigation or distractions — so far more visitors take the specific action the ad was designed to produce","Landing pages load significantly faster than full websites, and page speed is one of the biggest factors in whether a visitor stays or leaves","Landing pages rank higher in Google for specific searches because they're focused on one topic, rather than covering everything like a homepage"],ans:1},
+  {q:"What does ROAS mean and what does it measure?",opts:["Reach of Ad Spend — how many people saw your ad per £1 spent, which tells you how efficiently your audience is being targeted","Return on Ad Spend — how much revenue was generated for every £1 invested in advertising, the core measure of whether ads are actually profitable","Rate of Ad Success — the percentage of ad impressions that resulted in a click, also commonly called the click-through rate","Relevance of Ad Score — a quality metric Meta assigns to your ads based on how well-matched they are to your chosen audience"],ans:1},
+  {q:"You're calling a roofing company. Their Facebook page hasn't been updated in four months. What's the strongest opening observation?",opts:["'I noticed you've been active on Facebook in the past, but haven't posted recently — is that because you've been busy with jobs, or have you been trying a different approach?'","'I noticed your Facebook page has been quiet for a few months — for a service business where people check your social proof before calling, that gap can make prospects choose someone else instead.'","'I had a look at your Google Maps listing and noticed your competitors nearby have quite a few more reviews — that could be affecting how often you show up in local searches.'","'Your website explains your services clearly, but I couldn't find a way for someone visiting it to actually request a quote or get in touch directly.'"],ans:1},
+  {q:"What happens in Email 3 of the 5-email nurture sequence, and when does it go out?",opts:["An educational email explaining the specific service the prospect enquired about and why it's the right solution for a business like theirs — sent on Day 3","A story-based email featuring a customer in a similar situation, showing the transformation that was possible — sent on Day 5 to build trust through social proof","A re-engagement email with a clear call-to-action — a direct invitation to book a call before you move on — sent on Day 7 to create urgency","A summary email answering the two or three most common questions prospects ask before committing, with a soft call-to-action — sent on Day 3"],ans:1},
+  {q:"A business owner says 'I'm not interested.' What should you NOT do?",opts:["Ask whether it's a timing issue — maybe they're mid-project or short-staffed — and offer to check back in a couple of months","Acknowledge their position and pivot to a smaller ask: 'Completely understood — would it be okay if I sent a one-page overview just in case it's useful?'","Share a relevant result from a similar business in their area, because the right example sometimes changes the conversation — and keep going until they engage","Thank them for their time and ask whether they'd prefer you kept them on your list for a later follow-up or took them off completely"],ans:2},
+  {q:"Why should you call from a position of genuine conviction rather than apologising for calling?",opts:["Confident-sounding callers project authority, and authority triggers compliance — business owners are simply more likely to say yes to someone who sounds sure of themselves","These businesses genuinely need what we offer — a roofer who can't fill his diary, a dental clinic with empty slots. Calling with that understanding means you're not interrupting — you're helping.","It removes the awkwardness from the call — when you're not apologising for reaching out, the conversation feels more natural and less transactional for both parties","Business owners are trained to detect desperation — calling from a place of value rather than need means you're less likely to be dismissed before you've had the chance to make your point"],ans:1},
+  {q:"What is the correct process once a prospect says yes to a Growth Opportunity Review?",opts:["Send them a calendar link so they can choose a time that suits them — it's more convenient and tends to reduce no-shows","Offer two specific times, confirm one while they're still on the call, and send the calendar invite before the conversation ends","Take their email address and preferred days, then pass the details to the growth consultant to confirm the booking directly with them","Lock in their interest, then follow up within 24 hours with a booking link and a short intake form to help prepare for the review"],ans:1}
+];
+
+function buildQuiz(containerId,questions){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.innerHTML=questions.map((item,qi)=>`
+    <div class="quiz-q" id="${containerId}_q${qi}">
+      <div class="quiz-q-text">${qi+1}. ${item.q}</div>
+      <div class="quiz-options">
+        ${item.opts.map((opt,oi)=>`
+          <label class="quiz-opt" id="${containerId}_q${qi}_o${oi}" onclick="selectOpt('${containerId}',${qi},${oi})">
+            <input type="radio" name="${containerId}_q${qi}" value="${oi}"> ${opt}
+          </label>`).join('')}
+      </div>
+      <div class="quiz-feedback" id="${containerId}_q${qi}_fb"></div>
+    </div>`).join('');
+}
+
+function selectOpt(qid,qi,oi){
+  document.querySelectorAll(`#${qid}_q${qi} .quiz-opt`).forEach(o=>o.classList.remove('selected'));
+  document.getElementById(`${qid}_q${qi}_o${oi}`).classList.add('selected');
+}
+
+function checkQuiz(qid,btn,answers,scoreId){
+  const questions=quizData[qid];
+  let correct=0;
+  questions.forEach((item,qi)=>{
+    const sel=document.querySelector(`input[name="${qid}_q${qi}"]:checked`);
+    const fb=document.getElementById(`${qid}_q${qi}_fb`);
+    const opts=document.querySelectorAll(`#${qid}_q${qi} .quiz-opt`);
+    const right=answers[qi][0];
+    opts.forEach(o=>o.classList.remove('selected','correct','wrong'));
+    if(!sel){fb.textContent='Please select an answer.';fb.className='quiz-feedback err';return;}
+    const chosen=parseInt(sel.value);
+    document.getElementById(`${qid}_q${qi}_o${right}`).classList.add('correct');
+    if(chosen===right){correct++;fb.textContent='✓ Correct.';fb.className='quiz-feedback ok';}
+    else{document.getElementById(`${qid}_q${qi}_o${chosen}`).classList.add('wrong');fb.textContent='✗ Incorrect — correct answer highlighted.';fb.className='quiz-feedback err';}
+  });
+  btn.disabled=true;
+  const scoreEl=document.getElementById(scoreId);
+  scoreEl.style.display='block';
+  if(correct>=2){scoreEl.className='quiz-score pass';scoreEl.textContent=`${correct}/${questions.length} — Good. Move on.`;}
+  else{scoreEl.className='quiz-score fail';scoreEl.textContent=`${correct}/${questions.length} — Review the module and retake.`;}
+}
+
+function checkFinal(){
+  let correct=0;
+  finalQuestions.forEach((item,qi)=>{
+    const sel=document.querySelector(`input[name="qfinal_q${qi}"]:checked`);
+    const fb=document.getElementById(`qfinal_q${qi}_fb`);
+    const opts=document.querySelectorAll(`#qfinal_q${qi} .quiz-opt`);
+    opts.forEach(o=>o.classList.remove('selected','correct','wrong'));
+    if(!sel){fb.textContent='Please select an answer.';fb.className='quiz-feedback err';return;}
+    const chosen=parseInt(sel.value);
+    document.getElementById(`qfinal_q${qi}_o${item.ans}`).classList.add('correct');
+    if(chosen===item.ans){correct++;fb.textContent='✓ Correct.';fb.className='quiz-feedback ok';}
+    else{document.getElementById(`qfinal_q${qi}_o${chosen}`).classList.add('wrong');fb.textContent='✗ Incorrect.';fb.className='quiz-feedback err';}
+  });
+  document.getElementById('subfinal').disabled=false;
+  const scoreEl=document.getElementById('scorefinal');
+  scoreEl.style.display='block';
+  if(correct>=8){
+    scoreEl.className='quiz-score pass';scoreEl.textContent=`${correct}/10 — Excellent. You are ready to start making calls.`;
+    fetch('/nowagie-onboarding/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({score:correct})})
+      .then(r=>r.json()).then(result=>{if(result.ok){window.setTimeout(()=>{window.location.href=result.redirect},1200)}}).catch(()=>{});
+  }
+  else if(correct>=6){scoreEl.className='quiz-score fail';scoreEl.textContent=`${correct}/10 — Close. Review the modules you struggled with and retake.`;}
+  else{scoreEl.className='quiz-score fail';scoreEl.textContent=`${correct}/10 — Go back through the full guide before making calls.`;}
+}
+
+Object.keys(quizData).forEach(k=>buildQuiz(k,quizData[k]));
+buildQuiz('qfinal',finalQuestions.map(q=>({q:q.q,opts:q.opts})));
+</script>
+
+</body></html>

@@ -141,6 +141,7 @@ const CHECKIN_PATHS = ['/checklist', '/submit', '/submitted'];
 // POST /login and /choose-company) before anything else is gated — this
 // page has to stay reachable even though trainingCompleted isn't set yet.
 const COMPANY_CHOICE_PATH = '/choose-company';
+const NOWAGIE_ONBOARDING_PATH = '/nowagie-onboarding';
 
 // The NowagieOps academy launches on this date — not "whenever someone
 // first logs in and picks NowagieOps." Before it arrives she can still work
@@ -180,7 +181,10 @@ async function requireAuth(req, res, next) {
   // launch date arrives, at which point it's the same hard block as always.
   const nowagiePrelaunch = isNowagie && today() < NOWAGIE_ACADEMY_START_DATE;
   if (!nowagiePrelaunch && !req.session.trainingCompleted && !req.path.startsWith(trainingPath) && req.path !== '/sign-out'
-      && !CHECKIN_PATHS.includes(req.path)) {
+      && !req.path.startsWith(NOWAGIE_ONBOARDING_PATH) && !CHECKIN_PATHS.includes(req.path)) {
+    if (isNowagie && !req.session.nowagieOnboardingCompleted) {
+      return redirectToGate(NOWAGIE_ONBOARDING_PATH);
+    }
     return redirectToGate(trainingPath);
   }
 
@@ -292,9 +296,14 @@ app.post('/login', async (req, res) => {
   req.session.activeCompany = (marketer.role === 'telemarketer' && marketer.works_nowagieops) ? 'nowagieops' : 'dashspid';
   await enterActiveCompany(req);
 
-  const redirectTo = req.session.trainingCompleted
-    ? '/home'
-    : (req.session.activeCompany === 'nowagieops' ? '/nowagie-training' : '/training');
+  let redirectTo;
+  if (req.session.activeCompany === 'nowagieops' && !req.session.nowagieOnboardingCompleted) {
+    redirectTo = NOWAGIE_ONBOARDING_PATH;
+  } else {
+    redirectTo = req.session.trainingCompleted
+      ? '/home'
+      : (req.session.activeCompany === 'nowagieops' ? '/nowagie-training' : '/training');
+  }
   if (wantsJson) return res.json({ ok: true, redirect: redirectTo });
   res.redirect(redirectTo);
 });
@@ -306,6 +315,8 @@ async function enterActiveCompany(req) {
   if (req.session.marketerRole !== 'telemarketer') {
     req.session.trainingCompleted = true; // gate only applies to telemarketers
   } else if (req.session.activeCompany === 'nowagieops') {
+    const marketer = await db.getMarketerById(req.session.marketerId);
+    req.session.nowagieOnboardingCompleted = !!marketer?.nowagie_onboarding_completed_at;
     const progress = await db.getNowagieTrainingProgress(req.session.marketerId);
     req.session.trainingCompleted = !!(progress && progress.completed_at);
   } else {
@@ -325,8 +336,31 @@ app.post(COMPANY_CHOICE_PATH, requireAuth, async (req, res) => {
   if (!['dashspid', 'nowagieops'].includes(company)) return res.redirect(COMPANY_CHOICE_PATH);
   req.session.activeCompany = company;
   await enterActiveCompany(req);
+  if (company === 'nowagieops' && !req.session.nowagieOnboardingCompleted) {
+    return res.redirect(NOWAGIE_ONBOARDING_PATH);
+  }
   const trainingPath = company === 'nowagieops' ? '/nowagie-training' : '/training';
   res.redirect(req.session.trainingCompleted ? '/home' : trainingPath);
+});
+
+app.get(NOWAGIE_ONBOARDING_PATH, requireAuth, (req, res) => {
+  if (req.session.activeCompany !== 'nowagieops') return res.redirect('/home');
+  if (req.session.nowagieOnboardingCompleted) return res.redirect('/nowagie-training');
+  const filePath = path.join(__dirname, 'Nowagie Ops — Suliyat Onboarding (1).html');
+  let html = fs.readFileSync(filePath, 'utf8');
+  html = html.replace('Welcome, Suliyat', `Welcome, ${req.session.marketerName}`);
+  res.type('html').send(html);
+});
+
+app.post(NOWAGIE_ONBOARDING_PATH + '/complete', requireAuth, async (req, res) => {
+  if (req.session.activeCompany !== 'nowagieops') return res.status(403).json({ ok: false });
+  const score = parseInt(req.body.score, 10);
+  if (!Number.isFinite(score) || score < 8 || score > 10) {
+    return res.status(400).json({ ok: false, error: 'A score of 8/10 or higher is required.' });
+  }
+  await db.completeNowagieOnboarding(req.session.marketerId, nowLagos());
+  req.session.nowagieOnboardingCompleted = true;
+  res.json({ ok: true, redirect: '/nowagie-training' });
 });
 
 // Telemarketers work from home and start a few minutes later than the

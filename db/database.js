@@ -690,6 +690,13 @@ const db = {
   // the DashSpid one so a marketer working both businesses progresses
   // through each on its own schedule.
 
+  async completeNowagieOnboarding(marketerId, completedAt) {
+    await pool.execute(
+      'UPDATE marketers SET nowagie_onboarding_completed_at = ? WHERE id = ?',
+      [completedAt, parseInt(marketerId)]
+    );
+  },
+
   async getNowagieTrainingProgress(marketerId) {
     const [rows] = await pool.execute(
       'SELECT * FROM nowagie_training_progress WHERE marketer_id = ?',

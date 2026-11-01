@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS marketers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   pin VARCHAR(20) NOT NULL,
-  active TINYINT(1) NOT NULL DEFAULT 1
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  nowagie_onboarding_completed_at DATETIME NULL
 );
 
 CREATE TABLE IF NOT EXISTS marketer_devices (
