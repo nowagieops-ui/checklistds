@@ -292,7 +292,9 @@ app.post('/login', async (req, res) => {
   req.session.activeCompany = (marketer.role === 'telemarketer' && marketer.works_nowagieops) ? 'nowagieops' : 'dashspid';
   await enterActiveCompany(req);
 
-  const redirectTo = req.session.trainingCompleted ? '/home' : '/training';
+  const redirectTo = req.session.trainingCompleted
+    ? '/home'
+    : (req.session.activeCompany === 'nowagieops' ? '/nowagie-training' : '/training');
   if (wantsJson) return res.json({ ok: true, redirect: redirectTo });
   res.redirect(redirectTo);
 });
